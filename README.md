@@ -11,23 +11,21 @@ The distinction being made is that 'ephemeral' streams only flow due directly to
 Here, we are interested in modeling how much water (and river network) will lose Clean Water Act regulation under this new ruling.
 
 ## Workflow
-- This analysis uses `targets` to pipeline the entire workflow and ensure complete reproducibility. For more on using `targets` for reproducible workflows, see [here](https://books.ropensci.org/targets/).
+- This analysis uses `targets` and static branching to pipeline the entire workflow and ensure complete reproducibility. For more on using `targets` for reproducible workflows, see [here](https://books.ropensci.org/targets/). Inputs and setup are described in the `_targets.R` script.
 
-- To run the analysis in serial, execute `tar_make()` from within the project repo. `tar_watch()` will enable a Shiny app to track progress as the analysis is performed. Inputs and setup are designated as a workflow in the `_targets.R` script. Specify the level 4 HUC basins to run using the `huc4` object within the `values` tibble.
+- To view a proper workflow dependency chart, execute `tar_visnetwork(level_separation=500)`. The result of this is also saved in `docs/dag.html`.
 
-- While this repo has not been setup to run in parallel across nodes on an HPC, it was built to run across cores on a single node within an HPC. To do this, make sure that the `clustermq` package is installed and use `tar_make_clustermq(workers = 24)` with your desired number of cores.
-
-- To view a proper workflow dependency chart, execute `tar_visnetwork()`.
-
-- The `src/aggregate.R` script will aggregate results stored as target objects into summary data frames and shapefiles (outside of the pipline) and build figures too. These shapefiles are then used in QGIS to build the maps.
-
+- ### To run
+  - **Serial:**  execute `tar_make()` from within the project repo.
+  - **Parallel on HPC:** Each HUC4 basin is setup as a pipeline branch and can be submitted as independent jobs via an HPC scheduler and the `clustermq` package. From within a small interactive session (be a good steward and don't use login nodes!!!!), execute `tar_make(clustermq(workers=x))` for however many workers you want.
+    - Make sure options is setup correctly in `_targets.R`
+    - Job specifications are detailed in `slurm.tmpl`. This only works for a SLURM scheduler.
+    - Necessary details on using `clustermq` are [here]('https://mschubert.github.io/clustermq/index.html').
 
 ## Note
-- Make sure your working directory is set to the project repo!!!
-
 - This analysis uses the `renv` package for reproducibility. It creates a private library of R packages, snapshotted at specific versions so that near complete reproducibility is possible.
 
-- `renv` is used to build R libraries for `R 4.1.2`. Only this version of R is guaranteed to work.
+- Follow `conda_setup.md` to reproduce the virtual environment used for this analysis. Note some R packages were installed outside of `renv` because of Linux library access issues when using `renv` within a conda environment...
 
 - Note that the data is stored in another repo. While the user specifies the path to this repo within `_targets.R`, there are also hard-coded sub-directories within that repo. Check the functions in `src/analysis.R` to make sure you set up the folder structure correctly.
 
