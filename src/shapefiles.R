@@ -4,23 +4,22 @@
 ## Spring 2022
 #############
 
-library(targets)
-library(dplyr)
-library(sf)
-
-#user settings------------------------------------------
-huc2 <- '11'
-path_to_data <- 'C:\\Users\\craig\\OneDrive - University of Massachusetts\\Ongoing Projects\\CONUS_CO2_prep' #path to data repo (seperate from code repo)
-
-df <- tar_read(combined_results)
-
-#svae to shapefile-----------------------------------
-basins <- st_read(paste0(path_to_data, '\\HUC2_', huc2, '\\WBD_', huc2, '_HU2_Shape\\Shape\\WBDHU4.shp')) #basin polygons
-basins <- select(basins, 'huc4')
-basins <- left_join(basins, df, by='huc4')
-
-if (!file.exists(paste0('cache/shapefiles/results_', huc2, '.shp'))){
-  st_write(basins, paste0('cache/shapefiles/results_', huc2, '.shp'))
-  } else {
-  st_write(basins, paste0('cache/shapefiles/results_', huc2, '.shp'), append=FALSE)
+saveShapefile <- function(path_to_data, codes_huc02, combined_results){
+  #read in all HUC4 basins------------------
+  basins_overall <- st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
+  for(i in codes_huc02[-1]){
+    basins <- st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
+    basins_overall <- rbind(basins_overall, basins)
   }
+
+  #join model results
+  basins_overall <- left_join(basins_overall, combined_results, by='huc4')
+
+  if (!file.exists('cache/results_fin.shp')) {
+    st_write(basins_overall, 'cache/results_fin.shp')
+    } else {
+    st_write(basins_overall, 'cache/results_fin.shp', append=FALSE)
+    }
+
+  return('see cache/results_fin.shp')
+}

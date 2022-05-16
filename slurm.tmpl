@@ -3,9 +3,12 @@
 #SBATCH --partition=cpu
 #SBATCH --output={{ log_file | /dev/null }} # you can add .%a for array index
 #SBATCH --error={{ log_file | /dev/null }}
-#SBATCH --mem-per-cpu={{ memory | 4096 }}
+#SBATCH --mem-per-cpu={{ memory | 20000 }}
 #SBATCH --array=1-{{ n_jobs }}
 #SBATCH --cpus-per-task={{ cores | 1 }}
 
-ulimit -v $(( 1024 * {{ memory | 4096 }} ))
+ulimit -v $(( 1024 * {{ memory | 20000 }} ))
 CMQ_AUTH={{ auth }} R --no-save --no-restore -e 'clustermq:::worker("{{ master }}")'
+
+
+## note that memory needs to be at least 20gb to run some of these WTD extractions...

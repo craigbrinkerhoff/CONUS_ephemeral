@@ -4,10 +4,9 @@
 ## Functions to validate EROM discharges in the NHD
 #####################
 
-#' Builds discharge verification figure for all gaged NHD reaches (that pass USGS QC/QC)
+#' Builds discharge verification figure for all gaged NHD reaches (that pass USGS QC/QC) eventually used in model validation
 #'
-#' @param USGS_data: set of USGS gauges with their observed mean annual flow and baseflow indices
-#' @param nhdGages: all USGS gages joined to the NHD a priori and filtered by the USGS using their QA/QC protocols
+#' @param combined_verify: all model verification results
 #'
 #' @return NULL but writes figures to file
 eromVerification <- function(USGS_data, nhdGages){
@@ -33,7 +32,7 @@ eromVerification <- function(USGS_data, nhdGages){
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     annotate('text', label=paste0('r2: ', round(summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.001, y=175, size=9)+
     annotate('text', label=paste0('RMSE: ', round(Metrics::rmse(assessmentDF$QDMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
-    annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=900, y=0.001, size=7, color='darkblue')+
+    annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=100, y=0.001, size=7, color='darkblue')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
     scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
@@ -51,7 +50,7 @@ eromVerification <- function(USGS_data, nhdGages){
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     annotate('text', label=paste0('r2: ', round(summary(lm(log(QEMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.001, y=175, size=9)+
     annotate('text', label=paste0('RMSE: ', round(Metrics::rmse(assessmentDF$QEMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
-    annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=900, y=0.001, size=7, color='darkblue')+
+    annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=100, y=0.001, size=7, color='darkblue')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
     scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),

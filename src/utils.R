@@ -27,11 +27,9 @@ summariseWTD <- function(wtd){
 #' @param widAHG: width~Q AHG model from Brinkerhoff et al (in review GBC)
 #'
 #' @return river width via hydraulic geometry [m]
-width_func <- function(waterbody, Q, widAHG){
-  widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #width AHG model
-
+width_func <- function(waterbody, Q, a, b){
   if (waterbody == 'River') {
-    output <- exp(widAHG$coefficients[1])*Q^(widAHG$coefficients[2])
+    output <- exp(a)*Q^(b)
   }
   else {
     output <- NA #river width makes no sense in lakes so don't do it!
@@ -48,11 +46,9 @@ return(output)
 #' @param depAHG: depth~Q AHG model from Brinkerhoff et al (in review GBC)
 #'
 #' @return channel depth via hydraulic geometry [m]
-depth_func <- function(waterbody, Q, lakeVol, lakeArea, depAHG) {
-  depAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/depAHG.rds') #depth AHG model
-
+depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
   if (waterbody == 'River') {
-    output <- exp(depAHG$coefficients[1])*Q^(depAHG$coefficients[2])
+    output <- exp(c)*Q^(f)
   }
   else {
     output <- lakeVol/lakeArea #mean lake depth [m]
@@ -87,7 +83,7 @@ perenniality_func <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, 
       if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
         return('ephemeral')
       } else{
-        return('intermittent')
+        return('nonEph')
       }
     } else{
       return('perennial')
@@ -111,11 +107,11 @@ routing_func <- function(fromNode, curr_perr, toNode_vec, perenniality_vec, orde
   if(all(is.na(upstream_reaches)) & order_vec > 1){
     return('perennial')
   }
-  else if(any(perenniality_vec[upstream_reaches] == 'perennial')) {
+  else if(any(perenniality_vec[upstream_reaches] == 'perennial')) { #if anything directly upstream is 100% perennial, then so is this river!!
     return('perennial')
   }
 #  else if(sum(Q_vec[upstream_reaches]) < curr_Q & curr_perr == 'ephemeral'){ #gaining streams must not be ephemeral. This assumes that ephemeral streams must be losing, whether that's due to evaporative or infiltration losses it doesn't matter for this classification
-#    return('intermittent')
+#    return('nonEph')
 #  }
   else{
     return(curr_perr) #otherwise, leave as is

@@ -18,12 +18,10 @@ getRivNetverify <- function(rivNetFin, nhdGages, usgs_data){
     tidyr::drop_na()
 
   #VERIFY AGAINST BASEFLOW calculated previously-------------------
-  verifyDF <- left_join(nhd_gages, rivNetFin, by='NHDPlusID') %>%
-    tidyr::drop_na() %>%
-    #mutate(baseflow_cf = ifelse(round(no_flow_fraction, 2) < 0.014, 'perennial', #Minimum 1 month dry, following our model's monthly resolution
-  #                              ifelse(round(baseflow_fraction_lynehollick_singh,2) <= 0.05, 'ephemeral','intermittent')))
-      mutate(baseflow_cf = ifelse(round(baseflow_fraction_lynehollick_singh,2) <= 0.05, 'ephemeral', 'perennial'), #Overwriting intermittent, the correct names are used in the figure function below
-            model_cf = ifelse(perenniality == 'intermittent', 'perennial', perenniality))
+  verifyDF <- left_join(rivNetFin, nhd_gages, by='NHDPlusID') %>%
+    tidyr::drop_na(baseflow_fraction_lynehollick_singh) %>%
+    mutate(baseflow_cf = ifelse(round(baseflow_fraction_lynehollick_singh,2) <= 0.03, 'ephemeral', 'perennial'), #Overwriting nonEph, the correct names are used in the figure function below
+           model_cf = ifelse(perenniality == 'nonEph', 'perennial', perenniality))
 
   if(nrow(verifyDF) == 0){
     return()
@@ -48,7 +46,7 @@ verifyModel <- function(verifyDF){
     geom_text(aes(label=Freq), size=15)+
     scale_fill_manual(values=c('#bebada', '#8dd3c7','#bebada', '#8dd3c7')) +
     labs(x = "Estimated baseflow component of\nmean annual hydrograph",y = "Model Prediction") +
-    scale_x_discrete(labels=c("<5%",">=5%")) +
+    scale_x_discrete(labels=c("<=3%",">3%")) +
     scale_y_discrete(labels=c("Not\nEphemeral","Ephemeral")) +
     theme(legend.position = "none",
           axis.text=element_text(size=24),

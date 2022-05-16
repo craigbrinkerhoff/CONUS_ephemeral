@@ -28,7 +28,7 @@ extractWTD <- function(path_to_data, huc4){
   #monthly averages for hourly model runs for 2004-2014
   wtd <- rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))
 
-    #USGS NHD
+  #USGS NHD
   dsnPath <- paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb')
   nhd <- st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
   lakes <- as.data.frame(st_read(dsn=dsnPath, layer='NHDWaterbody', quiet=TRUE)) %>%
@@ -53,16 +53,23 @@ extractWTD <- function(path_to_data, huc4){
   nhd$lakeVol_m3 <- 0.533 * (nhd$LakeAreaSqKm*1e6)^1.204 #Cael et al. 2016 function
   #Calculate and assign lake percents to each throughflow line so that we have fracVols and fracSAs for each throughflow line
     #This is based on reachLength/total throughflow line reach length
-#  sumThroughFlow <- filter(as.data.frame(nhd), is.na(WBArea_Permanent_Identifier)==0) %>%
-#    group_by(WBArea_Permanent_Identifier) %>%
-#    summarise(sumThroughFlow = sum(LengthKM))
-  #nhd <- left_join(nhd, sumThroughFlow, by='WBArea_Permanent_Identifier')
-  #nhd$lakePercent <- nhd$LengthKM / nhd$sumThroughFlow
-  #nhd$frac_lakeVol_m3 <- nhd$lakeVol_m3 * nhd$lakePercent
-  #nhd$frac_lakeSurfaceArea_m2 <- nhd$LakeAreaSqKm * nhd$lakePercent * 1e6
+  sumThroughFlow <- filter(as.data.frame(nhd), is.na(WBArea_Permanent_Identifier)==0) %>%
+    group_by(WBArea_Permanent_Identifier) %>%
+    summarise(sumThroughFlow = sum(LengthKM))
+  nhd <- left_join(nhd, sumThroughFlow, by='WBArea_Permanent_Identifier')
+  nhd$lakePercent <- nhd$LengthKM / nhd$sumThroughFlow
+  nhd$frac_lakeVol_m3 <- nhd$lakeVol_m3 * nhd$lakePercent
+  nhd$frac_lakeSurfaceArea_m2 <- nhd$LakeAreaSqKm * nhd$lakePercent * 1e6
 
-  nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$Q_cms, nhd$lakeVol_m3, nhd$LakeAreaSqKm*1e6)
-  nhd$width_m <- mapply(width_func, nhd$waterbody, nhd$Q_cms)
+  #get width and depth
+  depAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/depAHG.rds') #depth AHG model
+  widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #depth AHG model
+  nhd$a <- widAHG$coefficients[1]
+  nhd$b <- widAHG$coefficients[2]
+  nhd$c <- depAHG$coefficients[1]
+  nhd$f <- depAHG$coefficients[2]
+  nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$Q_cms, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, nhd$c, nhd$f)
+  nhd$width_m <- mapply(width_func, nhd$waterbody, nhd$Q_cms, nhd$a, nhd$b)
 
   #extract water table depths
   nhd <- vect(nhd)
@@ -214,20 +221,16 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 collectResults <- function(nhd_df, huc4){
   results_nhd <- data.frame(
     'huc4'=huc4,
-    'perennialNetworkSA' = sum(nhd_df[nhd_df$perenniality == 'perennial',]$LengthKM*nhd_df[nhd_df$perenniality == 'perennial',]$width_m*1000, na.rm=T),
+    'notEphNetworkSA' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality != 'ephemeral',]$width_m*1000, na.rm=T),
     'ephemeralNetworkSA' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m*1000, na.rm=T),
-    'intermittentNetworkSA' = sum(nhd_df[nhd_df$perenniality == 'intermittent',]$LengthKM*nhd_df[nhd_df$perenniality == 'intermittent',]$width_m*1000, na.rm=T),
-    'totalperennialQ' = sum(nhd_df[nhd_df$perenniality == 'perennial',]$Q_cms, na.rm=T),
-    'totalephmeralQ' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cm, na.rm=T),
-    'totalintermittentQ' = sum(nhd_df[nhd_df$perenniality == 'intermittent',]$Q_cm, na.rm=T))
+    'totalNotEphQ' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$Q_cms, na.rm=T),
+    'totalephmeralQ' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cm, na.rm=T))
 
-  results_nhd$percQ_eph <- results_nhd$totalephmeralQ / sum(results_nhd$totalperennialQ, results_nhd$totalephmeralQ, results_nhd$totalintermittentQ)
-  results_nhd$percQ_int <- results_nhd$totalintermittentQ / sum(results_nhd$totalperennialQ, results_nhd$totalephmeralQ, results_nhd$totalintermittentQ)
-  results_nhd$percQ_per <- results_nhd$totalperennialQ / sum(results_nhd$totalperennialQ, results_nhd$totalephmeralQ, results_nhd$totalintermittentQ)
+  results_nhd$percQ_eph <- results_nhd$totalephmeralQ / sum(results_nhd$totalNotEphQ, results_nhd$totalephmeralQ)
+  results_nhd$percQ_notEph <- results_nhd$totalNotEphQ / sum(results_nhd$totalNotEphQ, results_nhd$totalephmeralQ)
 
-  results_nhd$percSA_eph <- results_nhd$ephemeralNetworkSA / sum(results_nhd$ephemeralNetworkSA, results_nhd$intermittentNetworkSA, results_nhd$totalperennialQ)
-  results_nhd$percSA_int <- results_nhd$intermittentNetworkSA / sum(results_nhd$ephemeralNetworkSA, results_nhd$intermittentNetworkSA, results_nhd$totalperennialQ)
-  results_nhd$percSA_per <- results_nhd$totalperennialQ / sum(results_nhd$ephemeralNetworkSA, results_nhd$intermittentNetworkSA, results_nhd$totalperennialQ)
+  results_nhd$percSA_eph <- results_nhd$ephemeralNetworkSA / sum(results_nhd$ephemeralNetworkSA, results_nhd$notEphNetworkSA)
+  results_nhd$percSA_notEph <- results_nhd$notEphNetworkSA / sum(results_nhd$ephemeralNetworkSA, results_nhd$notEphNetworkSA)
 
   return(results_nhd)
 }

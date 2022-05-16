@@ -1,1 +1,0 @@
-slurmstepd-cpu002: error: *** JOB 2956845 ON cpu002 CANCELLED AT 2022-05-13T19:24:50 ***
