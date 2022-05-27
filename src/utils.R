@@ -117,3 +117,32 @@ routing_func <- function(fromNode, curr_perr, toNode_vec, perenniality_vec, orde
     return(curr_perr) #otherwise, leave as is
   }
 }
+
+perenniality_func_peckel <- function(peckel, wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err){
+  if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0){ #NA handling
+    return(NA)
+  }
+  else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
+    if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
+      if(peckel > 0){
+        return('ephemeral')
+      } else{
+        return('dry')
+      }
+
+    }
+
+    else if(peckel > 0){
+      return('nonEph')
+    } else{
+      return('dry')
+    }
+  }
+  else{
+    if(peckel > 0){
+      return('perennial')
+    } else{
+      return('dry')
+    }
+  }
+}

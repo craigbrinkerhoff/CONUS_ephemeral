@@ -1,10 +1,10 @@
 ## RECIPE FOR EPHEMERAL PROJECT ENVIRONMENT
 
-### Do all of this from a small interactive session to avoid tying up the login nodes
-- `srun -c 10 -p cpu --pty bash`
-
 ### Load miniconda
 - `module load miniconda`
+
+### Do all of this from a small interactive session to avoid tying up the login nodes
+- `srun -c 10 -p cpu --pty bash`
 
 ### Create environment
 - `conda create -n CONUS_ephemeral-env`

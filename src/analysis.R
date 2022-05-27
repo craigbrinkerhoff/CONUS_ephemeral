@@ -86,6 +86,11 @@ extractWTD <- function(path_to_data, huc4){
   nhd_wtd_11<- extract(wtd$WTD_11, nhd, fun=summariseWTD)
   nhd_wtd_12 <- extract(wtd$WTD_12, nhd, fun=summariseWTD)
 
+  #extract Peckel 2016 Landsat water occurence
+  peckel <- rast(paste0(path_to_data, '/for_ephemeral_project/peckel_CONUS_occurrence.tif'))
+  peckel <- crop(peckel, basin)
+  nhd_peckel <- extract(peckel, nhd, fun=mean)
+
   nhd_df <- as.data.frame(nhd)
   nhd_df <- select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode', 'ToNode','Q_cms', 'LengthKM', 'width_m', 'depth_m'))
 
@@ -149,6 +154,8 @@ extractWTD <- function(path_to_data, huc4){
   nhd_df$wtd_m_mean_12 <- as.numeric(nhd_wtd_12$WTD_12.mean)
   nhd_df$wtd_m_max_12 <- as.numeric(nhd_wtd_12$WTD_12.max)
 
+  nhd_df$peckel_water_ocurrence <- as.numeric(nhd_peckel$peckel_CONUS_occurrence)
+
   return(nhd_df)
 }
 
@@ -178,6 +185,54 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
     nhd_df$perenniality <- mapply(perenniality_func, nhd_df$wtd_m_max_01, nhd_df$wtd_m_max_02, nhd_df$wtd_m_max_03, nhd_df$wtd_m_max_04, nhd_df$wtd_m_max_05, nhd_df$wtd_m_max_06, nhd_df$wtd_m_max_07, nhd_df$wtd_m_max_08, nhd_df$wtd_m_max_09, nhd_df$wtd_m_max_10, nhd_df$wtd_m_max_11, nhd_df$wtd_m_max_12,  nhd_df$depth_m, thresh, err)
   } else { #default is median
     nhd_df$perenniality <- mapply(perenniality_func, nhd_df$wtd_m_median_01, nhd_df$wtd_m_median_02, nhd_df$wtd_m_median_03, nhd_df$wtd_m_median_04, nhd_df$wtd_m_median_05, nhd_df$wtd_m_median_06, nhd_df$wtd_m_median_07, nhd_df$wtd_m_median_08, nhd_df$wtd_m_median_09, nhd_df$wtd_m_median_10, nhd_df$wtd_m_median_11, nhd_df$wtd_m_median_12,  nhd_df$depth_m, thresh, err)
+  }
+
+  #drop potential NA perennial streams, i.e. those with NA water table depths. I've come across a single one of these so far....
+  nhd_df <- nhd_df[is.na(nhd_df$perenniality)==0,]
+
+  #####ROUTING---------------------------
+  #now, route through network and identify 'perched perennial rivers', i.e. those supposedly above the water table that are always flowing because of upstream perennial rivers
+  #sort rivers from upstream to downstream
+  nhd_df <- filter(nhd_df, HydroSeq != 0)
+  nhd_df <- nhd_df[order(-nhd_df$HydroSeq),] #sort descending
+
+  #vectorize nhd to help with speed
+  fromNode_vec <- as.vector(nhd_df$FromNode)
+  toNode_vec <- as.vector(nhd_df$ToNode)
+  perenniality_vec <- as.vector(nhd_df$perenniality)
+  order_vec <- as.vector(nhd_df$StreamOrde)
+  Q_vec <- as.vector(nhd_df$Q_cms)
+
+  #run vectorized model
+  for (i in 1:nrow(nhd_df)) {
+    perenniality_vec[i] <- routing_func(fromNode_vec[i], perenniality_vec[i], toNode_vec, perenniality_vec, order_vec[i], Q_vec[i], Q_vec)
+  }
+
+  nhd_df$perenniality <- perenniality_vec
+
+  #save some example HUCs
+  if(huc4 %in% c('1103', '1111', '0108', '1603')){
+    write_csv(nhd_df, paste0('cache/reaches_', huc4, '.csv'))
+  }
+
+  out <- nhd_df %>% select('NHDPlusID','ToNode', 'StreamOrde', 'Q_cms', 'width_m', 'LengthKM', 'perenniality')
+  return(out)
+}
+
+getPerenniality_peckel <- function(nhd_df, huc4, thresh, err,summarizer){
+  huc2 <- substr(huc4, 1, 2)
+
+  ######INTIAL PASS AT ASSIGNING PERENNIALITY------------------
+  if(summarizer == 'median'){
+    nhd_df$perenniality <- mapply(perenniality_func_peckel, nhd_df$peckel_water_ocurrence, nhd_df$wtd_m_median_01, nhd_df$wtd_m_median_02, nhd_df$wtd_m_median_03, nhd_df$wtd_m_median_04, nhd_df$wtd_m_median_05, nhd_df$wtd_m_median_06, nhd_df$wtd_m_median_07, nhd_df$wtd_m_median_08, nhd_df$wtd_m_median_09, nhd_df$wtd_m_median_10, nhd_df$wtd_m_median_11, nhd_df$wtd_m_median_12, nhd_df$depth_m, thresh, err)
+  } else if(summarizer == 'mean'){
+    nhd_df$perenniality <- mapply(perenniality_func_peckel, nhd_df$peckel_water_ocurrence, nhd_df$wtd_m_mean_01, nhd_df$wtd_m_mean_02, nhd_df$wtd_m_mean_03, nhd_df$wtd_m_mean_04, nhd_df$wtd_m_mean_05, nhd_df$wtd_m_mean_06, nhd_df$wtd_m_mean_07, nhd_df$wtd_m_mean_08, nhd_df$wtd_m_mean_09, nhd_df$wtd_m_mean_10, nhd_df$wtd_m_mean_11, nhd_df$wtd_m_mean_12,  nhd_df$depth_m, thresh, err)
+  } else if(summarizer == 'min'){
+    nhd_df$perenniality <- mapply(perenniality_func_peckel, nhd_df$peckel_water_ocurrence, nhd_df$wtd_m_min_01, nhd_df$wtd_m_min_02, nhd_df$wtd_m_min_03, nhd_df$wtd_m_min_04, nhd_df$wtd_m_min_05, nhd_df$wtd_m_min_06, nhd_df$wtd_m_min_07, nhd_df$wtd_m_min_08, nhd_df$wtd_m_min_09, nhd_df$wtd_m_min_10, nhd_df$wtd_m_min_11, nhd_df$wtd_m_min_12,  nhd_df$depth_m, thresh, err)
+  } else if(summarizer == 'max'){
+    nhd_df$perenniality <- mapply(perenniality_func_peckel, nhd_df$peckel_water_ocurrence, nhd_df$wtd_m_max_01, nhd_df$wtd_m_max_02, nhd_df$wtd_m_max_03, nhd_df$wtd_m_max_04, nhd_df$wtd_m_max_05, nhd_df$wtd_m_max_06, nhd_df$wtd_m_max_07, nhd_df$wtd_m_max_08, nhd_df$wtd_m_max_09, nhd_df$wtd_m_max_10, nhd_df$wtd_m_max_11, nhd_df$wtd_m_max_12,  nhd_df$depth_m, thresh, err)
+  } else { #default is median
+    nhd_df$perenniality <- mapply(perenniality_func_peckel, nhd_df$peckel_water_ocurrence, nhd_df$wtd_m_median_01, nhd_df$wtd_m_median_02, nhd_df$wtd_m_median_03, nhd_df$wtd_m_median_04, nhd_df$wtd_m_median_05, nhd_df$wtd_m_median_06, nhd_df$wtd_m_median_07, nhd_df$wtd_m_median_08, nhd_df$wtd_m_median_09, nhd_df$wtd_m_median_10, nhd_df$wtd_m_median_11, nhd_df$wtd_m_median_12,  nhd_df$depth_m, thresh, err)
   }
 
   #drop potential NA perennial streams, i.e. those with NA water table depths. I've come across a single one of these so far....

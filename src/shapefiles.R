@@ -4,6 +4,17 @@
 ## Spring 2022
 #############
 
+#' Joins all HUC4 shapefiles into a single shapefile
+#'
+#' @name saveShapefile
+#'
+#' @param path_to_data: data repo path directory
+#' @param codes_huc02: all HUC level 2 regions currently being ran
+#' @param combined_results: all model results combined into a single target
+#'
+#' @import sf
+#'
+#' @return print statement as it writes to file
 saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   #read in all HUC4 basins------------------
   basins_overall <- st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
