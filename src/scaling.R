@@ -4,13 +4,24 @@
 ## Summer 2022
 ########################
 
+#' Scales Peckel results to include rivers with no flood events > 30m wide (Peckel visible)
+#'
+#' @name doScaling
+#'
+#' @param nhd_df: river network with assigned perenniality status
+#' @param ephThresh: min Q to scale to. This is currently overrided by the minQ in nhd_df
+#' @param huc2: HUC2 code (string)
+#' @param perc_thresh: threshold for intialzing scaling, i.e. at one point Pecekl-identified ephemeral streaams are systematically underestimated
+#'
+#' @return dataframe with scaled results and discharge statitics
 doScaling <- function(nhd_df, ephThresh, huc2, perc_thresh){
   `%notin%` <- Negate(`%in%`)
 
   #calculate general terms
-  sumQ <- sum(nhd_df$Q_cms) #[nhd_df$perenniality != 'ephemeral',]
+  perQ <- sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$Q_cms) #
   minQ <- min(nhd_df$Q_cms, na.rm=T)
 
+  #remove super high flows that 'disrupt' the ephemeral CDFs used to fit the GAMs
   nhd_clip_eph <- nhd_df[nhd_df$Q_cms < quantile(nhd_df$Q_cms, probs=c(0.95), na.rm=T),]
 
   nhd_clip_eph <- nhd_clip_eph[nhd_df$perenniality == 'ephemeral',]
@@ -21,11 +32,6 @@ doScaling <- function(nhd_df, ephThresh, huc2, perc_thresh){
   all_data <- nhd_clip_eph #store all data for complete model in figure
 
   nhd_clip_eph <- nhd_clip_eph[(log10(max(nhd_clip_eph$cumm_eph_Q, na.rm=T))-log10(nhd_clip_eph$cumm_eph_Q))/log10(nhd_clip_eph$cumm_eph_Q) >= perc_thresh & is.na((log10(max(nhd_clip_eph$cumm_eph_Q, na.rm=T))-log10(nhd_clip_eph$cumm_eph_Q))/log10(nhd_clip_eph$cumm_eph_Q))==0,]
-  #t <- nhd_clip_eph[-nrow(nhd_clip_eph),]
-  #thresh <- t[which.max(diff(t$cumm_eph_Q)),]$cumm_eph_Q
-  #nhd_clip_eph <- nhd_clip_eph[nhd_clip_eph$cumm_eph_Q >= thresh,] #percent change in cummQ is > 1%, to identify 'point of asymptote'
-
-  #nhd_clip_eph <- nhd_clip_eph[-nrow(nhd_clip_eph),] #remove last point, which has an artifically high diff
 
   #fit GAM
   nhd_clip_eph$log10_Q <- log10(nhd_clip_eph$Q_cms)
@@ -38,8 +44,11 @@ doScaling <- function(nhd_df, ephThresh, huc2, perc_thresh){
   nhd_clip_eph$pred_cumm_eph_Q <- 10^(predict(gamModel, newdata=nhd_clip_eph))
   extrapolatedresult <- 10^(predict(gamModel, newdata=data.frame('log10_Q'=log10(minQ))))
 
-  #total sumQ is the non-ephemeral estimate and the extrapolated ephemeral estimate
-#  sumQ <- sumQ + extrapolatedresult
+  #get sum Q
+  ephQ_model <- max(nhd_clip_eph$cumm_eph_Q, na.rm=T)
+  del <- extrapolatedresult - ephQ_model
+  perQ <- perQ - del
+  sumQ <- perQ + extrapolatedresult
 
   #plot
   t <- ggplot() +
@@ -58,7 +67,13 @@ doScaling <- function(nhd_df, ephThresh, huc2, perc_thresh){
               'totalQ'=sumQ,
               'ephemeralQ'=extrapolatedresult,
               'percEphQ_scaled'=extrapolatedresult / sumQ,
-              'deviance_exp'=dev_exp)) #perc deviance explained by the model
+              'deviance_exp'=dev_exp, #perc deviance explained by the model
+              'meanEphemeralQ'=mean(nhd_clip_eph$Q_cms, na.rm=T),
+              'medianEphemeralQ'=median(nhd_clip_eph$Q_cms, na.rm=T),
+              'cvEphemeralQ'=sd(nhd_clip_eph$Q_cms, na.rm=T)/mean(nhd_clip_eph$Q_cms, na.rm=T),
+              'relativeQ'=mean(nhd_clip_eph$Q_cms, na.rm=T) / mean(nhd_df[nhd_df$perenniality != 'ephemeral',]$Q_cms, na.rm=T),
+              'n_reaches'=nrow(nhd_df),
+              'nModel_reaches'=nrow(nhd_clip_eph)))
 }
 
 

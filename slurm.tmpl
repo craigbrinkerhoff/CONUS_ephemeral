@@ -3,11 +3,11 @@
 #SBATCH --partition=cpu
 #SBATCH --output={{ log_file | /dev/null }} # you can add .%a for array index
 #SBATCH --error={{ log_file | /dev/null }}
-#SBATCH --mem-per-cpu={{ memory | 30000 }}
+#SBATCH --mem-per-cpu={{ memory | 10000 }}
 #SBATCH --array=1-{{ n_jobs }}
 #SBATCH --cpus-per-task={{ cores | 1 }}
 
-ulimit -v $(( 1024 * {{ memory | 30000 }} ))
+ulimit -v $(( 1024 * {{ memory | 10000 }} ))
 CMQ_AUTH={{ auth }} R --no-save --no-restore -e 'clustermq:::worker("{{ master }}")'
 
 

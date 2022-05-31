@@ -17,15 +17,15 @@ source('src/verify.R')
 source('src/shapefiles.R')
 source('src/scaling.R')
 
-#options(clustermq.scheduler = "slurm", clustermq.template = "slurm.tmpl") #set up clustermq R parallel scheduler
+options(clustermq.scheduler = "multiprocess")#clustermq.scheduler = "slurm", clustermq.template = "slurm.tmpl") #set up clustermq R parallel scheduler
 tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'grwat', 'scales', 'mgcv')) #set up packages to load in. Note that tidyr is specified manually throughout to avoid conflicts with dplyr
 
 #############USER INPUTS-------------------
 path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
 codes_huc02 <- c('01','02','11', '12', '13','14','15','16') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
-threshold <- -0.25 #threshold for 'persistent surface saturation' from Fan etal 2013
+threshold <- -0.05 #5cm buffer around 0m depth
 error <- 0
-ephThresh <- 1e-6 #[m] minimum width of flow for 'ephemeral flow'
+ephThresh <- 1e-7 #[m] minimum flow for 'ephemeral flow' in scaling
 perc_thresh <- 0.03
 
 #SETUP STATIC BRANCHING----------------------------
@@ -67,11 +67,11 @@ list(tar_target(nhdGages, getNHDGages(path_to_data, codes_huc02)), #gages joined
      tar_combine(combined_02, mapped$rivNetFin[11:17], command = dplyr::bind_rows(!!!.x, .id='method')),
      tar_target(scaledResult_02, doScaling(combined_02, ephThresh, '02', perc_thresh)),
 
-     tar_combine(combined_11_12, mapped$rivNetFin[12:42], command = dplyr::bind_rows(!!!.x, .id='method')),
+     tar_combine(combined_11_12, mapped$rivNetFin[18:42], command = dplyr::bind_rows(!!!.x, .id='method')),
      tar_target(scaledResult_11_12, doScaling(combined_11_12, ephThresh, '11', perc_thresh)),
 
-     #tar_combine(combined_12, mapped$rivNetFin[32:42], command = dplyr::bind_rows(!!!.x, .id='method')),
-     #tar_target(scaledResult_12, doScaling(combined_12, ephThresh, '12', perc_thresh)),
+  #   tar_combine(combined_12, mapped$rivNetFin[32:42], command = dplyr::bind_rows(!!!.x, .id='method')),
+  #   tar_target(scaledResult_12, doScaling(combined_12, ephThresh, '12', perc_thresh)),
 
      tar_combine(combined_13, mapped$rivNetFin[43:51], command = dplyr::bind_rows(!!!.x, .id='method')),# NOT ENOUGH EPHEMERAL DATA...
      tar_target(scaledResult_13, doScaling(combined_13, ephThresh, '13', perc_thresh)),
