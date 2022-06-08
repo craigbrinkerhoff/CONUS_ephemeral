@@ -11,7 +11,7 @@
 #'
 #' @return set of USGS gages on the NHD with flows converted to metric
 getNHDGages <- function(path_to_data, codes_huc02){
-  #get USGS stations joined to NHD that meet thier QA/QC requirements
+  #get USGS stations joined to NHD that meet their QA/QC requirements
   codes <- c(NA)
   for(code_huc2 in codes_huc02){
     code <- list.dirs(paste0(path_to_data, '/HUC2_', code_huc2), full.names = FALSE, recursive = FALSE)
@@ -93,58 +93,21 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
         gageQ$Q_cms <- gageQ$mean_va*0.0283 #cfs to cms
         gageQ$Q_cms <- round(gageQ$Q_cms, 3) #round to 1 decimal to handle low-flow errors following Zipper et al 2021
 
-        #CALCULATE RIVER-SPECIFIC ALPHA PARAMETER FOLLOWING SINGH ET AL 2019---------------------------------
-        Q0 <- median(gageQ$Q_cms) #median flow
-        Q_plus <- (gageQ$Q_cms)/Q0
-        dQplus_dt <- diff(Q_plus)/1
-        Q_plus <- Q_plus[-1]
-
-        Q_plus <- Q_plus[dQplus_dt < 0] #filter only for 'recession flows', i.e. dQ/dt is negative
-        dQplus_dt <- dQplus_dt[dQplus_dt < 0]#filter only for 'recession flows', i.e. dQ/dt is negative
-
-        Q_plus[which(Q_plus == 0)] <- 1e-6 #dummy to not be zero
-        dQplus_dt[which(dQplus_dt == 0)] <- 1e-6 #dummy to not be zero
-
-        lm <- tryCatch(lm(log(-1*dQplus_dt)~log(Q_plus)), error=function(m){NA}) #error handling if lm doesn't work b/c of poor gage data or something
-        if(is.na(lm)){
-          print('all NAs')
-          alpha <- 0.925} #default for algorithm
-        else{
-          To <- exp(summary(lm)$coefficients[1])^-1
-          alpha <- exp(-1/To)
-        } #filtering exponent
-
-        #ACTUALLY CALCULATE BASEFLOW-------------------------------------
+        #ACTUALLY CALCULATE MEAN ANNUAL FLOW-------------------------------------
         gageQ <- select(gageQ, c('site_no', 'Q_cms', 'month_nu')) %>%
-          mutate(Qbase_chapman_singh = gr_baseflow(Q_cms, method='chapman', a=alpha),
-                 Qbase_jakeman_singh = gr_baseflow(Q_cms, method='jakeman', a=alpha),
-                 Qbase_lynehollick_singh = gr_baseflow(Q_cms, method='lynehollick', a=alpha),
-                 Qbase_lynehollick = gr_baseflow(Q_cms, method='lynehollick'),
-                 Qbase_chapman = gr_baseflow(Q_cms, method='chapman'),
-                 Qbase_jakeman = gr_baseflow(Q_cms, method='jakeman'),
-                 Qbase_maxwell = gr_baseflow(Q_cms, method='maxwell'), #Chapman-maxwell, our preferred method
-                 Q_MA = mean(gageQ$Q_cms, na.rm=T),
+          mutate(Q_MA = mean(gageQ$Q_cms, na.rm=T),
                  date=1:nrow(gageQ),
                  month=month_nu) #cfs to cms.
 
         if(gageQ$Q_MA == 0){next} #avoid gages with literally no flow
 
-        #round to 1 decimal place to reduce low-flow errors (Zipper et al 2021))
         temp <- data.frame('gageID'=gageQ[1,]$site_no,
-                           'alpha'=alpha,
                            'no_flow_fraction'=sum(gageQ$Q_cms == 0)/nrow(gageQ),
-                           'baseflow_fraction_lynehollick'=sum(gageQ$Qbase_lynehollick*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_lynehollick_singh'=sum(gageQ$Qbase_lynehollick_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_chapman'=sum(gageQ$Qbase_chapman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_chapman_singh'=sum(gageQ$Qbase_chapman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_jakeman'=sum(gageQ$Qbase_jakeman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_jakeman_singh'=sum(gageQ$Qbase_jakeman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-                           'baseflow_fraction_maxwell'=sum(gageQ$Qbase_maxwell*60*60*24)/sum(gageQ$Q_cms*60*60*24),
                            'Q_MA'=gageQ[1,]$Q_MA)
 
         results <- rbind(results, temp)
       }
-    results <- select(results, c('gageID', 'alpha', 'Q_MA', 'no_flow_fraction', 'baseflow_fraction_lynehollick', 'baseflow_fraction_chapman', 'baseflow_fraction_jakeman', 'baseflow_fraction_maxwell', 'baseflow_fraction_lynehollick_singh', 'baseflow_fraction_chapman_singh', 'baseflow_fraction_jakeman_singh')) %>%
+    results <- select(results, c('gageID', 'Q_MA', 'no_flow_fraction')) %>%
       distinct(.keep_all = TRUE)
 
     write_rds(results, paste0('cache/training/trainingData_', m, '.rds'))
@@ -168,3 +131,48 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
   out <- results_all
   return(out)
 }
+
+
+
+
+
+
+#CALCULATE RIVER-SPECIFIC ALPHA PARAMETER FOLLOWING SINGH ET AL 2019---------------------------------
+#        Q0 <- median(gageQ$Q_cms) #median flow
+#        Q_plus <- (gageQ$Q_cms)/Q0
+#        dQplus_dt <- diff(Q_plus)/1
+#        Q_plus <- Q_plus[-1]
+
+#        Q_plus <- Q_plus[dQplus_dt < 0] #filter only for 'recession flows', i.e. dQ/dt is negative
+#        dQplus_dt <- dQplus_dt[dQplus_dt < 0]#filter only for 'recession flows', i.e. dQ/dt is negative
+
+#        Q_plus[which(Q_plus == 0)] <- 1e-6 #dummy to not be zero
+#        dQplus_dt[which(dQplus_dt == 0)] <- 1e-6 #dummy to not be zero
+
+#        lm <- tryCatch(lm(log(-1*dQplus_dt)~log(Q_plus)), error=function(m){NA}) #error handling if lm doesn't work b/c of poor gage data or something
+#        if(is.na(lm)){
+#          print('all NAs')
+#          alpha <- 0.925} #default for algorithm
+#        else{
+#          To <- exp(summary(lm)$coefficients[1])^-1
+#          alpha <- exp(-1/To)
+#        } #filtering exponent
+
+#'baseflow_fraction_lynehollick'=sum(gageQ$Qbase_lynehollick*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_lynehollick_singh'=sum(gageQ$Qbase_lynehollick_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_chapman'=sum(gageQ$Qbase_chapman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_chapman_singh'=sum(gageQ$Qbase_chapman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_jakeman'=sum(gageQ$Qbase_jakeman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_jakeman_singh'=sum(gageQ$Qbase_jakeman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+#'baseflow_fraction_maxwell'=sum(gageQ$Qbase_maxwell*60*60*24)/sum(gageQ$Q_cms*60*60*24),
+
+
+#Qbase_chapman_singh = gr_baseflow(Q_cms, method='chapman', a=alpha),
+#                 Qbase_jakeman_singh = gr_baseflow(Q_cms, method='jakeman', a=alpha),
+#                 Qbase_lynehollick_singh = gr_baseflow(Q_cms, method='lynehollick', a=alpha),
+#                 Qbase_lynehollick = gr_baseflow(Q_cms, method='lynehollick'),
+#                 Qbase_chapman = gr_baseflow(Q_cms, method='chapman'),
+#                 Qbase_jakeman = gr_baseflow(Q_cms, method='jakeman'),
+#                 Qbase_maxwell = gr_baseflow(Q_cms, method='maxwell'), #Chapman-maxwell, our preferred method
+
+#, 'alpha', 'baseflow_fraction_lynehollick', 'baseflow_fraction_chapman', 'baseflow_fraction_jakeman', 'baseflow_fraction_maxwell', 'baseflow_fraction_lynehollick_singh', 'baseflow_fraction_chapman_singh', 'baseflow_fraction_jakeman_singh')) %>%

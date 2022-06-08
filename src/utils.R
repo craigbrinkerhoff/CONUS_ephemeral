@@ -90,6 +90,16 @@ perenniality_func <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, 
   }
 }
 
+perenniality_func_zell <- function(wtd_m, depth, thresh, err){
+  if(is.na(wtd_m) == 1){ #NA handling
+     return(NA)
+  } else if(wtd_m < (thresh+err+depth)) {
+     return('ephemeral')
+  } else{
+     return('perennial')
+  }
+}
+
 #' Use network routing to check for two scenarios that may arise and produce false positive ephemeral streams:
 #' 1) 'downstream ephemerak rivers', i.e. modeled ephemeral rivers that have perennial rivers just upstream (physically impossible). These need to be reclassified as perennial.
 #' 2) 'gaining ephemeral streams', i.e. modeled ephemeral rivers that have gaining conditions, i.e. groundwater recharge > river outflow. This should be impossible in a truly ephemeral channel as they must be losing streams by nature
@@ -118,56 +128,30 @@ routing_func <- function(fromNode, curr_perr, toNode_vec, perenniality_vec, orde
   }
 }
 
-#' Calculates river perenniality status via Fan + Peckel
-#'
-#' @name perenniality_func_peckel
-#'
-#' @param pecekl: Surface water occurence in Landsat record (values are 0-100 corresponding to how much the record is wetted)
-#' @param wtd_m_01: Water table depth- January
-#' @param wtd_m_01: Water table depth- January
-#' @param wtd_m_01: Water table depth- February
-#' @param wtd_m_01: Water table depth- March
-#' @param wtd_m_01: Water table depth- April
-#' @param wtd_m_01: Water table depth- May
-#' @param wtd_m_01: Water table depth- June
-#' @param wtd_m_01: Water table depth- July
-#' @param wtd_m_01: Water table depth- August
-#' @param wtd_m_01: Water table depth- September
-#' @param wtd_m_01: Water table depth- October
-#' @param wtd_m_01: Water table depth- November
-#' @param wtd_m_01: Water table depth- December
-#' @param depth: depth derived via hydraulic geomtery or lake volume scaling
-#' @param thresh: water table depth threshold for 'perennial'
-#' @param err: error tolerance for thresholding
-#'
-#'
-#' @note  This model will always overrestimate dry channles and underestaimte ephemeral channels given Peckel resolution. This is why we use scaling later
-#'
-#' @return status: ephemeral, perennial, not-ephemeral (can't def say which it is), and always dry (no identified water)
-perenniality_func_peckel <- function(peckel, wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err){
-  if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0){ #NA handling
-    return(NA)
-  }
-  else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
-    if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
-      if(peckel > 0){
-        return('ephemeral')
-      } else{
-        return('dry')
-      }
-    }
+#perenniality_func_peckel <- function(peckel, wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err){
+#  if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0){ #NA handling
+#    return(NA)
+#  }
+#  else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
+#    if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+depth))){
+#      if(peckel > 0){
+#        return('ephemeral')
+#      } else{
+#        return('dry')
+#      }
+#    }
 
-    else if(peckel > 0){
-      return('nonEph') #stand-in for not def ephemeral and not def perennial, as these ae scenarios where it isn't clear what is genuine and what is model noise. BUT, we can at least say it's not ephemeral
-    } else{
-      return('dry')
-    }
-  }
-  else {
-    if(peckel > 0){
-        return('perennial') #stand-in for not def ephemeral and not def perennial, as these ae scenarios where it isn't clear what is genuine and what is model noise. BUT, we can at least say it's not ephemeral
-    } else{
-      return('dry')
-    }
-  }
-}
+#    else if(peckel > 0){
+#      return('nonEph') #stand-in for not def ephemeral and not def perennial, as these ae scenarios where it isn't clear what is genuine and what is model noise. BUT, we can at least say it's not ephemeral
+#    } else{
+#      return('dry')
+#    }
+#  }
+#  else {
+#    if(peckel > 0){
+#        return('perennial') #stand-in for not def ephemeral and not def perennial, as these ae scenarios where it isn't clear what is genuine and what is model noise. BUT, we can at least say it's not ephemeral
+#    } else{
+#      return('dry')
+#    }
+#  }
+#}
