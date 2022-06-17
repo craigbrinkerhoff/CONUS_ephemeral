@@ -91,9 +91,11 @@ perenniality_func <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, 
 }
 
 perenniality_func_zell <- function(wtd_m, depth, thresh, err){
+  wtd_m <- ifelse(wtd_m > 0, 0, wtd_m)
+
   if(is.na(wtd_m) == 1){ #NA handling
      return(NA)
-  } else if(wtd_m < (thresh+err+depth)) {
+  } else if(wtd_m < (thresh+err+(-1*depth))) {
      return('ephemeral')
   } else{
      return('perennial')
@@ -126,6 +128,16 @@ routing_func <- function(fromNode, curr_perr, toNode_vec, perenniality_vec, orde
   else{
     return(curr_perr) #otherwise, leave as is
   }
+}
+
+#' get appropriate UTM zone from longitude
+#'
+#' @param long: Longitude
+#'
+#' @return UTM zone (N) as numeric
+long2UTM <- function(long) {
+    out <- (floor((long + 180)/6) %% 60) + 1
+    return(out)
 }
 
 #perenniality_func_peckel <- function(peckel, wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err){

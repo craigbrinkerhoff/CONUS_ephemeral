@@ -97,6 +97,56 @@ extractWTD <- function(path_to_data, huc4){
   return(nhd_df)
 }
 
+#' Calculate runoff efficiency per HUC4 basin mostly following  https://doi.org/10.1111/1752-1688.12431
+#'
+#' @param path_to_data: data repo path directory
+#' @param codes_huc02: HUC2 zones we are currently running on
+#'
+#' @import sf
+#' @import raster
+#' @import terra
+#' @import ncdf4
+#'
+#' @return dataframe with runoff coefficients at HUC level 4 scale
+calcRunoffEff <- function(path_to_data, codes_huc02){
+  #read in all HUC4 basins------------------
+  basins_overall <- st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
+  for(i in codes_huc02[-1]){
+    basins <- st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
+    basins_overall <- rbind(basins_overall, basins)
+  }
+
+  #SETUP RUNOFF DATA----------------------------------
+  HUC4_runoff <- read.table(paste0(path_to_data, '/for_ephemeral_project/HUC4_runoff_mm.txt'), header=TRUE)
+  HUC4_runoff$huc4 <- as.character(HUC4_runoff$huc_cd)   #setup IDs
+  HUC4_runoff$huc4 <- ifelse(nchar(HUC4_runoff$huc_cd)==3, paste0('0', HUC4_runoff$huc_cd), HUC4_runoff$huc_cd)
+  HUC4_runoff$runoff_ma_mm_yr <- rowMeans(HUC4_runoff[,71:122]) #1970-2021   #get long-term mean annual runoff
+  HUC4_runoff <- select(HUC4_runoff, c('huc4', 'runoff_ma_mm_yr'))
+  basins_overall <- left_join(basins_overall, HUC4_runoff, by='huc4')
+
+  basins_overall <- vect(basins_overall)
+
+  #SETUP MEAN DAILY PRECIP DATA-----------------------------------
+  precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/precip.V1.0.day.ltm.nc'))
+  precip <- raster::rotate(precip)
+  precip_mean <- rast(mean(precip)) #get long term mean for 1981-2010
+
+  #reproject
+  basins_overall <- project(basins_overall, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  precip_mean <- project(precip_mean, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+
+  precip_mean_basins <- terra::extract(precip_mean, basins_overall, fun='mean', na.rm=TRUE)
+  basins_overall$precip_ma_mm_yr <- (precip_mean_basins$layer*365) #apply long term mean over the entire year
+
+  #runoff efficecincy
+  basins_overall$runoff_eff <- basins_overall$runoff_ma_mm_yr / basins_overall$precip_ma_mm_yr #efficiency of P to streamflow routing
+
+  #save as rds file
+  basins_overall <- as.data.frame(basins_overall)
+
+  return(basins_overall)
+}
+
 #' Estimates reach perenniality status for the NHD
 #'
 #' @param nhd_df: nhd hydrography with mean monthly water table depths already joined to hydrography
@@ -148,8 +198,8 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 
   nhd_df$perenniality <- perenniality_vec
 
-  #save some example HUCs
-  if(huc4 %in% c('1103', '1111', '0108', '1603')){
+  #save some example HUCs (including those used for model validation/verification)
+  if(huc4 %in% c('1103', '1111', '0108', '1603', '1503', '1505', '0107')){
     write_csv(nhd_df, paste0('cache/reaches_', huc4, '.csv'))
   }
 
@@ -164,17 +214,36 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 #' @param flowQmodel: scaling model for number of days that Q is flowing
 #'
 #' @return summary statistics
-collectResults <- function(nhd_df, huc4, flowQmodel){
+collectResults <- function(nhd_df, path_to_data, huc4, runoff_eff, precip_thresh){
   #adjust Q for ephemeral streams to reflect 'average flowing discharge', i.e. ignoring days when the ephemeral reach is dry
-  nhd_df$Q_bin <- ifelse(nhd_df$Q_cms < 0.01, 0.01,
-                      ifelse(nhd_df$Q_cms < 0.1, 0.1,
-                            ifelse(nhd_df$Q_cms < 1, 1,
-                                  ifelse(nhd_df$Q_cms < 10, 10, 100))))
-  nhd_df$meanFlowingDays <- predict(flowQmodel, nhd_df)
-  nhd_df$meanFlowingDays <- ifelse(nhd_df$perenniality != 'ephemeral', NA, nhd_df$meanFlowingDays) #only applies to ephemeral reaches
+  #nhd_df$Q_bin <- ifelse(nhd_df$Q_cms < 0.01, 0.01,
+  #                    ifelse(nhd_df$Q_cms < 0.1, 0.1,
+  #                          ifelse(nhd_df$Q_cms < 1, 1,
+  #                                ifelse(nhd_df$Q_cms < 10, 10, 100))))
+  #nhd_df$meanFlowingDays <- predict(flowQmodel, nhd_df)
+  #nhd_df$meanFlowingDays <- ifelse(nhd_df$perenniality != 'ephemeral', NA, nhd_df$meanFlowingDays) #only applies to ephemeral reaches
+
+  #get basin to clip wtd model
+  huc2 <- substr(huc4, 1, 2)
+  basins <- vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
+  basin <- basins[basins$huc4 == huc4,]
+
+  #add long term mean daily precip
+  precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1980_2010.gri'))#'/for_ephemeral_project/precip.V1.0.day.ltm.nc'))
+  precip <- raster::rotate(precip) #convert 0360 lon to -180-180 lon
+  basin <- project(basin, '+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ')#"+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  basin <- as(basin, 'Spatial')
+  precip <- raster::crop(precip, basin)
+
+  #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency
+  thresh <- mean(quantile(log(precip), (1-precip_thresh), na.rm=TRUE)) #basin average exceedance probability
+  #thresh <- 1 #mm event
+  precip <- sum(log(precip) >= log(thresh))
+
+  numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin and for one year
 
   #adjusted Q
-  nhd_df$Q_cms_adj <- nhd_df$Q_cms * (365/nhd_df$meanFlowingDays)
+  nhd_df$Q_cms_adj <- nhd_df$Q_cms * (365/numFlowingDays) #ifelse(is.finite(nhd_df$Q_cms * (365/numFlowingDays))==0, 0, nhd_df$Q_cms * (365/numFlowingDays))
 
   #adjusted widths
   widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #depth AHG model
@@ -185,6 +254,7 @@ collectResults <- function(nhd_df, huc4, flowQmodel){
   #concatenate and generate results
   results_nhd <- data.frame(
     'huc4'=huc4,
+    'num_flowing_dys'=numFlowingDays,
     'notEphNetworkSA' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality != 'ephemeral',]$width_m*1000, na.rm=T),
     'ephemeralNetworkSA_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m_adj*1000, na.rm=T),
     'ephemeralNetworkSA' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m*1000, na.rm=T),

@@ -15,20 +15,23 @@ source('src/getGageData.R')
 source('src/eromAssessment.R')
 source('src/shapefiles.R')
 source('src/dischargeScaling.R')
+source('src/validation.R')
 
-#options(clustermq.scheduler = 'multiprocess')#, clustermq.template = "slurm.tmpl") #set up clustermq R parallel scheduler options(clustermq.scheduler = "")#
+options(clustermq.scheduler = 'multiprocess')#, clustermq.template = "slurm.tmpl") #set up clustermq R parallel scheduler options(clustermq.scheduler = "")#
 tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr')) #set up packages to load in. Note that tidyr is specified manually throughout to avoid conflicts with dplyr
 
 #############USER INPUTS-------------------
 path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
 codes_huc02 <- c('01','02','06', '11', '12', '13','14','15','16') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
-threshold <- -0.05 #5cm buffer around 0m depth
+threshold <- -0.1 #10cm buffer around 0m depth
 error <- 0
+snappingThresh <- 200 #[m] for snapping valiation data to river network
+precip_exceedance <- 0.1 #$ exceeding
 
-#SETUP STATIC BRANCHING----------------------------
+#SETUP STATIC BRANCHING FOR MODEL RUNS ACCROSS BASINS----------------------------
 #Each HUC4 basin gets it's own branch
 mapped <- tar_map(
-       unlist=FALSE, #to facilitate tar_combine within a mapping scheme (see below)
+       unlist=FALSE,
        values = tibble(
          method_function = rlang::syms("extractWTD"),
          huc4 = c('0101', '0102', '0103', '0104', '0105', '0106', '0107', '0108', '0109', '0110',
@@ -38,29 +41,47 @@ mapped <- tar_map(
                   '1301', '1302', '1303', '1304', '1305', '1306', '1307', '1308', '1309',
                    '1402', '1403', '1406', '1407', '1408','1401', '1404', '1405',
                    '1502',  '1504', '1505', '1506', '1507', '1501','1508', '1503',
-                  '1601', '1602', '1603', '1605','1604', '1606',
+                   '1602', '1603', '1605','1604', '1606', #'1601',
                   '0602', '0603', '0604') #0601 not working
        ),
        names = "huc4",
-       tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along the river reaches
-       tar_target(rivNetFin, getPerenniality(extractedRivNet, huc4, threshold, error, 'mean')), #calculate perenniality using mean water table depth along the reach and a summarizing statistic (mean, median, min, max)
-       tar_target(results, collectResults(rivNetFin, huc4, flowQmodel))) #calculate basin statistics
+       tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
+       tar_target(rivNetFin, getPerenniality(extractedRivNet, huc4, threshold, error, 'mean')), #calculate perenniality
+       tar_target(results, collectResults(rivNetFin, path_to_data, huc4, runoffEff, precip_exceedance)), #calculate basin statistics using streamflow model
+       tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4))) #snap WOTUS descisions to modeled river network for later validation
 
 #############ACTUAL PIPLINE, COMBINING STATIC BRANCHING, AGGREGATION TARGETS, AND OTHER TARGETS
-list(tar_target(nhdGages, getNHDGages(path_to_data, codes_huc02)), #gages joined to NHD a priori
-     tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculates baseflow and no flow indices for every gage with minimum 20yrs data b/w 1970-2018 and joined to NHD
-     tar_target(flowQmodel, flowingQ(USGS_data)),
+list(
+     #######GATHER AND VALIDATE STREAMFLOWS VIA USGS GAUGES
+     tar_target(nhdGages, getNHDGages(path_to_data, codes_huc02)), #gages joined to NHD a priori, used for erom verification
+     tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculates mean observed flow 1970-2018 to verify erom model
+
+     #########GATHER WOTUS JD VALIDATION SET
+     tar_target(validationDF, prepValDF()), #clean WOTUS validation set
+     tar_target(runoffEff, calcRunoffEff(path_to_data, codes_huc02)), #calculate runoff efficiency
+
+     ##########RUN & VALIDATE MODEL
      mapped, #run actual model (see above)
-     tar_combine(combined_results, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model results across branches (for mapping)
-     tar_target(EROM_figure, eromVerification(USGS_data, nhdGages), deployment='main'), #generate figures for validating discharges (run locally on master process)
-     tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results)),
-     tar_target(boxplots, boxPlots(combined_results))
+
+     ##########BUILD FIGURES AND SHAPEFILES
+     tar_combine(combined_results, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model results across branches
+     tar_combine(combined_validation, mapped$snappedValidation, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model validation results across branches
+     tar_target(EROM_figure, eromVerification(USGS_data, nhdGages), deployment='main'), #figures for validating discharges
+     tar_target(validationResults, validateModel(combined_validation)), #validation confusion matrix
+     tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results, validationResults)), #model results shapefile
+     tar_target(boxplots, boxPlots(combined_results)), #build boxplots comparing flowing vs non flowing importance
+
+     ##########PERFORM ADDITIONAL EPHEMERAL SCALING
+     tar_target(scalingModel, scalingFunc(validationResults)), #clean WOTUS validation set
+     tar_target(scaledResult, scalingByBasin(scalingModel, rivNetFin_1211, results_1211)) #clean WOTUS validation set
 )
 
 
 
 
 
+
+# tar_target(flowQmodel, flowingQ(USGS_data)),
 
 
 #ephThresh <- 1e-7 #[m] minimum flow for 'ephemeral flow' in scaling
