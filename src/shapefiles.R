@@ -40,7 +40,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results, validatio
                       n_val=n())
 
   basins_overall <- left_join(basins_overall, out, by='huc4')
-
+  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQ_eph_flowing_scaled', 'basinAccuracy', 'basinSensitivity', 'basinSpecificity', 'n_val', 'geometry'))
 
   if (!file.exists('cache/results_fin.shp')) {
     st_write(basins_overall, 'cache/results_fin.shp')

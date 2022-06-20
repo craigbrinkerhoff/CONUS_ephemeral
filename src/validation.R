@@ -11,36 +11,41 @@
 #' @import readr
 #'
 #' @return prepared validation set (as dataframe)
-prepValDF <- function(){
+prepValDF <- function(path_to_data){
   `%notin%` <- Negate(`%in%`)
 
   #load in validation dataset
-    #Queried "Clean Water Act Approved Jurisdictional Determinations" database on 6/15/2022 for all JDs post Navigatable Waters Protection Rule
-    #n= 62,955
-  validationDF <- read_csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/for_ephemeral_project/jds202206151449.csv')
+    #Queried "Clean Water Act Approved Jurisdictional Determinations" database on 6/20/2022 for all JDs requested by landowners
+    #n= 156,147 (pre cleaning and fixing) Number is very high because of repeat assessments at sites, and multiple assessments along an NHD reach (handled later)
+  validationDF <- read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
 
   #clean up this mess of a dataset...
-  #A1: Traditionally navigable waters (i.e. perennial)
-  #A2: Perennnial/intermittent tributaries to traditionally navigable waters
-  #B3: Ephemeral features
-  # All upland/dryland data removed
-  # All wetlands removed
-  # All wastewater plants removed
-  # All storm runoff / tile drainage removed
-  # All Section 10 features removed (special classes involving coastal features)
-  validationDF <- filter(validationDF, substr(`Resource Types`, 1, 2) %in% c('A1', 'A2', 'A3', 'B3')) %>% #because our model exists only in a paradigm of ephemeral -> intermttent -> perennial, we only keep these categories (for both river and lakes. NOT wetlands)
+    #because our model exists only in a paradigm of ephemeral -> intermttent -> perennial, we only keep these categories (for both river and lakes. NOT wetlands)
+  #KEEP:
+    #A1: Traditionally navigable waters (i.e. perennial) (both rivers and lakes)
+    #A2: Perennnial/intermittent tributaries to traditionally navigable waters (both rivers and lakes)
+    #B3: Ephemeral features
+  #REMOVE:
+    # All upland/dryland data removed
+    # All wetlands removed
+    # All wastewater plants removed
+    # All storm runoff / tile drainage removed
+    # All Section 10 features removed (special classes involving coastal features)
+  validationDF <- filter(validationDF, substr(`Resource Types`, 1, 2) %in% c('A1', 'A2', 'A3', 'B3')) %>%
       select(`JD ID`, `Resource Types`, `Project ID`, Longitude, Latitude, `Water of the U.S.`, HUC8)
 
   colnames(validationDF) <- c('JD_ID', 'resource_type', 'project_id', 'long', 'lat', 'wotus_class', 'huc8')
   validationDF$huc4 <- substr(validationDF$huc8, 1, 4)
 
-  #assign ephemeral/not ephemeral. 'Ephemeral' is all waters classed as ephemeral streams, disconnected lakes/wetlands, and ditches (as the later two meet our broader defintion of ephemeralality)
-  validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3', 'ephemeral', 'perennial') #note that perennial here is actually perennial/intermittent
+  validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3', 'ephemeral', 'perennial') #note that perennial here is actually perennial/intermittent, it's shotened for simplicity :)
 
   return(validationDF)
 }
 
-#' Snaps EPA WOTUS Jurisdictional distinctions to HUC4 river networks: 1) auto-finds the correct UTM zone to project data and 2) gets distance between NHD reach and tagged WOTUS distinction point
+#' Snaps EPA WOTUS Jurisdictional distinctions to HUC4 river networks:
+#'    1) auto-finds the correct UTM zone to project data
+#'    2) gets distance between NHD reach and tagged WOTUS distinction point
+#'
 #' Also also grabs USGS data and appends adds it to the validation set
 #'
 #' @param path_to_data: path to data directory
@@ -141,14 +146,15 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 #' Creates confusion matrix for model valdation
 #'
 #' @param verifyDF: combo df of all verification tables for each HUC4
+#' @param snappingThresh: snapping threshold for 'on the NHD'
 #'
 #' @return confusion matrix. Figure saved to file
-validateModel <- function(combined_validation){
+validateModel <- function(combined_validation, snappingThresh){
   verifyDF <- tidyr::drop_na(combined_validation, 'NHDPlusID') #remove empty columns that arise from empty validation HUC regions
   verifyDF$snap_distance_m <- as.numeric(verifyDF$snap_distance_m)
 
   totNHD <- nrow(verifyDF[!duplicated(verifyDF$NHDPlusID) & verifyDF$distinction == 'ephemeral',])
-  verifyDF <- dplyr::filter(verifyDF, snap_distance_m < 15) #15m snapping buffer
+  verifyDF <- dplyr::filter(verifyDF, snap_distance_m < snappingThresh) #15m snapping buffer
 
   #take most frequent JD per NHD reach
   verifyDFfin <- verifyDF %>%
@@ -171,7 +177,7 @@ validateModel <- function(combined_validation){
   cfMatrix <- ggplot(cm, aes(Reference, Prediction,fill=factor(Freq))) +
     geom_tile() +
     geom_text(aes(label=Freq), size=15)+
-    scale_fill_manual(values=c('#d95f02', '#d95f02', '#1b9e77', '#1b9e77')) +
+    scale_fill_manual(values=c('grey', 'grey', '#1b9e77', '#1b9e77')) +
     labs(x = "Observed Class",y = "Model Class") +
     scale_x_discrete(labels=c("Ephemeral","Intermittent/Perennial")) +
     scale_y_discrete(labels=c("Intermittent\n/Perennial","Ephemeral")) +
@@ -187,5 +193,6 @@ validateModel <- function(combined_validation){
 
   return(list('validation_fin'=verifyDFfin,
               'eph_features_on_nhd'=onNHD,
-              'eph_features_off_nhd'=totNHD - onNHD))
+              'eph_features_off_nhd'=totNHD - onNHD,
+              'all_validation_features'=nrow(verifyDF)))
 }

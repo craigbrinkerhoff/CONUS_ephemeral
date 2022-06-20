@@ -16,10 +16,12 @@ scalingFunc <- function(validationResults){
   #fit model for Horton number of streams per order
   lm <- lm(log(n)~StreamOrde, data=df)
   Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-  ephMinOrder <- round((max(df$StreamOrde)*log(Rb) - log(desiredFreq))/log(Rb),0)
+  #ephMinOrder <- round((max(df$StreamOrde)*log(Rb) - log(desiredFreq))/log(Rb),0)
+  ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
 
   return(list('ephMinOrder'=ephMinOrder,
-              'horton_Rb'=Rb,
+              'df'=df,
+              'desiredFreq'=desiredFreq,
               'horton_lm'=lm)) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
 }
 
@@ -27,42 +29,59 @@ scalingByBasin <- function(scalingModel, rivNetFin, results){
   #fit horton laws to this river system
   numNewOrders <- (1-scalingModel$ephMinOrder)
 
-  #number of streams
+  #num flowing days per earlier rain analysis
+  numFlowingDays <- results$num_flowing_dys
+
+  #number and average discharge of ephemeral streams
   df <- filter(rivNetFin, perenniality == 'ephemeral') %>%
       group_by(StreamOrde) %>%
       summarise(n=n(),
-                Qbar = mean(Q_cms, na.rm=T))
-  lm <- lm(log(n)~StreamOrde, data=df)
-  Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-
-  #mean streamflow by order
-  lm <- lm(log(Qbar)~StreamOrde, data=df)
-  Rq <- exp(lm$coefficient[2]) #Horton law parameter
+                Qbar = mean(Q_cms, na.rm=T),
+                Qbar_adj = mean(Q_cms, na.rm=T)* (365/numFlowingDays))
 
   #rewrte stream orders for scaling
+  df$old_orders <- df$StreamOrde
   df$StreamOrde <- df$StreamOrde + numNewOrders
+
+  #get horton ratios
+  lm <- lm(log(n)~StreamOrde, data=df)
+  Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
+  lm2 <- lm(log(Qbar)~StreamOrde, data=df)
+  Rq <- exp(lm2$coefficient[2]) #Horton law parameter for mean Q
+  lm3 <- lm(log(Qbar_adj)~StreamOrde, data=df)
+  Rq_f <- exp(lm3$coefficient[2]) #Horton law parameter for mean flowing Q
 
   #scale
   for (i in 1:numNewOrders){
     new <- data.frame('StreamOrde'=i, 'n'=NA, 'Qbar'=NA)
-    new$n <- Rb^(max(df$StreamOrde) - i)
+    new$old_orders <- NA
+    new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
     if(i ==1){
-      new$Qbar <- (df[df$StreamOrde == 5,]$Qbar)/(Rq^(df[df$StreamOrde == 5,]$StreamOrde - 1)) #ratio using 5th order
+      new$Qbar <- (df[df$StreamOrde == 3,]$Qbar)/(Rq^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+      new$Qbar_adj <- (df[df$StreamOrde == 3,]$Qbar_adj)/(Rq_f^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
     }
     else{
       new$Qbar <- df[df$StreamOrde == 1,]$Qbar*Rq^(i-1)
+      new$Qbar_adj <- df[df$StreamOrde == 1,]$Qbar*Rq_f^(i-1)
     }
     df <- rbind(df, new)
   }
 
   df <- df[order(df$StreamOrde), ]
 
-  additionalQ <- sum(df[1:numNewOrders,]$Qbar * df[1:numNewOrders,]$n)
-  results$totalephmeralQ_scaled <- results$totalephmeralQ + additionalQ
+  #get water volume in additional stream order
+  additionalQ <- sum(df[1:numNewOrders,]$Qbar * df[1:numNewOrders,]$n) #mean annual
+  additionalQ_flowing <- sum(df[1:numNewOrders,]$Qbar_adj * df[1:numNewOrders,]$n) #mean annual flowing
+
+  #adding scaled results to previous results
+  results$totalephmeralQ_scaled <- results$totalephmeralQ + additionalQ #mean annual
   results$percQ_eph_scaled <- results$totalephmeralQ_scaled / (results$totalephmeralQ_scaled + results$totalNotEphQ)
 
-  return(list('results'=results,
-                'orders'=df))
+  results$totalephmeralQ_flowing_scaled <- results$totalephmeralQ_flowing + additionalQ_flowing #mean annual flowing
+  results$percQ_eph_flowing_scaled <- results$totalephmeralQ_flowing_scaled / (results$totalephmeralQ_flowing_scaled + results$totalNotEphQ)
+
+
+  return(results)
 }
 
 

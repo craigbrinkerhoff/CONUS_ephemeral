@@ -215,32 +215,25 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 #'
 #' @return summary statistics
 collectResults <- function(nhd_df, path_to_data, huc4, runoff_eff, precip_thresh){
-  #adjust Q for ephemeral streams to reflect 'average flowing discharge', i.e. ignoring days when the ephemeral reach is dry
-  #nhd_df$Q_bin <- ifelse(nhd_df$Q_cms < 0.01, 0.01,
-  #                    ifelse(nhd_df$Q_cms < 0.1, 0.1,
-  #                          ifelse(nhd_df$Q_cms < 1, 1,
-  #                                ifelse(nhd_df$Q_cms < 10, 10, 100))))
-  #nhd_df$meanFlowingDays <- predict(flowQmodel, nhd_df)
-  #nhd_df$meanFlowingDays <- ifelse(nhd_df$perenniality != 'ephemeral', NA, nhd_df$meanFlowingDays) #only applies to ephemeral reaches
-
   #get basin to clip wtd model
   huc2 <- substr(huc4, 1, 2)
   basins <- vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
   basin <- basins[basins$huc4 == huc4,]
 
-  #add long term mean daily precip
-  precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1980_2010.gri'))#'/for_ephemeral_project/precip.V1.0.day.ltm.nc'))
+  #add year gridded precip
+  precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1980_2010.gri')) #daily precip for 1980-2010, perfect for identifying storm events!
   precip <- raster::rotate(precip) #convert 0360 lon to -180-180 lon
-  basin <- project(basin, '+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ')#"+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  basin <- project(basin, '+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ')
   basin <- as(basin, 'Spatial')
   precip <- raster::crop(precip, basin)
 
   #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency
-  thresh <- mean(quantile(log(precip), (1-precip_thresh), na.rm=TRUE)) #basin average exceedance probability
-  #thresh <- 1 #mm event
-  precip <- sum(log(precip) >= log(thresh))
+  thresh <- precip_thresh / runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff #convert runoff thresh to precip thresh using runoff efficiency coefficient (because proportion of P that becomes Q varies regionally)
+  precip <- sum(precip >= thresh)
 
-  numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin and for one year
+  numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin
+
+  numFlowingDays <- (numFlowingDays/(31*365))*365#average number of dys per year across the record
 
   #adjusted Q
   nhd_df$Q_cms_adj <- nhd_df$Q_cms * (365/numFlowingDays) #ifelse(is.finite(nhd_df$Q_cms * (365/numFlowingDays))==0, 0, nhd_df$Q_cms * (365/numFlowingDays))
@@ -280,9 +273,9 @@ boxPlots <- function(combined_results){
   theme_set(theme_classic())
 
   #discharge
-  forPlotQ <- tidyr::gather(combined_results, key=key, value=value, c('percQ_eph', 'percQ_eph_flowing'))
+  forPlotQ <- tidyr::gather(combined_results, key=key, value=value, c('percQ_eph_scaled', 'percQ_eph_flowing_scaled'))
   forPlotQ$key <- as.factor(forPlotQ$key)
-  levels(forPlotQ$key) <- c("All year", "When flowing")
+  levels(forPlotQ$key) <- c("When flowing", "All year")
   boxplotsQ <- ggplot(forPlotQ, aes(x=key, y=value, fill=key)) +
     geom_boxplot(color='black', size=1.25) +
     annotate('text', label=paste0('n = ', nrow(combined_results), ' basins'), x=as.factor('All year'), y=0.80, size=8)+
@@ -316,6 +309,16 @@ boxPlots <- function(combined_results){
   return(boxplotsQ)
 }
 
+
+
+
+#adjust Q for ephemeral streams to reflect 'average flowing discharge', i.e. ignoring days when the ephemeral reach is dry
+#nhd_df$Q_bin <- ifelse(nhd_df$Q_cms < 0.01, 0.01,
+#                    ifelse(nhd_df$Q_cms < 0.1, 0.1,
+#                          ifelse(nhd_df$Q_cms < 1, 1,
+#                                ifelse(nhd_df$Q_cms < 10, 10, 100))))
+#nhd_df$meanFlowingDays <- predict(flowQmodel, nhd_df)
+#nhd_df$meanFlowingDays <- ifelse(nhd_df$perenniality != 'ephemeral', NA, nhd_df$meanFlowingDays) #only applies to ephemeral reaches
 
 #getPerenniality_peckel <- function(nhd_df, huc4, thresh, err,summarizer){
 #  huc2 <- substr(huc4, 1, 2)

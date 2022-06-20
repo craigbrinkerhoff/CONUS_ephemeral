@@ -25,8 +25,8 @@ path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to d
 codes_huc02 <- c('01','02','06', '11', '12', '13','14','15','16') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
 threshold <- -0.1 #10cm buffer around 0m depth
 error <- 0
-snappingThresh <- 200 #[m] for snapping valiation data to river network
-precip_exceedance <- 0.1 #$ exceeding
+snappingThresh <- 15 #[m] for snapping valiation data to river network
+precip_thresh <- 0.24 #[mm/dy] threshold for a stop event, equivalent to 0.1mm/hr
 
 #SETUP STATIC BRANCHING FOR MODEL RUNS ACCROSS BASINS----------------------------
 #Each HUC4 basin gets it's own branch
@@ -47,7 +47,8 @@ mapped <- tar_map(
        names = "huc4",
        tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
        tar_target(rivNetFin, getPerenniality(extractedRivNet, huc4, threshold, error, 'mean')), #calculate perenniality
-       tar_target(results, collectResults(rivNetFin, path_to_data, huc4, runoffEff, precip_exceedance)), #calculate basin statistics using streamflow model
+       tar_target(results, collectResults(rivNetFin, path_to_data, huc4, runoffEff, precip_thresh)), #calculate basin statistics using streamflow model
+       tar_target(scaledResult, scalingByBasin(scalingModel, rivNetFin, results)), #scale to additonal ephemeral orders vis Horton Laws
        tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4))) #snap WOTUS descisions to modeled river network for later validation
 
 #############ACTUAL PIPLINE, COMBINING STATIC BRANCHING, AGGREGATION TARGETS, AND OTHER TARGETS
@@ -57,23 +58,22 @@ list(
      tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculates mean observed flow 1970-2018 to verify erom model
 
      #########GATHER WOTUS JD VALIDATION SET
-     tar_target(validationDF, prepValDF()), #clean WOTUS validation set
+     tar_target(validationDF, prepValDF(path_to_data)), #clean WOTUS validation set
      tar_target(runoffEff, calcRunoffEff(path_to_data, codes_huc02)), #calculate runoff efficiency
+
+     ##########PREP FOR ADDITIONAL EPHEMERAL SCALING
+     tar_target(scalingModel, scalingFunc(validationResults)), #how many additional ephemeral orders we should have (via Horton laws)
 
      ##########RUN & VALIDATE MODEL
      mapped, #run actual model (see above)
 
      ##########BUILD FIGURES AND SHAPEFILES
-     tar_combine(combined_results, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model results across branches
+     tar_combine(combined_results, mapped$scaledResult, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model results across branches
      tar_combine(combined_validation, mapped$snappedValidation, command = dplyr::bind_rows(!!!.x, .id = "method")),  #aggregate model validation results across branches
      tar_target(EROM_figure, eromVerification(USGS_data, nhdGages), deployment='main'), #figures for validating discharges
-     tar_target(validationResults, validateModel(combined_validation)), #validation confusion matrix
+     tar_target(validationResults, validateModel(combined_validation, snappingThresh)), #validation confusion matrix
      tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results, validationResults)), #model results shapefile
-     tar_target(boxplots, boxPlots(combined_results)), #build boxplots comparing flowing vs non flowing importance
-
-     ##########PERFORM ADDITIONAL EPHEMERAL SCALING
-     tar_target(scalingModel, scalingFunc(validationResults)), #clean WOTUS validation set
-     tar_target(scaledResult, scalingByBasin(scalingModel, rivNetFin_1211, results_1211)) #clean WOTUS validation set
+     tar_target(boxplots, boxPlots(combined_results)) #build boxplots comparing flowing vs non flowing importance
 )
 
 
