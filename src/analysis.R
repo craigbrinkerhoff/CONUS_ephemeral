@@ -24,11 +24,11 @@ extractWTD <- function(path_to_data, huc4){
   huc2 <- substr(huc4, 1, 2)
 
   #get basin to clip wtd model
-  basins <- vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
+  basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
   basin <- basins[basins$huc4 == huc4,]
 
   #Process-based water table depth modeling
-  wtd <- rast(paste0(path_to_data, '/for_ephemeral_project/conus_MF6_SS_Unconfined_250_dtw.tif'))   #monthly averages for hourly model runs for 2004-2014
+  wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/conus_MF6_SS_Unconfined_250_dtw.tif'))   #monthly averages for hourly model runs for 2004-2014
   wtd$wtd_m <- wtd$conus_MF6_SS_Unconfined_250_dtw * -1 #(convert to depth below water table)
 
   #USGS NHD
@@ -41,8 +41,8 @@ extractWTD <- function(path_to_data, huc4){
   lakes <- as.data.frame(lakes) %>%
     dplyr::filter(FType %in% c(390, 436)) #lakes/reservoirs only
   colnames(lakes)[6] <- 'LakeAreaSqKm'
-  NHD_HR_EROM <- st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
-  NHD_HR_VAA <- st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
+  NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
+  NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
 
   nhd <- left_join(nhd, lakes, by=c('WBArea_Permanent_Identifier'='Permanent_Identifier'))
   colnames(nhd)[16] <- 'NHDPlusID' #some manual rewriting b/c this columns get doubled from previous joins where data was needed for specific GIS tasks...
@@ -75,16 +75,16 @@ extractWTD <- function(path_to_data, huc4){
   nhd$width_m <- mapply(width_func, nhd$waterbody, nhd$Q_cms, nhd$a, nhd$b)
 
   #extract water table depths
-  nhd <- vect(nhd)
+  nhd <- terra::vect(nhd)
 
   #reproject to match wtd raster
-  nhd <- project(nhd, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
-  basin <- project(basin, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  nhd <- terra::project(nhd, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  basin <- terra::project(basin, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
 
   #clip wtd data to basin at hand
-  wtd <- crop(wtd, basin)
+  wtd <- terra::crop(wtd, basin)
 
-  nhd_wtd <- extract(wtd$wtd_m, nhd, fun=summariseWTD)
+  nhd_wtd <- terra::extract(wtd$wtd_m, nhd, fun=summariseWTD)
 
   nhd_df <- as.data.frame(nhd)
   nhd_df <- select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode', 'ToNode','Q_cms', 'LengthKM', 'width_m', 'depth_m'))
@@ -137,6 +137,11 @@ calcRunoffEff <- function(path_to_data, codes_huc02){
 
   precip_mean_basins <- terra::extract(precip_mean, basins_overall, fun='mean', na.rm=TRUE)
   basins_overall$precip_ma_mm_yr <- (precip_mean_basins$layer*365) #apply long term mean over the entire year
+
+  #Manually adding result from Canada gage 05AD007 in Alberta because no usgs gauges to calc runoff
+    #listed long term avg flow = 29.6 m3/sam
+    #listed drainage area: 17,000 km2
+  basins_overall$runoff_ma_mm_yr <- ifelse(basins_overall$huc4 == '0904', (29.6/(17000*1e6))*86400*365*1000, basins_overall$runoff_ma_mm_yr) #m3/s to mm/yr
 
   #runoff efficecincy
   basins_overall$runoff_eff <- basins_overall$runoff_ma_mm_yr / basins_overall$precip_ma_mm_yr #efficiency of P to streamflow routing
@@ -207,14 +212,15 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
   return(out)
 }
 
-#' Tabulates summary statistics (namely % discharge and % surface area) at the huc 4 level
+#' Calculates a first-order 'number flowing days' per HUC4 basin using long-term runoff efficiency and daily precip for 1980-2010
 #'
-#' @param nhd_df: NHD hydrography with river perenniality status
+#' @param path_to_data: path to data repo
 #' @param huc4: huc basin level 4 code
-#' @param flowQmodel: scaling model for number of days that Q is flowing
+#' @param runoff_eff: calculated runoff efficiencies per HUC4 basin
+#' @param runoff_thresh: a priori runoff threshold for 'flow generation'
 #'
-#' @return summary statistics
-collectResults <- function(nhd_df, path_to_data, huc4, runoff_eff, precip_thresh){
+#' @return number of flowing days for a given HU43 basin
+calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh){
   #get basin to clip wtd model
   huc2 <- substr(huc4, 1, 2)
   basins <- vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
@@ -228,31 +234,42 @@ collectResults <- function(nhd_df, path_to_data, huc4, runoff_eff, precip_thresh
   precip <- raster::crop(precip, basin)
 
   #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency
-  thresh <- precip_thresh / runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff #convert runoff thresh to precip thresh using runoff efficiency coefficient (because proportion of P that becomes Q varies regionally)
+  thresh <- runoff_thresh / runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff #convert runoff thresh to precip thresh using runoff efficiency coefficient (because proportion of P that becomes Q varies regionally)
   precip <- sum(precip >= thresh)
 
   numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin
 
-  numFlowingDays <- (numFlowingDays/(31*365))*365#average number of dys per year across the record
+  numFlowingDays <- (numFlowingDays/(31*365))*365 #average number of dys per year across the record (31 years)
 
-  #adjusted Q
-  nhd_df$Q_cms_adj <- nhd_df$Q_cms * (365/numFlowingDays) #ifelse(is.finite(nhd_df$Q_cms * (365/numFlowingDays))==0, 0, nhd_df$Q_cms * (365/numFlowingDays))
+  return(numFlowingDays)
+}
+
+#' Tabulates summary statistics (namely % discharge and % surface area) at the huc 4 level
+#'
+#' @param nhd_df: NHD hydrography with river perenniality status
+#' @param numFlowingDays: number of flowing days for a given HU43 basin
+#' @param huc4: huc basin level 4 code
+#'
+#' @return summary statistics
+collectResults <- function(nhd_df, numFlowingDays, huc4){
+    #adjusted Q
+  #nhd_df$Q_cms_adj <- nhd_df$Q_cms * (365/numFlowingDays)
 
   #adjusted widths
-  widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #depth AHG model
-  a <- widAHG$coefficients[1]
-  b <- widAHG$coefficients[2]
-  nhd_df$width_m_adj <- exp(a)*nhd_df$Q_cms_adj^(b)
+  #widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #depth AHG model
+  #a <- widAHG$coefficients[1]
+  #b <- widAHG$coefficients[2]
+  #nhd_df$width_m_adj <- exp(a)*nhd_df$Q_cms_adj^(b)
 
   #concatenate and generate results
   results_nhd <- data.frame(
     'huc4'=huc4,
     'num_flowing_dys'=numFlowingDays,
     'notEphNetworkSA' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality != 'ephemeral',]$width_m*1000, na.rm=T),
-    'ephemeralNetworkSA_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m_adj*1000, na.rm=T),
+    'ephemeralNetworkSA_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m*1000, na.rm=T) * (365/numFlowingDays), #scale to 'flowing Q'
     'ephemeralNetworkSA' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM*nhd_df[nhd_df$perenniality == 'ephemeral',]$width_m*1000, na.rm=T),
     'totalNotEphQ' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$Q_cms, na.rm=T),
-    'totalephmeralQ_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms_adj, na.rm=T),
+    'totalephmeralQ_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms, na.rm=T)* (365/numFlowingDays), #scale to 'flowingQ'
     'totalephmeralQ' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms, na.rm=T))
 
   results_nhd$percQ_eph_flowing <- results_nhd$totalephmeralQ_flowing / (results_nhd$totalNotEphQ + results_nhd$totalephmeralQ_flowing)
@@ -288,24 +305,7 @@ boxPlots <- function(combined_results){
       plot.title = element_text(size = 30, face = "bold"),
       legend.position='none')
 
-  #surface area
-  forPlotSA <- tidyr::gather(combined_results, key=key, value=value, c('percSA_eph', 'percSA_eph_flowing'))
-  forPlotSA$key <- as.factor(forPlotSA$key)
-  levels(forPlotSA$key) <- c("All year", "When flowing")
-  boxplotsSA <- ggplot(forPlotSA, aes(x=key, y=value, fill=key)) +
-    geom_boxplot(color='black', size=1.25) +
-    scale_fill_brewer(palette='Dark2') +
-    ylab('% ephemeral surface area') +
-    xlab('')+
-    theme(axis.text=element_text(size=20),
-      axis.title=element_text(size=22,face="bold"),
-      legend.text = element_text(size=17),
-      plot.title = element_text(size = 30, face = "bold"),
-      legend.position='none')
-
-  plot_fin <- plot_grid(boxplotsQ, boxplotsSA, ncol=2)
-
-  ggsave('cache/boxplots.jpg', plot_fin, width=18, height=10)
+  ggsave('cache/boxplots.jpg', boxplotsQ, width=10, height=10)
   return(boxplotsQ)
 }
 

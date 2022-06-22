@@ -16,7 +16,7 @@ scalingFunc <- function(validationResults){
   #fit model for Horton number of streams per order
   lm <- lm(log(n)~StreamOrde, data=df)
   Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-  #ephMinOrder <- round((max(df$StreamOrde)*log(Rb) - log(desiredFreq))/log(Rb),0)
+  #ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
   ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
 
   return(list('ephMinOrder'=ephMinOrder,
@@ -37,7 +37,7 @@ scalingByBasin <- function(scalingModel, rivNetFin, results){
       group_by(StreamOrde) %>%
       summarise(n=n(),
                 Qbar = mean(Q_cms, na.rm=T),
-                Qbar_adj = mean(Q_cms, na.rm=T)* (365/numFlowingDays))
+                Qbar_adj = mean(Q_cms, na.rm=T) * (365/numFlowingDays))
 
   #rewrte stream orders for scaling
   df$old_orders <- df$StreamOrde
