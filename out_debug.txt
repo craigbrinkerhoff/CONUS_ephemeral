@@ -1,2 +1,0 @@
-Error in soptions(clustermq.scheduler = "slurm", clustermq.template = "slurm.tmpl") : 
-  could not find function "soptions"
