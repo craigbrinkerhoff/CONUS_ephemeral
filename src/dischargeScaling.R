@@ -4,6 +4,54 @@
 ## Function to update discharges to refelct 'average flowing Q'
 #####################
 
+scalingTestWrapper <- function(threshs, combined_validation){
+  out <- data.frame()
+  for(i in threshs){
+    validationResults <- validateModel(combined_validation, i)
+    desiredFreq <- validationResults$eph_features_off_nhd #ephemeral features not on the NHD, what we want to scale too
+
+    df <- validationResults$validation_fin
+    df <- filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gages, which are always perennial anyway
+
+    df <- group_by(df, StreamOrde) %>%
+        summarise(n=n())
+
+    #fit model for Horton number of streams per order
+    lm <- lm(log(n)~StreamOrde, data=df)
+    Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
+    ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
+
+    predN <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - df$StreamOrde)
+    rmseN <- Metrics::rmse(df$n, predN)
+    maeN <- Metrics::mae(df$n, predN)
+    temp <- data.frame('thresh'=i,
+                       'rmse'=rmseN,
+                       'mae'=maeN,
+                       'median_abs_perc_diff'=abs(median((predN-df$n)/df$n))*100,
+                       'n'=sum(df$n))
+
+    out <- rbind(out, temp)
+  }
+
+  #save tradeoff plot to file
+  out$total <- out$mae + out$rmse + out$median_abs_perc_diff
+  forPlot <- tidyr::gather(out, key=key, value=value, c('rmse', 'mae', 'median_abs_perc_diff', 'total'))
+  tradeOffPlot <- ggplot(forPlot, aes(thresh, value, color=key)) +
+        geom_point(size=5) +
+        geom_line(linetype='dashed', size=1) +
+        scale_color_manual(name='', labels=c('MAE', 'Median Percent\nDifference', 'RMSE', 'Aggregate'), values=c('#238b45', '#41ab5d', '#74c476', '36a51a3'))+
+        xlab('Snapping Threshold') +
+        ylab('Horton Scaling Performance')+
+        theme(axis.text=element_text(size=24),
+              axis.title=element_text(size=28,face="bold"),
+              legend.text = element_text(size=17),
+              legend.title = element_text(size=17, face='bold'))
+  ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=10, height=8)
+
+  return(list('results'=out,
+              'chosenThresh'=out[which.min(out$total),]$thresh))
+}
+
 scalingFunc <- function(validationResults){
   desiredFreq <- validationResults$eph_features_off_nhd #ephemeral features not on the NHD, what we want to scale too
 
@@ -16,13 +64,13 @@ scalingFunc <- function(validationResults){
   #fit model for Horton number of streams per order
   lm <- lm(log(n)~StreamOrde, data=df)
   Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-  #ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
   ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
 
   return(list('ephMinOrder'=ephMinOrder,
               'df'=df,
               'desiredFreq'=desiredFreq,
-              'horton_lm'=lm)) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
+              'horton_lm'=lm,
+              'Rb'=  Rb <- 1/exp(lm$coefficient[2]))) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
 }
 
 scalingByBasin <- function(scalingModel, rivNetFin, results){

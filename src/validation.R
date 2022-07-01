@@ -150,11 +150,12 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 #'
 #' @return confusion matrix. Figure saved to file
 validateModel <- function(combined_validation, snappingThresh){
+
   verifyDF <- tidyr::drop_na(combined_validation, 'NHDPlusID') #remove empty columns that arise from empty validation HUC regions
   verifyDF$snap_distance_m <- as.numeric(verifyDF$snap_distance_m)
 
   totNHD <- nrow(verifyDF[!duplicated(verifyDF$NHDPlusID) & verifyDF$distinction == 'ephemeral',])
-  verifyDF <- dplyr::filter(verifyDF, snap_distance_m < snappingThresh) #15m snapping buffer
+  verifyDF <- dplyr::filter(verifyDF, snap_distance_m < snappingThresh)
 
   #take most frequent JD per NHD reach
   verifyDFfin <- verifyDF %>%

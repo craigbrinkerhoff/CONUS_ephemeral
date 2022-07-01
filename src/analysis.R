@@ -108,13 +108,11 @@ extractWTD <- function(path_to_data, huc4){
 #' @import ncdf4
 #'
 #' @return dataframe with runoff coefficients at HUC level 4 scale
-calcRunoffEff <- function(path_to_data, codes_huc02){
-  #read in all HUC4 basins------------------
-  basins_overall <- st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
-  for(i in codes_huc02[-1]){
-    basins <- st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
-    basins_overall <- rbind(basins_overall, basins)
-  }
+calcRunoffEff <- function(path_to_data, huc4){
+  #read in HUC4 basin------------------
+  huc2 <- substr(huc4, 1, 2)
+  basin <- st_read(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
+  basin <- dplyr::filter(basin, huc4 == huc4)
 
   #SETUP RUNOFF DATA----------------------------------
   HUC4_runoff <- read.table(paste0(path_to_data, '/for_ephemeral_project/HUC4_runoff_mm.txt'), header=TRUE)
@@ -122,9 +120,9 @@ calcRunoffEff <- function(path_to_data, codes_huc02){
   HUC4_runoff$huc4 <- ifelse(nchar(HUC4_runoff$huc_cd)==3, paste0('0', HUC4_runoff$huc_cd), HUC4_runoff$huc_cd)
   HUC4_runoff$runoff_ma_mm_yr <- rowMeans(HUC4_runoff[,71:122]) #1970-2021   #get long-term mean annual runoff
   HUC4_runoff <- select(HUC4_runoff, c('huc4', 'runoff_ma_mm_yr'))
-  basins_overall <- left_join(basins_overall, HUC4_runoff, by='huc4')
+  basin <- left_join(basin, HUC4_runoff, by='huc4')
 
-  basins_overall <- vect(basins_overall)
+  basin <- vect(basin)
 
   #SETUP MEAN DAILY PRECIP DATA-----------------------------------
   precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/precip.V1.0.day.ltm.nc'))
@@ -132,24 +130,24 @@ calcRunoffEff <- function(path_to_data, codes_huc02){
   precip_mean <- rast(mean(precip)) #get long term mean for 1981-2010
 
   #reproject
-  basins_overall <- project(basins_overall, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
+  basin <- project(basin, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
   precip_mean <- project(precip_mean, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
 
-  precip_mean_basins <- terra::extract(precip_mean, basins_overall, fun='mean', na.rm=TRUE)
-  basins_overall$precip_ma_mm_yr <- (precip_mean_basins$layer*365) #apply long term mean over the entire year
+  precip_mean_basins <- terra::extract(precip_mean, basin, fun='mean', na.rm=TRUE)
+  basin$precip_ma_mm_yr <- (precip_mean_basins$layer*365) #apply long term mean over the entire year
 
   #Manually adding result from Canada gage 05AD007 in Alberta because no usgs gauges to calc runoff
     #listed long term avg flow = 29.6 m3/sam
     #listed drainage area: 17,000 km2
-  basins_overall$runoff_ma_mm_yr <- ifelse(basins_overall$huc4 == '0904', (29.6/(17000*1e6))*86400*365*1000, basins_overall$runoff_ma_mm_yr) #m3/s to mm/yr
+  basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0904', (29.6/(17000*1e6))*86400*365*1000, basin$runoff_ma_mm_yr) #m3/s to mm/yr
 
   #runoff efficecincy
-  basins_overall$runoff_eff <- basins_overall$runoff_ma_mm_yr / basins_overall$precip_ma_mm_yr #efficiency of P to streamflow routing
+  basin$runoff_eff <- basin$runoff_ma_mm_yr / basin$precip_ma_mm_yr #efficiency of P to streamflow routing
 
   #save as rds file
-  basins_overall <- as.data.frame(basins_overall)
+  basin <- as.data.frame(basin)
 
-  return(basins_overall)
+  return(basin)
 }
 
 #' Estimates reach perenniality status for the NHD

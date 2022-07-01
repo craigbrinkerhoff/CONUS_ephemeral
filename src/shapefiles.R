@@ -60,13 +60,16 @@ saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
 
   #calculate classification stats (round for mapping)
   out <- group_by(out, huc2) %>%
-            summarise(basinAccuracy = round((sum(TP, na.rm=T) + sum(TN, na.rm=T))/n(),2),
-                      basinSpecificity = round(sum(TP, na.rm=T)/(sum(TP,na.rm=T)+sum(FP,na.rm=T)),2),
-                      basinSensitivity = round(sum(TN, na.rm=T)/(sum(TN,na.rm=T)+sum(FN,na.rm=T)),2),
-                      n_val=n())
+            summarise(basinAccuracy = round((sum(TP, na.rm=T) + sum(TN, na.rm=T))/(sum(TP, na.rm=T) + sum(TN, na.rm=T) + sum(FN, na.rm=T) + sum(FP, na.rm=T)),2),
+                      basinSensitivity = round(sum(TP, na.rm=T)/(sum(TP,na.rm=T)+sum(FP,na.rm=T)),2),
+                      basinSpecificity = round(sum(TN, na.rm=T)/(sum(TN,na.rm=T)+sum(FN,na.rm=T)),2),
+                      n_total=sum(TP, na.rm=T) + sum(TN, na.rm=T) + sum(FN, na.rm=T) + sum(FP, na.rm=T),
+                      n_eph = sum(TP == 1, na.rm=T) + sum(FP == 1, na.rm=T),
+                      n_not_eph = sum(TN == 1, na.rm=T) + sum(FN == 1, na.rm=T))
+  out$basinBalAccuracy <- (out$basinSensitivity + out$basinSpecificity)/2
 
   basins_overall <- left_join(basins_overall, out, by='huc2')
-  basins_overall <- select(basins_overall, c('huc2', 'name', 'basinAccuracy', 'basinSensitivity', 'basinSpecificity', 'n_val', 'geometry'))
+  basins_overall <- select(basins_overall, c('huc2', 'name', 'basinAccuracy', 'basinBalAccuracy', 'basinSensitivity', 'basinSpecificity', 'n_total', 'n_eph', 'n_not_eph', 'geometry'))
 
   if (!file.exists('cache/validation_fin.shp')) {
     st_write(basins_overall, 'cache/validation_fin.shp')
