@@ -1,0 +1,256 @@
+---
+title: "Significant Contribution of WOTUS ephemeral streams to United States drainage networks"
+author:
+  - Craig B Brinkerhoff:
+      email: cbrinkerhoff@umass.edu
+      institute: UMass
+      correspondence: true
+  - Colin J Gleason:
+      institute: UMass
+  - Mathew J Kohen:
+      institute: Yale1
+  - Doug Kysar:
+      institute: Yale2
+  - Peter A Raymond:
+      institute: Yale1
+institute:
+  - UMass: Department of Civil & Environmental Engineering, University of Massachusetts; Amherst, MA
+  - Yale1: School of the Environment, Yale University; New Haven, CT
+  - Yale2: Yale Law School, Yale University, New Haven; CT
+bibliography: References.bib
+csl: science_csl.csl
+output:
+  word_document:
+      pandoc_args:
+        - '--lua-filter=scholarly-metadata.lua'
+        - '--lua-filter=author-info-blocks.lua'
+      reference_docx: word-styles-reference.docx
+---
+
+```{r, echo=FALSE}
+library(targets)
+setwd('/nas/cee-water/cjgleason/craig/CONUS_ephemeral') #thinks it's in /manuscript...
+
+tar_load(combined_results)
+tar_load(USGS_data)
+tar_load(validationResults)
+tar_load(val_shapefile_fin)
+tar_load(flowingDaysValidation)
+
+val_shapefile_fin <- val_shapefile_fin$shapefile
+
+#validation numbers and results
+nDischargeValidation <- nrow(USGS_data)
+nMapValidation <- nrow(validationResults$validation_fin)
+
+#some regional categories for summary stats
+east <- c('01', '02', '03', '04', '05', '06', '07', '08', '09')
+aridWest <- c('10', '11', '12', '16') #Great Plains and Great Basin
+```
+
+## Abstract
+Ephemeral streams flow only in direct response to precipitation and their regulated status under the United States Clean Water Act (CWA) has recently been questioned [@departmentofthearmycorpsofengineersNavigableWatersProtection2020]. Despite this debate, an understanding of ephemeral influence on drainage network hydrology and water quality has remained elusive. Here, we apply a geomorphic model for ephemeral stream hydrology to over 20 million distinct surface water features in the contiguous United States, finding that ephemeral streams on average contribute `r round(mean(combined_results$percQ_eph_scaled)*100,0)`% of water to their drainage networks per year, despite only flowing on average `r round(mean(df$num_flowing_dys, na.rm=T),0)` days per year. We also assess how frequently ephemeral streams flow through riparian zones with high potential for pollution discharge under the proposed CWA changes. In aggregate, we find there is potential for regionally significant water quality degradation if ephemeral streams' protected status is removed.
+
+## One-Sentence Summary
+Ephemeral streams are a regionally significant portion of drainage networks and directly implicate United States water quality.
+
+## Main Text
+Terrestrial drainage networks transport nutrients, sediments, pollutants, and other constituents from the land surface to all points downstream [@raymondHydrologicalBiogeochemicalControls2016; @heAssessmentGlobalNitrogen2011; @schmidtExportPlasticDebris2017; @liuRiversLargestSource2021], fundamentally implicating all downstream water quality [@keiserCONSEQUENCESCLEANWATER]. The most upland component of this network are 'ephemeral' streams, which flow only in direct response to precipitation and are not fed by groundwater like larger intermittent and perennial rivers are. Recently, the United States Navigable Waters Protection Rule (NWPR) proposed changes to what constitutes the 'Waters of the United States' [WOTUS- @departmentofthearmycorpsofengineersNavigableWatersProtection2020], removing CWA jurisdiction from ephemeral streams and ultimately enabling the discharge of point-source pollution into the United States ephemeral stream network [@keiserCONSEQUENCESCLEANWATER]. The total extent of WOTUS and therefore CWA jurisdiction is a contentious topic that has recieved considerable attention from environmental groups, farm lobbying groups, and politicians [**CITATIONS**] since the 1970s. The NWPR's implementation is currently paused due to ongoing litagation [**CITATION**]
+
+Intermittent and ephemeral streams, collectively referred to as 'non-perennial' because they run dry every year, account for over 1/2 of the global river network [@messagerGlobalPrevalenceNonperennial2021]. While much recent work has developed classifiers for non-perennial streams [@messagerGlobalPrevalenceNonperennial2021; @jaegerProbabilityStreamflowPermanence2019; @durighettoProbabilisticDescriptionStreamflow2022; @russellSpatiallyExplicitModel2015] and ephemeral streams [@fesenmyerLargePortionUSA2021], all of these efforts focused simply on mapping non-perennial stream presence. We still lack an understanding of ephemeral stream hydrology and water quality at scale. More broadly, we cannot quantify the potential ramifications of the NWPR, where unpermitted discharges of pollutants into ephemeral streams would be allowed.
+
+Here, we use a remarkably simple geomorphic model to identify ephemeral streams by comparing long-term water table depths to drainage network presence in over 20 million discrete streams, rivers, lakes, reservoirs, canals, and ditches across the contiguous United States (CONUS) (Fig 1b-e). Then, we perform a first-order survey of American ephemeral streams along three dimensions: 1) ephemeral flow magnitude, 2) ephemeral flow frequency, and 3) potential for ephemeral point-source pollution [@MaterialsMethodsAre]. For 1) and 2), we use runoff and precipitation data and geomorphic scaling to quantify ephemeral stream magnitude and frequency. For 3), we map riparian land uses for every epehemeral stream in the contiguous United States and identify the most 'at-risk' drainage networks, those with a significant potential for point-source pollution into ephemeral streams. We validate individual model components (Figs. 2, S1-S3) and test parameter sensitivity when necessary (Figs. S4-S6) [@MaterialsMethodsAre].
+
+![Fig. 1: (A) Contiguous United States map and distribution of the ephemeral contribution to streamflow, highlighting significant variability in the role of ephemeral streams across the United States. (B-E) Hydrography maps for basins with a range of ephemeral streamflow contributions.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/paper_figures/fig1.jpg)
+
+![Fig. 2: Regional validations of the ephemeral stream classification model against completely independent field assessments of stream ephemerality: (A) regional model classification accuracy and (B) number of field-observations. The average regional classification accuracy is `r round(mean(val_shapefile_fin$basinAccuracy) ,2)*100`%. Consult the supplemental information for more on how we validate the model.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/paper_figures/fig2.jpg)
+
+On average, CONUS drainage networks are `r round(mean(combined_results$percLength_eph)*100,0)`% ephemeral by length and contribute `r round(mean(combined_results$percQ_eph_scaled), 2)*100`% of streamflow to their networks, but there are significant regional differences in this result (Fig. 1a; Fig. S7) controlled by variability in geomorphic and hydrologic landscape properties.  Drainage networks in the Great Basin and Great Plains source an average of `r  round(mean(combined_results[substr(combined_results$huc4,1,2) %in% aridWest, ]$percQ_eph_scaled)*100,0)`% of streamflow from ephemeral streams, with `r  sum(combined_results[substr(combined_results$huc4,1,2) %in% aridWest, ]$percQ_eph_scaled > 0.10)` drainage networks over 10%. Ephemeral streams contribute much less to streamflow in the east (Fig 1a), with an average contribution of only `r round(mean(combined_results[substr(combined_results$huc4,1,2) %in% east, ]$percQ_eph_scaled)*100,0)`%. For `r sum(combined_results$percQ_eph_scaled*100 < 1)` basins, ephemeral streamflow is less than 1% of the streamflow contribution, with many of these systems completely dominated by the largest rivers in the U.S. (Fig. 1a). Outside of the arid/semi-arid basins, ephemeral contributions are generally less than 1% for inland networks (Mississippi, Colombia, and Canada-bound drainage networks) while costal systems have realitively higher ephemeral contributions (East Coast, Great Lakes).
+
+![Fig. 3: (A) Contiguous United States map and distribution of the average number of days that ephemeral streams are flowing per year (for 1980-2010), with points indicating approximate locations of field data. (B) Verification of model results with field data. The blue point corresponds to a catchment that transitions from intermittent to ephemeral.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/paper_figures/fig3.jpg)
+
+The significance of ephemeral streamflow contribution is underpinned by how infrequently they flow. Ephemeral streams flow no more than `r round(max(combined_results$num_flowing_dys),0)` days in an average year, with a mean of `r round(mean(df$num_flowing_dys, na.rm=T),0)` days (Fig. 2a). A delicate balance is struck between hydro-climatic properties (where rainfall frequency, rainfall magnitude, and runoff efficiency control the size and occurence of runoff events) and geomorphology (where catchment size controls the amount of accumulated runoff needed to produce streamflow) [@MaterialsMethodsAre]. Through these mechanisms, regional patterns emerge. Non-arid ephemeral streams flow much more frequently than arid and semi-arid ones. Eastern coastal basins flow less frequently than their interior counterparts, in line with their realtively larger streamflow contributions (Fig. 1a). While individual ephemeral streams certainly flow more often than `r round(max(combined_results$num_flowing_dys),0)` days a year, our model suggests that there is a broad-scale upper bound on the frequency that ephemeral streams are activated. The simple, completely uncalibrated model uses only precipitation and runoff data and landscape scaling theory, yet it reasonably matches field measurements of flow frequency in ephemeral channels (Fig 2b) [@MaterialsMethodsAre]. In aggregate, figs. 1 and 3 suggest that ephemeral streams exert a significant influence on CONUS hydrology despite flowing infrequently. Under the hypothetical scenario that all ephemeral streams in a basin are flowing at the same time, average ephemeral contribution to streamflow becomes drammatically larger (Fig. S8).
+
+Overall, our results suggest a potentially significant mechanism for point-source pollution entering the CONUS drainage network when ephemeral streams are flowing (Fig. 1a, Fig 2a). To assess the potential ramifications of this mechanism, we compare the ephemeral streamflow contribution (Fig. 1a) to the relative occurence of cultivated/developed riparian lands along ephemeral streams  [@MaterialsMethodsAre]. While there is no gurantee that there will be pollution discharged into a given stream, cultivated/devolped lands are associated with the potential for point-source pollution due primarily to manufacturing facilities, concentrated animal feed operations (CAFOs) and private landowners. Through this analysis we identify basins with the greatest potential for water quality degradation directly at the hands of the NWPR (Fig. 4). The central Great Plains emerge has a region of particuraly high risk for point-source pollution in ephemeral streams (Fig. 4) due to a co-occurence of croplands and ephemeral streams. Much of the arid/semiarid Southwest is spared due to little ephemeral farmland or developed land at the basin-scale. With groundwater pumping a fact of life in the central Great Plains, it is likely that this potential water quality degradation will only grow in significance as river channels become increasingly disconnected from groundwater and 'turn ephemeral' [@goodrichSouthwesternIntermittentEphemeral2018; @scanlonGroundwaterDepletionSustainability2012].
+
+![Fig. 4: Bivariate map of % ephemeral streamflow versus % of ephemeral streams flowing through cultivated or developed riparian landscapes. Colors are assigned using tertiles and thus show realtive risk. The dark blue basins, where both values are realtively high, suggest the greatest potential for water quality degradation due to the NWPR.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/paper_figures/fig4.jpg)
+
+**Room for 1 policy paragraph here**
+
+## References
+references bust be moved here manually
+
+## Acknowledgements
+We thank Dr. Ying Fan Reinfelder, the USGS, and the EPA for making their data and/or models freely available. This study was made by possible by the Unity cluster at the Massachusetts Green High Performance Computing Center (MGHPCC), where all modeling was performed.
+
+## Funding
+Yale wrol (CBB, CJG, PAR)
+NASA finesst (CBB)
+
+## Author Contributions
+- Conceptualization: PAR, CBB, MJK, DK
+- Methodology: CBB, PAR, CJG
+- Investigation: CBB, PAR, MJK, DK, CJG
+- Visualization: CBB
+- Supervision: PAR
+- Writing- original draft: CBB
+- Writing- review & editing: CBB, CJG, PAR, MJK, DK
+
+## Competing interests
+Authors declare that they have no competing interests.
+
+## Data and materials availability
+All input data and/or models are available in the main text or the supplementary materials. The ephemeral model results, per drainage reach, are archived at ____________.
+
+## Supplementary Materials
+- Materials and Methods
+- Figs. S1 to S8
+- Tables S1 to S2
+- References (##–##)
+
+## This PDF file includes:
+
+- Materials and Methods
+- Figs. S1 to S8
+- Tables S1 to S2
+
+## Materials and Methods
+
+To identify WOTUS (Waters of the United States) ephemeral streams throughout the contiguous United States (CONUS), we use a global soil hydrology model [@fanHydrologicRegulationPlant2017], high-resolution drainage network hydrography [@u.s.geologicalsurveyNationalHydrographyDataset2022], and hydraulic geometry and drainage network scaling theory [@caelVolumeMeanDepth2017; @brink gbc; @hortonEROSIONALDEVELOPMENTSTREAMS1945]. To obtain basin-scale estimates of the mean annual 'number of days flowing' each year for ephemeral streams, we used long-term records of runoff and precipitation for each basin [@brakebillDigitalHydrologicNetworks2011; @xieGaugeBasedAnalysisDaily2007], as well as work on headwater hydromorphology [@allenSimilarityStreamWidth2018a]. Equation S1 brings these data and models together, calculating the % of streamflow contributed by ephemeral streams per basin, where $Q_e$ is discharge from an ephemeral mass-conserved reach and $Q_{ne}$ is discharge from a non-ephemeral reach. *i* refers to each reach in the drainage network.
+
+$$ ephemeral streamflow contribution= \frac{\sum_{x = i}^{I} Q_{e_i}}{\sum_{x = i}^{I} Q_{e_i} + \sum_{x = i}^{I} Q_{ne_i}} \mathbf{(S1)}$$
+
+All modeling and analysis was performed on the Unity Cluster at the Massachusetts Green High Performance Computing Center using publically available datasets, models, and entirely free and open-source geoprocessing tools in the R programming language.
+
+### 1 Drainage network framework
+#### 1.1 Overview
+
+CONUS drainage network hydrography is defined by the USGS National Hydrography Dataset High-Resolution (NHD-HR), built at a 1:24,000 map scale [@u.s.geologicalsurveyNationalHydrographyDataset2022]. We use the data publicily available as of Spring 2022. This is the highest resoultion hydrography data available and is often treated as a gold-standard to benchmark hydrography models against. The NHD-HR is discretized into 'reaches', which correspond to mass-conserved segments of rivers, streams, ditches, canals, lakes, and reservoirs. The NHD-HR uses artificial flowpaths to maintain network topology through lakes and reservoirs, and here we use a previous framework to incorporate discretized lake/reservoir bathymetry into our model [@brinkerhoffLakeMorphometryRiver2021]. The NHD-HR also uses nested drainage basins across 12 scales. We run our model at the 4th level (Fig. 1, Fig. 2), and our mapping validation at the 2nd level (Fig. 3). This was done based on data resolution, data availability across the United States, and ease of interpretation.
+
+As will all human-built products, NHD-HR data quality varies across CONUS. We identified significantly higher drainage densities in the NHD-HR for the state of Indiana (often 1-2x the stream orders as other portions of a given basin in adjacent U.S. states). For these basins, we manually removed the lowest 1 or two stream orders within the Indiana portions of these basins, until the whole-basin drainage density was visually consistent. We also removed all divergent reaches, i.e. minor flowpaths that diverge from the main downstream path of flow. We did not remove the rest of the flowpath downstream of a divergent reache if there was another source that ultimately flowed back into the drainage network. This is necessary to perform traditional river network routing, which requires a single downstream source.
+
+#### 1.2 Discharge model
+
+Each reach is associated with a mean annual discharge as modeled by the USGS [@u.s.geologicalsurveyNationalHydrographyDataset2022]. These are obtained through a runoff routing protocol that accounts for evapotranspirative losses (i.e. 'losing streams') and is 'gauge-adjusted' at sites with streamgauges. The USGS validated this model for 1970-2000. To confirm model performance for more recent years, we extend the validation to 1970-2018 using all USGS streamguages with sufficient data (Fig. S1). The discharge model is adjusted at gauged reaches to match observed conditions but the unadjusted values are also publicly available. This enables a validation of both the gauged reaches and the ungauged reaches using the respective modeled discharges to get a complete picture of model error. Both are presented in Fig. S1. There is strong agreement with the gauges, with the model strongly capturing mean annual discharges for 1970-2018 in both gauged and ungauged settings.
+
+We also calculate a hypothetical 'mean annual flowing discharge' ($\bar{Q_f}$) to assess ephemeral influence if all ephemeral streams in a basin are flowing at once. To do this, we use the theory laid out in equations S2-S4, where $Q_d$ is the mean daily discharge, and $N_{flw}$ is the number of flowing days per year on average in ephemeral streams. Equation S4 reduces our unknowns to just $N_{flw}$ and we estimate this later (section 5).
+
+$$\bar{Q} = \frac{\sum_{1}^{365} Q_d}{365} \mathbf{(S2)}$$
+
+$$\bar{Q_f} = \frac{\sum_{1}^{365} Q_d}{N_{flw}}\mathbf{(S3)}$$
+
+$$\bar{Q_f} = \bar{Q}*\frac{365}{N_{flw}} \mathbf{(S4)}$$
+
+#### 1.3 Hydraulic Geometry
+We use hydraulic geometry scaling to obtain broad estimates of mean annual river, lake, and reservoir depth that are needed to assess ephemerality (section 3). For rivers, canals, and ditches we used the relation from [@brink in review gbc], who fit an equation of the form $H=c\bar{Q}^f$ on over 500,000 USGS in situ measurements of river channel depth *H* and discharge *Q*. For lakes and reservoirs, we mass-conservation to obtain average depths from lake/reservoir volume (*Vol*) and surface area *SA*. *Vol* was scaled using an existing equation of the form $Vol=a(SA)^{1.2}$ [@caelVolumeMeanDepth2017], developed using the Hurst coefficient for self-affine surfaces and existing datasets.
+
+### 2 Field assessments of ephemerality
+We use a dataset of field assessments of stream ephemerality to validate the ephemeral classification model and to inform the scaling model that captures the full distribution of ephemeral streams (section 3). This dataset comes from three sources: a) EPA WOTUS jurisdictional determinations, b) USGS streamgauges, and c) field assessments of New England streams. These are outlined below.
+
+The EPA Jurisdictional Determinations dataset [@usepaCWAApprovedJDs] consists of site assessments (as of 06/20/2022 when downloaded) for WOTUS status made at the landowners request, where status was determined under the at-the-time jurisdictional rules. We filter this dataset to include only determinations made under the NWPR after it was enacted in 2020, which specifically includes a determination for ephemeral streams. This amounts to over 60,000 distinct jurisdictional determinations (including multiple determinations in the same reach, over space and time) and forms the bulk of our dataset. To make the dataset copacetic with our drainage network, we had to remove data not associated with surface water features directly connected to the drainage network: adjacent/riparian wetlands, drylands, uplands, upland or non-adjacent wetlands/ponds/depressions, croplands, wastewater plants, and groundwater. We kept all other determinations (rivers, lakes, reservoirs, canals, ditches, stormwater control features, and artificial surface water features) and recast all determinations as ephemeral or non-ephemeral.
+
+We use the USGS streamgauge network to supplement the Jurisdictional Determinations dataset. Because the EPA Jurisdictional Determinations are done on a voluntary basis at the landowner's request, it is biased towards small features whose WOTUS status may not be immediately apparent to the landowner. To make sure we are also correctly classifying large (usually perennial) rivers, we use gauged rivers (section 1.2). All gauged rivers that, on average, are flowing 95% of the year (for 1970-2018) are assumed to be non-ephemeral, and are added to the dataset as such.
+
+Finally, we assess stream ephemerality in New England ourselves. We follow the 'expert protocol' used by North Carolina's department of Water Quality for assessing stream ephemerality [@dorneyChapterNorthCarolina2018]. This protocol uses geomorphic, hydrological, and biotic indicators of seasonally and/or permanently high water tables to assess stream permanence. We use our local knowledge to identify streams we thought are likely to be ephemeral, verify they are present in the NHD-HR (but do not look at the model result a priori to avoid biasing our assessments) and assess the channels following the protocol. Classification results are in Table S1. All streams are assessed over 48 hours from the most recent rain event to avoid the influence of delayed runoff in the channel that might be mistaken for baseflow. Note that we do not perform full soil assessments nor species counts as the protocol technically specifies, but instead perform rapid visual assessments that favor speed of classification over thoroughness. Per the protocol, none of these channels are close enough to being classified as intermittent (Table S1) that we feel confident our rapid assessments are sufficient.
+
+We join this trple-dataset to the NHD-HR by snapping each field assessment to the nearest NHD-HR reach. Despite it's high resolution, the NHD-HR does not contain every stream in the United States and many of the field sites are not expected to be associated with an NHD-HR reach. So, we use a reasonable threshold for the maximum allowable snapping distance between the field site and the reach. Too small a threshold and we miss field sites that have locational error in their geographic coordinates. Too large a threshold and field sites are associated with the wrong river and produce an unrealistic validation. Sensitivity to this snapping threshold is explained in sections 3 and 4. Ultimately, we settle on a threshold of 10m. After snapping, we assign the most frequently occurring field assessment along the reach as its 'true assessment of ephemerality'. Ultimately, we have `r nrow(validationResults$validation_fin)` field assessments of reach ephemerality to validate our model.
+
+### 3 Identifying ephemeral streams
+
+We use a ~1km global soil hydrology model for mean monthly estimates of the water table depth (*WTD*)[@fanHydrologicRegulationPlant2017; @fanGlobalPatternsGroundwater2013]. Those authors coupled a vertical soil water balance with an inverse model that solves for groundwater recharge, lateral discharge, water table depth, and plant root uptake from evapotranspirative demand, inferred from remotely sensed leaf area index [@fanHydrologicRegulationPlant2017]. The model ignores local, perched aquifers and anthropgenic pumping in favor of a broad, long-term average *WTD* (as is common in global-scale groundwater models). Ignoring pumping likely leads to an underestimation of ephemeral streams, as the modeled water table is artifically high relative to the observed water table that has been lowered at the hands of pumping. In this scenario, we mis-classify ephemeral streams as perennial and further underestimate the ephemerla influence on basin hydrology.
+
+We extracted the mean *WTD* along each NHD-HR reach for over 20 million discrete reaches throughout CONUS. We perform an initial classification of ephemeral/not ephemeral based solely on water table depth below the drainage feature: if *WTD* is deeper than river/lake/reservoir depth plus a 1m buffer, for all twelve months of the year, it is classed as ephemeral. To avoid mis-classifying streams with an intermittently high/low water table, this must hold true for all twelve months of the year. The 1m buffer, determined through trail and error to balance classification sensitivity and specificity (Table S2 and explained below), corresponds approximately to the mean residual errors in the modeled water table depths at observation wells under different recharge scenarios [@fanHydrologicRegulationPlant2017; @fanGlobalPatternsGroundwater2013].
+
+Next, we traverse the network from upstream to downstream, cleaning up impossible scenarios and amending our initial classification to a more conservative estimate. Specifically, once a drainage path becomes 'not ephemeral', it must stay that way downstream because some amount of water is advected from upstream, whether perenially or intermittently, over long-term averages. Even if it is a 'losing stream', where discharge decreases downstream due to losses via soil transmission or evaporation to the atmosphere, this assumption must be true unless the reach's subsurface transport capacity so exceeds the surface flow that it behaves endorheically (of which are already accounted for topologically in the NHD-HR). Following NWPR rules, we only count rivers/streams as ephemeral and recast all ephemeral canals, ditches, and ponds as non-ephemeral. These features fall under different WOTUS rules and are not the focus of this study. While Mexican and Canadian ephemeral streams contribute streamflow to the CONUS drainage network, they are not under U.S. jurisdiction and so are also recast as non-ephemeral. To account for basins downstream of other basins, we use an implicit routing scheme to facilitate quicker computation. We assume that any reach that is 2nd order or greater, but with no upstream reaches, must be the recieving reach from an upstream basin and thus set it as non-ephemeral.
+
+Ephemeral classification accuracy is assessed using the field assessment dataset (section 2). We assess performance using regional classification accuracy, sensitivity (the true positive rate), specificity (the true negative rate), and "informedness", which is also called the true skill statistic (TSS) or Youden's J depending on the literature [@alloucheAssessingAccuracySpecies2006]. See Table S2 for metric definitions. TSS is equal to the sensitivity + specificity - 1 and represents the proportion of cases where the model provides an 'informed' decision. A score of zero indicates that the model performs as well as random guessing. TSS has been used in the past to assess headwater and ephemeral mapping models [@fesenmyerLargePortionUSA2021], and so we use it here to compare against existing models. Regional classification accuracy is mapped in Fig. 3 while boxplots of all regional metrics are Fig. S2. We also test the senstivity of CONUS-wide classification accuracy to the snapping threshol, finding it robustly stable when the threshold is at least 10m (Fig. S4).
+
+### 4 Extending the ephemeral stream network
+As alluded to in section 2, much of our ephemeral field data does not fall on the mapped drainage network and are instead on streams too small to be represented in the NHD-HR. While this hydrography is the highest resolution available, it inevitably has a lower bound on the streams that it includes (particuarly with respect to ephemeral channels). Because we want to include all ephemeral streams in our model, we use Hortonian river network scaling [@hortonEROSIONALDEVELOPMENTSTREAMS1945] to extend the ephemeral stream network to best reproduce the observed distribution of the ephemeral field assessment dataset (section 2). This approach assumes the following:
+
+-   All scaled streams are ephemeral. This is valid considering that nearly all headwater NHD-HR reaches are mapped as ephemeral already.
+-   Ephemeral streams across many CONUS drainage networks will fit Hortonian scaling theory. This is valid as Horton ratios are a statistical inevitability of stream ordering and do not represent an inherent geomorphic process  [@kirchnerStatisticalInevitabilityHorton1993]. This also enables us to expand Horton's laws to mean discharge per order, as explained below.
+-   The section 2 ephemeral field data is representative of the distribution of ephemeral streams across CONUS. Because this data consists of voluntary field assessments, it is very likely an underestimate of ephemeral stream presence. Actual estimates are likely even greater. It is also worth stressing that we remove 'upland' data from the dataset a priori, so as to not conflate upland areas with ephemeral ones when scaling.
+
+Equation S5 provides the Horton law of stream numbers, which is a power-law function relating stream order $SO_m$ to the number of streams in the mth order $N_m$ [@hortonEROSIONALDEVELOPMENTSTREAMS1945]. $R_B$ is the Horton ratio and $N_{max}$ is the number of streams in the largest order. Equation S6 is the same, but for mean discharge per order $\bar{Q_m}$ and Horton ratio $R_Q$. Our validation data (section 2) provides us with $N_{SO_k}$ for the *kth* hypothetical order smaller than stream order 1 in the NHD-HR (i.e. the ephemeral sites not present in the NHD-HR), so we re-express equation S5 as S7 and algebraically solve for $SO_k$: the stream order necessary to reproduce the observed $N_{SO_k}$. $R_B$ was obtained using least squares regression as is standard practice.
+
+$$N_m=N_{max}*R_B^{SO_{max} - SO_m} \mathbf{(S5)}$$
+
+$$\bar{Q_m}=\bar{Q_1}*R_Q^{SO_m-1} \mathbf{(S6)}$$
+
+$$SO_k = \frac{log(N_{SO_k}) - log(N_{SO_{max}}) - SO_{max}log(R_B)}{-log(R_B)} \mathbf{(S7)}$$
+
+Using equation S7, we found that one additional ephemeral stream order should be added to our drainage network (Fig. S3). Thus, we scale each basin's river network one additional order by fitting a unique $R_B$ to each basin and calculating the number of streams in the order below the current first order. We also did this for the mean flowing discharge ($\bar{Q}$) for each stream order using equation S8. Finally, $\bar{Q_{min}}$ was applied across all hypothetical streams in the sclaed order and incorporated into the equation S1 calculation. We tested the sensitivity of this calculation to the snapping threshold used to join the validation data to the NHD-HR and found that the ephemeral river network most closely matched Hortonian theory with a snapping threshold of 5-15m (Fig. S4-S5). Otherwise, this scaling relationship began to break down.
+
+### 5 Estimating mean-annual ephemeral flow frequency $N_{flw}$
+
+We first calculate a mean annual basin runoff ratio $R_I$ to convert precipitation *P* to stream runoff *I* and vice versa. The runoff ratio (equation S8) reflects the proportion of rainfall on the basin that winds up as stream runoff, where the implicit losses are via groundwater recharge and evapotranspiration. We used mean annual, basin weighted-average runoff data for 1901-2021 [@brakebillDigitalHydrologicNetworks2011] and mean annual precipitation for 1980-2010 to do this. The latter is calculated from a daily gauge-based precipitation model for CONUS for the same time period [@xieGaugeBasedAnalysisDaily2007].
+
+$$i_r = \frac{i}{P} \mathbf{(S8)}$$
+
+This runoff ratio and 30 year daily timeseries of precipitation are used to determine how often runoff is generated in the ephemeral streams. Daily precipitation depths are converted to daily, basin-averaged stream runoffs using $I_r$. Model flow 'occurs' when daily runoff exceeds the runoff threshold (defined below). We tally all days when flow occurs over the 30 years of precipitation data and calculate a mean annual $N_{flw}$. This number is verified against field data in Fig. 3. For a handful of basins on the Mexican/Canadian borders, there are no USGS gauges and no runoff data. We use the calculated mean annual runoff values from adjacent basins (the "closest" as assessed visually) and assumed it held constant into these basins.
+
+The runoff threshold ($i_m$) is functionally a bias corrector, because the runoff ratio already accounts for the various mechanisms that limit how efficiently rainfall is 'converted' to stream runoff. Thus, it can be scaled as a function of the average ephemeral catchment area: larger ephemeral catchments need less runoff to generate streamflow due to greater flow accumulation. We scale the average ephemeral runoff threshold, per basin, using equation S9, where $W_{min}$ is the consistent headwater stream width identified across many field sites by @allenSimilarityStreamWidth2018a: 32cm and *a* and *b* are empirical constants for the width~discharge scaling relation from @brink gbc.
+
+$$i_m = \frac{(W_{min}/a)^{1/b}}{A_c}\mathbf{(S9)}$$
+
+The $N_{flw}$ model also parameterizes watershed 'memory', or the delayed arrival of basin runoff to the drainage network. Conceptually, a bulk memory parameter captures the lag in arrival of runoff to the drainage network via all major mechanisms: Dunnian and/or Hortonian overland flow, interflow, and baseflow. Memory parameter assignment was guided by a recent analysis [@mogesStrengthMemoryPrecipitation2022], which calculated the streamflow memory of rain events for 671 watersheds in CONUS, including many with groundwater influence. They found a median memory of approximately 4 days, with most of the watersheds that are longer than 4 days featuring a baseflow signal. So, we took 4 days and reduced it slightly to account for the zero baseflow in ephemeral streams, setting this parameter to 2 days.
+
+Given the simplicity of our $N_{flw}$ model, we sought to ensure the results were not particularly sensitive to our chosen parameter settings. We did a pseudo-sensitivity test where we re-calculate the $N_{flw}$ across all basins under an very 'low runoff' scenario and a very 'high runoff scenario'. The low scenario perturbs the lower limit of $N_{flw}$, setting runoff memory to 0 days and deflating runoff ratio by 35%. The 'high runoff scenario' sets runoff memory at 10 days and runoff ratio is inflated by 35%. At the basin-scale, results change only slightly (Fig. S8), suggesting that runoff memory and efficiency are not the primary drivers of ephemeral flow frequency (at this coarse, basin-averaged scale).
+
+We verify our model using existing field-scale data in ephemeral and intermittent-to-ephemeral catchments [@zimmerBidirectionalStreamGroundwater2017; @fritzCoarseParticulateOrganic2019; @kampfRainfallThresholdsFlow2018; @slaughterThirtyfiveYearsResearch2001; @moranLongtermRemoteSensing2008; @schoenerImpactUrbanizationStormwater2022; @strombergRiparianVegetationEphemeral2017; @peirceCharacterizingEphemeralStreams2015]. Note that field $N_{flw}$ data is quite sparse and measured in very different ways at very different temporal resolutions. However, to our knowledge we use all existing field data that provides sufficient information to calculate $N_{flw}$ (Table S3). Length of the timeseries varied significantly, from approximately 1/3 of a year in Guelph, Ontario to 45 years of sub-daily data in the Walnut Gulch Experimental watershed in Arizona. The Duke Forest site in North Carolina includes an intermittent main stem where the flow was recorded, however the rest of the drainage system is ephemeral [@zimmerBidirectionalStreamGroundwater2017]. Data from @peirceCharacterizingEphemeralStreams2015 exist for three catchments in Guelph, Ontario that do not flow into the United States. However, they are located approximately 15 km from one of our model basins that do flow into the U.S. (Figure 2) and so we use that basin for validation.
+
+When applicable, we took the average calculated $N_{flw}$ across the gauges within each study catchment to produce a catchment average $N_{flw}$. To compare against our model estimates (which reflect basin averages), we then took the average of the catchment averages within each study basin in Fig. 2. This was only relevant in the Arizona basins where sufficient data exists. The Guelph, Ontario data is only for 1/3 of the year (approximately July to October). To obtain a mean annual estimate, we assumed the frequency of flow was the same for March to June and that the ephemeral channels do not run in the winter (November to February), i.e. we doubled the $N_{flw}$ measured in their study. Likewise, the Robinson Forest data was only assessed for the latter half of a year, though reports indicate that flow only generally occurs 1-2 times in the remaining months [@fritzStructuralFunctionalCharacteristics2010], so we added that to the calculation.
+
+### 6 Extracting ephemeral riparian land uses
+We use the 2019 USGS National Land Cover Dataset (NLCD- 30m resolution) to extract riparian land use types for every NHD-HR reach. To enable efficient computation, the 30m raster was downscaled a priori to 1km (to match @fanHydrologicRegulationPlant2017) using Google Earth Engine. We also recast all NLCD land use types to their coarest category, i.e. 'cultivated-crops' and 'cultivated- pasture/hay' were both recast as 'cultivated'. We calculated the % of ephemeral reaches that flow through cultivated/developed lands (Fig. 4) as the % of ephemeral reaches (per basin) that are on average cultivated or developed per the NLCD.
+
+## Supplementary Figures
+![Fig. S1: Validation of discharge model at 4,044 streamgauges across CONUS. a) Ungauged validation, using the 'unadjusted' model discharges. These are reflective of model performance in unaguged streams and represent the vast majority of the network. b) Gauged validation, using the model discharges after adjustment to the streamgauge. These represent the errors in the gauged reaches in the network. ](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/eromVerification.jpg)
+
+![Fig. S2: Boxplots of regional ephemeral classification performance, by accuracy metric (section 3). Red dots correspond to the mean value. The ovbious outlier scores for sensitivity and TSS are from region HUC09 (Minnesota and Wisconsin draining to Canada) and due to there only being 1 ephemeral assessment in our dataset in that region. See Table S2 for metric definitions.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/boxPlots_classification.jpg)
+
+![Fig. S3: Ephemeral scaling model for CONUS ephemeral stream network beyond the NHD-HR. Orange points are associated with reaches in the NHD-HR while the green point is the number of ephemeral streams not associated with NHD-HR reaches. 1 additional order is needed to 'capture' the green point and match this observed pattern in our data (section 4).](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/scalingModel.jpg)
+
+![Fig. S4: CONUS-wide classification sensitivity to snapping threshold. Note that the regional accuracy reported in Fig. 3 and Fig. S2 are more useful from a model performance perspective, but here we are simply confirming that model accuracy is not significantly influenced by snapping threshold. Our chosen 10m threshold is noted by the dashed line.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/acc_sens_to_snapping.jpg)
+
+![Fig. S5: Sensitivity test of the snapping threshold used to join field assessments of ephemerality (section 2) to the drainage network. Green line is the number of additional stream orders calculated by equation S9, given a snapping threshold. Purple line is the mean absolute error (MAE) of the Horton law of stream numbers (equation S7), given a snapping threshold. MAE should be smallest when the data best fit Horton's laws, indicating that we are not missassinging field data to the wrong rivers. This is explained in detail in section 2.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/snappingThreshTradeOff.jpg)
+
+![Fig. S6: Ssensitivity test for the $N_{flw}$ calculation, resulting in boxplots of by-basin ephemeral fraction of drainage network export (equivalent to the Fig. 1a map). The low scenario sets runoff memory to 0 days and deflates runoff ratio by 35%. The 'high runoff scenario' sets runoff memory at 10 days and runoff ratio is inflated by 35%.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/boxPlots_sensitivity.jpg)
+
+![Fig. S7: THIS IS CURRENTLY NOT INCLUDED ADDITIONAL HORTON ORDER. MUST ADD SCALING. Contiguous United States map and distribution of the ephemeral contribution to drainage network length](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/lengthMap.jpg)
+
+![Fig. S8: Contiguous United States map and distribution of the ephemeral contribution to streamflow if all ephemeral streams were simultanesouly flowing, via equation S4.](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/flowingMap.jpg)
+
+## Supplementary Tables
+**Table S1** Field assessments of stream ephemerality performed in New England, Summer 2022. We followed the ephemeral/intermittent/perennial protocol for the State of North Carolina Department of Water Quality [@dorneyChapterNorthCarolina2018]. Scores < 19 are deemed 'ephemeral'. NHDPlus ID corresponds to the reach ID in the drainage network framework.
+
+```{r, echo=FALSE, message=FALSE}
+df <- readr::read_csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/for_ephemeral_project/new_england_fieldSites.csv')
+df <- dplyr::select(df, c('name', 'lat', 'lon', 'score', 'classification'))
+
+knitr::kable(df[, 1:5], format = "pipe", col.names = c('Name', 'Latitude', 'Longitude', 'Score', 'Classification'))
+
+```
+
+**Table S2:** Classification metrics used to assess the ephemeral mapping model. *TP* is the true positive rate, *TN* is the true negative rate, *FP* is the false positive rate, and *FN* is the false negative rate.
+
+| Name                  | Definition                                          |
+|-----------------------|-----------------------------------------------------|
+|Accuracy               | $\frac{N_{TP}+N_{TN}}{N_{TP}+N_{TN}+N_{FP}+N_{FN}}$ |
+|Sensitivity            | $\frac{N_{TP}}{N_{TP}+N_{FN}}$                      |
+|Specificity            | $\frac{N_{TN}}{N_{TN}+N_{FP}}$                      |
+|True Skill Score (TSS) | Sensitivity + Specificity - 1                       |
+
+**Table S3:** Mean annual number of flowing days for ephemeral streams per basin compared against the same value calculated via our model. Note that basins with multiple watersheds were averaged to compare against our basin model in Fig. 2b.
+
+```{r, echo=FALSE}
+df <- flowingDaysValidation
+df$watershed <- c('Duke Forest', 'Guelph', 'Goldwater', 'Huachuca', 'Mohave-Yuma', 'Montoyas', 'Reynolds Creek', 'Robinson Forest', 'Santa Rita', 'Walnut Gulch')
+df$num_flowing_dys <- round(df$num_flowing_dys, 2)
+df$n_flw_d <- round(df$n_flw_d, 2)
+df$X0 <- c('Zimmer & McGlynn, 2017', 'Peirce & Lindsay, 2015', 'Stromberg et al. 2017', 'Stromberg et al. 2017', 'Kampf et al. 2018', 'Schoener 2022', 'Slaughter et al. 2001', 'Fritz et al. 2019', 'Moran et al. 2008', 'Moran et al. 2008')
+knitr::kable(df[, 2:6], format = "pipe", col.names = c('Model Basin', 'Model Nflw [dys]', 'Watershed', 'Observed Nflw [dys]', 'Reference'))
+```
+
+## References

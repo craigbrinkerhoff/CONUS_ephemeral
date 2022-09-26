@@ -1,180 +1,122 @@
 #####################
 ## Craig Brinkerhoff
 ## Summer 2022
-## Function to update discharges to refelct 'average flowing Q'
+## Functions to scale model to additional stream orders beyond the NHD
 #####################
 
-scalingTestWrapper <- function(threshs, combined_validation){
-  out <- data.frame()
-  for(i in threshs){
-    validationResults <- validateModel(combined_validation, i)
-    desiredFreq <- validationResults$eph_features_off_nhd #ephemeral features not on the NHD, what we want to scale too
 
-    df <- validationResults$validation_fin
-    df <- filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gages, which are always perennial anyway
 
-    df <- group_by(df, StreamOrde) %>%
-        summarise(n=n())
-
-    #fit model for Horton number of streams per order
-    lm <- lm(log(n)~StreamOrde, data=df)
-    Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-    ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
-
-    predN <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - df$StreamOrde)
-    rmseN <- Metrics::rmse(df$n, predN)
-    maeN <- Metrics::mae(df$n, predN)
-    temp <- data.frame('thresh'=i,
-                       'rmse'=rmseN,
-                       'mae'=maeN,
-                       'median_abs_perc_diff'=abs(median((predN-df$n)/df$n))*100,
-                       'n'=sum(df$n))
-
-    out <- rbind(out, temp)
-  }
-
-  #save tradeoff plot to file
-  out$total <- out$mae + out$rmse + out$median_abs_perc_diff
-  forPlot <- tidyr::gather(out, key=key, value=value, c('rmse', 'mae', 'median_abs_perc_diff', 'total'))
-  tradeOffPlot <- ggplot(forPlot, aes(thresh, value, color=key)) +
-        geom_point(size=5) +
-        geom_line(linetype='dashed', size=1) +
-        scale_color_manual(name='', labels=c('MAE', 'Median Percent\nDifference', 'RMSE', 'Aggregate'), values=c('#238b45', '#41ab5d', '#74c476', '36a51a3'))+
-        xlab('Snapping Threshold') +
-        ylab('Horton Scaling Performance')+
-        theme(axis.text=element_text(size=24),
-              axis.title=element_text(size=28,face="bold"),
-              legend.text = element_text(size=17),
-              legend.title = element_text(size=17, face='bold'))
-  ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=10, height=8)
-
-  return(list('results'=out,
-              'chosenThresh'=out[which.min(out$total),]$thresh))
-}
-
+#' Fits horton laws to ephemeral data and calculates number of additional stream orders to match the observed ephemeral data occurence off  network
+#'
+#' @name scalingFunc
+#'
+#' @param validationResults: completed snapped and cleaned WOTUS JD validation dataset
+#'
+#' @import dplyr
+#'
+#' @return list of properties obtained from horton fitting: new minimum order ('ephMinOrder'), desired epehemeral frequncy ('desiredFreq'), horton model ('horton_lm'), horton coefficient ('Rb')
 scalingFunc <- function(validationResults){
-  desiredFreq <- validationResults$eph_features_off_nhd #ephemeral features not on the NHD, what we want to scale too
+  desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, what we want to scale too
 
   df <- validationResults$validation_fin
-  df <- filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gages, which are always perennial anyway
+  df <- dplyr::filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gages, which are always perennial anyway
 
-  df <- group_by(df, StreamOrde) %>%
-      summarise(n=n())
+  df <- dplyr::group_by(df, StreamOrde) %>%
+      dplyr::summarise(n=n())
 
   #fit model for Horton number of streams per order
   lm <- lm(log(n)~StreamOrde, data=df)
   Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
-  ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0)
+  ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0) #algebraically solve for smallest order in the system
+  df_west <- df
 
-  return(list('ephMinOrder'=ephMinOrder,
+  return(list('desiredFreq'=desiredFreq,
               'df'=df,
-              'desiredFreq'=desiredFreq,
+              'ephMinOrder'=ephMinOrder,
               'horton_lm'=lm,
-              'Rb'=  Rb <- 1/exp(lm$coefficient[2]))) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
+              'Rb'=  Rb)) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
 }
 
-scalingByBasin <- function(scalingModel, rivNetFin, results){
-  #fit horton laws to this river system
-  numNewOrders <- (1-scalingModel$ephMinOrder)
+
+
+#' Scales model results to additional stream order(s) if necessary. Horton ratio used in this calcualtion comes from the NHD 3rd order calculated ratio (to be somehere in the middle of the network)
+#'
+#' @name scalingByBasin
+#'
+#' @param scalingModel: Horton laws, already fit to ephemeral field data
+#' @param rivNetFin: nhd hydrography for a given huc4 basin
+#' @param results: results file for a given huc4 basin
+#' @param huc4: HUC4 basin code
+#'
+#' @import dplyr
+#'
+#' @return updated results dataframe with scaled and scaled_flowing results
+scalingByBasin <- function(scalingModel, rivNetFin, results, huc4){
+  #fit horton laws to this river system (east vs west of Mississippi, different scaling)
+  numNewOrders <- 1 - scalingModel$ephMinOrder
 
   #num flowing days per earlier rain analysis
   numFlowingDays <- results$num_flowing_dys
 
   #number and average discharge of ephemeral streams
-  df <- filter(rivNetFin, perenniality == 'ephemeral') %>%
-      group_by(StreamOrde) %>%
-      summarise(n=n(),
+  df <- dplyr::filter(rivNetFin, perenniality == 'ephemeral') %>%
+      dplyr::group_by(StreamOrde) %>%
+      dplyr::summarise(n=n(),
                 Qbar = mean(Q_cms, na.rm=T),
                 Qbar_adj = mean(Q_cms, na.rm=T) * (365/numFlowingDays))
 
-  #rewrte stream orders for scaling
-  df$old_orders <- df$StreamOrde
-  df$StreamOrde <- df$StreamOrde + numNewOrders
+  #rewrte stream orders for scaling (when appropritate)
+  if(numNewOrders > 0){
+    df$old_orders <- df$StreamOrde
+    df$StreamOrde <- df$StreamOrde + numNewOrders
 
-  #get horton ratios
-  lm <- lm(log(n)~StreamOrde, data=df)
-  Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
-  lm2 <- lm(log(Qbar)~StreamOrde, data=df)
-  Rq <- exp(lm2$coefficient[2]) #Horton law parameter for mean Q
-  lm3 <- lm(log(Qbar_adj)~StreamOrde, data=df)
-  Rq_f <- exp(lm3$coefficient[2]) #Horton law parameter for mean flowing Q
+    #get horton ratios
+    lm <- lm(log(n)~StreamOrde, data=df)
+    Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
+    lm2 <- lm(log(Qbar)~StreamOrde, data=df)
+    Rq <- exp(lm2$coefficient[2]) #Horton law parameter for mean Q
+    lm3 <- lm(log(Qbar_adj)~StreamOrde, data=df)
+    Rq_f <- exp(lm3$coefficient[2]) #Horton law parameter for mean flowing Q
 
-  #scale
-  for (i in 1:numNewOrders){
-    new <- data.frame('StreamOrde'=i, 'n'=NA, 'Qbar'=NA)
-    new$old_orders <- NA
-    new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
-    if(i ==1){
-      new$Qbar <- (df[df$StreamOrde == 3,]$Qbar)/(Rq^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
-      new$Qbar_adj <- (df[df$StreamOrde == 3,]$Qbar_adj)/(Rq_f^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+    #scale to new minimum order
+    for (i in 1:numNewOrders){
+      new <- data.frame('StreamOrde'=i, 'n'=NA, 'Qbar'=NA)
+      new$old_orders <- NA
+      new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
+      if(i ==1){ #do first order first (as its different)
+        new$Qbar <- (df[df$StreamOrde == 3,]$Qbar)/(Rq^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+        new$Qbar_adj <- (df[df$StreamOrde == 3,]$Qbar_adj)/(Rq_f^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+      }
+      else{ #do all other additional orders (if necessary)
+        new$Qbar <- df[df$StreamOrde == 1,]$Qbar*Rq^(i-1)
+        new$Qbar_adj <- df[df$StreamOrde == 1,]$Qbar*Rq_f^(i-1)
+      }
+      df <- rbind(df, new)
     }
-    else{
-      new$Qbar <- df[df$StreamOrde == 1,]$Qbar*Rq^(i-1)
-      new$Qbar_adj <- df[df$StreamOrde == 1,]$Qbar*Rq_f^(i-1)
-    }
-    df <- rbind(df, new)
+
+    df <- df[order(df$StreamOrde), ]
+
+    #get water volume in additional stream order
+    additionalQ <- sum(df[1:numNewOrders,]$Qbar * df[1:numNewOrders,]$n) #mean annual
+    additionalQ_flowing <- sum(df[1:numNewOrders,]$Qbar_adj * df[1:numNewOrders,]$n) #mean annual flowing
+
+    scalingFlag <- 1
   }
 
-  df <- df[order(df$StreamOrde), ]
-
-  #get water volume in additional stream order
-  additionalQ <- sum(df[1:numNewOrders,]$Qbar * df[1:numNewOrders,]$n) #mean annual
-  additionalQ_flowing <- sum(df[1:numNewOrders,]$Qbar_adj * df[1:numNewOrders,]$n) #mean annual flowing
+  #when no additional scaling is done
+  else{
+    additionalQ <- 0
+    additionalQ_flowing <- 0
+    scalingFlag <- 0
+  }
 
   #adding scaled results to previous results
   results$totalephmeralQ_scaled <- results$totalephmeralQ + additionalQ #mean annual
-  results$percQ_eph_scaled <- results$totalephmeralQ_scaled / (results$totalephmeralQ_scaled + results$totalNotEphQ)
-
+  results$percQ_eph_scaled <- results$totalephmeralQ_scaled / (results$totalephmeralQ_scaled + results$totalNotEphQ) #mean annual percent
   results$totalephmeralQ_flowing_scaled <- results$totalephmeralQ_flowing + additionalQ_flowing #mean annual flowing
-  results$percQ_eph_flowing_scaled <- results$totalephmeralQ_flowing_scaled / (results$totalephmeralQ_flowing_scaled + results$totalNotEphQ)
+  results$percQ_eph_flowing_scaled <- results$totalephmeralQ_flowing_scaled / (results$totalephmeralQ_flowing_scaled + results$totalNotEphQ) #mean annual flowing percent
 
+  results$scalingFlag <- scalingFlag
 
   return(results)
 }
-
-
-
-#flowingQ <- function(USGS_data){
-#  theme_set(theme_classic())
-
-  #get gages with no flow flow in their mean daily flows
-#  nonP <- dplyr::filter(USGS_data, no_flow_fraction > 0)
-
-#  nonP$Q_bin <- ifelse(nonP$Q_MA < 0.01, 0.01,
-#                      ifelse(nonP$Q_MA < 0.1, 0.1,
-#                            ifelse(nonP$Q_MA < 1, 1,
-#                                  ifelse(nonP$Q_MA < 10, 10, 100))))
-
-  #reduce to Q bins
-#  scaling <- nonP %>%
-#      group_by(Q_bin) %>%
-#      summarise(meanFlowingDays = mean((1-no_flow_fraction)*365), #number of days flowing
-#      n=n())
-
-  #setup modelPlot
-#  model <- lm(log10(meanFlowingDays)~log10(Q_bin), data=scaling)
-
-  #save model as plot
-#  modelPlot <- ggplot(scaling, aes(x=Q_bin, y=meanFlowingDays)) +
-#      geom_point(size=5) +
-#      annotate('text', label=paste0('r2: ', round(summary(model)$r.squared,2)), x=1, y=100, size=8)+
-#      annotate('text', label=paste0('n = ', nrow(nonP), ' gauges'), x=1, y=30, size=8)+
-#      geom_smooth(method='lm', se=F, fullrange=TRUE) +
-#      xlab('Mean Annual Flow Bins')+
-#      ylab('Average Flowing Days per year')+
-#      scale_y_log10(breaks=c(1, 30, 180, 365),
-#                    labels=c('1', '30', '180', '365'),
-#                    limits=c(1, 365))+
-#      scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100),
-#                    labels=c('0.0001','0.001', '0.01', '0.1', '1', '10', '100'),
-#                    limits=c(0.0001, 100))+
-#      theme(axis.text=element_text(size=20),
-#            axis.title=element_text(size=22,face="bold"),
-#            legend.text = element_text(size=17),
-#            plot.title = element_text(size = 30, face = "bold"))
-
-#  ggsave('cache/flowingQModel.jpg', modelPlot, width=8, height=8)
-
-  #return model itself
-#  return(model)
-#}

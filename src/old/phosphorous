@@ -1,0 +1,216 @@
+#' Downscales HUC8-level EPA-permitted point-source phosphorous data (for 2012) to HUC4 level
+#'
+#' @name phosphorousPrep
+#'
+#' @param combined_results: all concatenated model results
+#' @param huc8PointSourceLoadings: 2012 data on EPA-permitted phosphorous loadings per HUC8 basin
+#'
+#' @import dplyr
+#'
+#' @return df of senstivity test results
+phosphorousPrep <- function(combined_results, huc8PointSourceLoadings){
+  huc8PointSourceLoadings$HUC_8 <- as.character(huc8PointSourceLoadings$HUC_8)
+  huc8PointSourceLoadings$HUC_8 <- ifelse(nchar(huc8PointSourceLoadings$HUC_8) < 8, paste0('0',huc8PointSourceLoadings$HUC_8), huc8PointSourceLoadings$HUC_8)
+  huc8PointSourceLoadings$huc4 <- substr(huc8PointSourceLoadings$HUC_8, 1, 4)
+
+  huc8PointSourceLoadings <- dplyr::group_by(huc8PointSourceLoadings, huc4) %>%
+      dplyr::summarise(pointSourceLoading_kg_2012 = sum(P_kg_ww, na.rm=T))
+
+  huc8PointSourceLoadings$pointSourceLoading_kg_2012 <- ifelse(huc8PointSourceLoadings$pointSourceLoading_kg_2012 == 0, NA, huc8PointSourceLoadings$pointSourceLoading_kg_2012)
+
+  combined_results <- dplyr::left_join(combined_results, huc8PointSourceLoadings, by='huc4')
+
+  return(combined_results)
+}
+
+
+
+#' Simulates relative ephemeral phosphorous loadings at HUC4 level
+#' Takes mean of 100 random samples to make sure the specific sample isn't the answer
+#'
+#' @name phosphorousSim
+#'
+#' @param phosphorousData: wrangled and uupscaled 2012 point-source phosphorous loading data
+#' @param rivnet: classified hydrography per HUC4 basin
+#' @param huc4id: huc4 code
+#' @param sampleNum: how many ephemeral rivers to simulate with a phosphorous loading
+#' @param Pconc_kg_m3: hypotetical phosphorous concentration to calculate the loading, i.e. W=cQ
+#'
+#' @import dplyr
+#'
+#' @return df of simulation results per HUC4 basin
+phosphorousSim <- function(phosphorousData, rivnet, huc4id, sampleNum, Pconc_kg_m3) {
+  set.seed(143) #reproducibility
+
+  phosphorousData <- dplyr::filter(phosphorousData, huc4 == huc4id)
+  ephStreams <- dplyr::filter(rivnet, perenniality == 'ephemeral')
+
+  #ranom sample of ephemeral streams
+  Pload_relative <- NA
+  Pload <- NA
+  for(i in 1:length(sampleNum)){
+    Pload_relative[i] <- mean(replicate(100, Pload_rel_func(ephStreams, sampleNum[i], Pconc_kg_m3, phosphorousData$pointSourceLoading_kg_2012, phosphorousData$num_flowing_dys))) #repeat 100 times and take mean so there is no sampling bias
+    Pload[i] <- mean(replicate(100, Pload_func(ephStreams, sampleNum[i], Pconc_kg_m3, phosphorousData$num_flowing_dys))) #repeat 100 times and take mean so there is no sampling bias
+  }
+
+  out <- data.frame('num_rivers'=sampleNum,
+                    'Pload_relative'=Pload_relative,
+                    'Pload_ephemeral'=Pload,
+                    'Pload_data'=rep(phosphorousData$pointSourceLoading_kg_2012, length(sampleNum)))
+  return(out)
+}
+
+
+
+
+
+
+#' create main validation paper figure (fig 3)
+#'
+#' @name phosphorousSimFigure
+#'
+#' @param phosphorousSims: simualted ephemeral phosphorous loadings per basin
+#'
+#' @import ggplot2
+#' @import cowplot
+#' @import tidyr
+#'
+#' @return phosphorous simulation figure (writes it to file too)
+phosphorousSimFigure <- function(phosphorousSims_3, phosphorousSims_4, phosphorousSims_5){
+  theme_set(theme_classic())
+
+#  forPlot3 <- tidyr::gather(phosphorousSims_3, key=key, value=value, c('Pload'))
+#  forPlot4 <- tidyr::gather(phosphorousSims_4, key=key, value=value, c('Pload'))
+#  forPlot5 <- tidyr::gather(phosphorousSims_5, key=key, value=value, c('Pload'))
+
+  df <- rbind(phosphorousSims_3, phosphorousSims_4, phosphorousSims_5)
+  df$conc <- substr(df$method, 17,17)
+  df <- group_by(df, conc, num_rivers) %>% #get whole US estimates buy summing across basins
+      summarise(Pload_ephemeral = sum(Pload_ephemeral, na.rm=T),
+                Pload_data = sum(Pload_data, na.rm=T))
+  df$Pload_relative_conus <- df$Pload_ephemeral / (df$Pload_ephemeral + df$Pload_data)
+
+  plot <- ggplot(df, aes(color=conc, x=factor(num_rivers), y=Pload_relative_conus, group=conc)) +
+      geom_point(size=12)+
+      geom_line(size=1.75)+
+      scale_color_brewer(palette='Pastel1', name='Simulated\nPhosphorous\nConcentration\n[kg/m3]', labels=c('1e-3', '1e-4', '1e-5'))+
+      ylim(0,1)+
+      xlab('# Ephemeral Point-Source Loadings per Basin') +
+      ylab('Ephemeral Fraction of CONUS Point-Source Loadings') +
+      theme(legend.position='right',
+            legend.title=element_text(size=22),
+            legend.text=element_text(size=20),
+            axis.title=element_text(size=22),
+            axis.text=element_text(size=20))
+
+  ggsave('cache/paper_figures/fig4.jpg', plot, width=12, height=10)
+  return(plot)
+
+#  image <- ggplot() +
+#      cowplot::draw_image(magick::image_read_svg('/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/paper_figures/fig4_schematic.svg')) +
+#      labs(tag='D')+
+#      theme_void()+
+#      theme(plot.tag = element_text(size=26,
+#                                  face='bold'))
+
+#  design <- "
+#  AB
+#  CD
+#  "
+#  comboPlot <- patchwork::wrap_plots(A=plot_3, B=plot_4, C=plot_5, D=image, design=design)
+
+#  ggsave('cache/paper_figures/fig4.jpg', comboPlot, width=15, height=15)
+#  return(comboPlot)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#for 2012 data
+phosphorousExercise <- function(combined_results, huc8PointSourceLoadings){
+  huc8PointSourceLoadings$HUC_8 <- as.character(huc8PointSourceLoadings$HUC_8)
+  huc8PointSourceLoadings$HUC_8 <- ifelse(nchar(huc8PointSourceLoadings$HUC_8) < 8, paste0('0',huc8PointSourceLoadings$HUC_8), huc8PointSourceLoadings$HUC_8)
+  huc8PointSourceLoadings$huc4 <- substr(huc8PointSourceLoadings$HUC_8, 1, 4)
+
+  huc8PointSourceLoadings <- group_by(huc8PointSourceLoadings, huc4) %>%
+      summarise(pointSourceLoading_kg_yr = sum(P_kg_ww, na.rm=T))
+
+  combined_results <- left_join(combined_results, huc8PointSourceLoadings, by='huc4')
+  combined_results$ephLoading_flowing_scaled_kg_2012 <- combined_results$percQ_eph_flowing_scaled * combined_results$pointSourceLoading_kg_yr
+
+  return(combined_results)
+}
+
+
+
+phosphorousFigure <- function(shapefile_fin){
+  theme_set(theme_classic())
+
+  ##GET DATA
+  results <- shapefile_fin$shapefile
+
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                         'American Samoa',
+                                         'Commonwealth of the Northern Mariana Islands',
+                                         'Guam',
+                                         'District of Columbia',
+                                         'Puerto Rico',
+                                         'United States Virgin Islands',
+                                         'Hawaii'))) #remove non CONUS states/territories
+  states <- sf::st_union(states)
+
+  #results shapefile
+  results <- dplyr::filter(results, is.na(ephLoading_flowing_scaled_kg_km2_2012)==0)
+
+  ##MAP
+  fig <- ggplot(results) +
+   geom_sf(aes(fill=ephLoading_flowing_scaled_kg_km2_2012), color='black', size=0.3) + #map
+   geom_sf(data=states, color='black', size=1.0, alpha=0)+ #conus domain
+   scale_fill_gradientn(name='Ephemeral Point Source Phosphorous Loadings (2012) [kg/km2]',
+                    colors = c("#fcfbfd", "#9e9ac8", "#3f007d"),
+                    limits=c(0,10),
+                    breaks=c(0,0.25,0.50,0.75,1,2.5,5,10),
+                    guide = guide_legend(direction = "horizontal",title.position = "top"))+
+   labs(tag='A')+
+   theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+   theme(legend.position = c(.5, 0.15))+ #legend position settings
+   theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 18),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                              face='bold'))+
+   xlab('')+
+   ylab('') +
+   guides(pch = 'none') #remove pch from legend
+
+   ##EXTRACT SHARED LEGEND
+   legend <- cowplot::get_legend(fig +
+                                    labs('')+
+                                    theme(plot.tag = element_text(size=26,
+                                                          face='bold')))
+
+
+   design <- "
+   A
+   A
+   A
+   B
+   "
+   comboPlot <- patchwork::wrap_plots(A=fig + theme(legend.position='none'), B=legend, design=design)
+
+   ggsave('cache/paper_figures/fig4_new.jpg', comboPlot, width=10, height=10)
+   return(fig)
+}

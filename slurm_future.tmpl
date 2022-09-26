@@ -1,0 +1,13 @@
+#!/bin/sh
+#SBATCH --job-name=<%= job.name %>
+#SBATCH --output=<%= log.file %>
+#SBATCH --error=<%= log.file %>
+#SBATCH --ntasks=1
+#SBATCH --mem-per-cpu=64000
+#SBATCH -t 24:00:00  # Job time limit 14 days (just in case)
+#SBATCH -p cpu
+
+module load netcdf-c
+
+Rscript -e 'batchtools::doJobCollection("<%= uri %>")' # Leave alone.
+exit 0 # Leave alone.

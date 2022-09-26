@@ -1,4 +1,4 @@
 #ignore all targets
 _targets/objects
+.future/
 cache/*.csv
-.Rproj.user

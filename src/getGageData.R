@@ -1,15 +1,22 @@
 #####################
 ## Craig Brinkerhoff
 ## Spring 2022
-## Functions for getting baseflow indices at USGS streamgages on the NHD
+## Functions for getting mean annual flow and flow frequency at USGS streamgages along the NHD
 #####################
 
+
+
 #' Returns set of USGS gages that are joined to the NHD a priori (that meet USGS QA/QC requirements)
+#'
+#' @name getNHDGages
 #'
 #' @param path_to_data: data repo path
 #' @param codes_huc02: HUC2 basins to get gages for
 #'
-#' @return set of USGS gages on the NHD with flows converted to metric
+#' @import dplyr
+#' @import sf
+#'
+#' @return df of USGS gages on the NHD with flows converted to metric
 getNHDGages <- function(path_to_data, codes_huc02){
   #get USGS stations joined to NHD that meet their QA/QC requirements
   codes <- c(NA)
@@ -42,12 +49,21 @@ getNHDGages <- function(path_to_data, codes_huc02){
   return(assessmentDF)
 }
 
+
+
 #' Gather streamflow data at gages and calculate no flow fractions and baseflow fractions
 #'
+#' @name getGageData
+#'
+#' @param path_to_data: path to data working directory
 #' @param nhdGages: list of USGS streamgauges joined to the NHD with their Q info
 #' @param codes_huc02: HUC2 basins to get gage data for
 #'
-#' @return NULL but writes results to file
+#' @import dataRetrieval
+#' @import readr
+#' @import dplyr
+#'
+#' @return df of USGS gaueg IDs + long term mean annual flow data + % of annual record with no flow (river runs dry)
 getGageData <- function(path_to_data, nhdGages, codes_huc02){
   for(m in codes_huc02){
     #NOTE::::: will be longer than the final sites b/c some of them don't have 20 yrs of data  within the bounds.
@@ -131,48 +147,3 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
   out <- results_all
   return(out)
 }
-
-
-
-
-
-
-#CALCULATE RIVER-SPECIFIC ALPHA PARAMETER FOLLOWING SINGH ET AL 2019---------------------------------
-#        Q0 <- median(gageQ$Q_cms) #median flow
-#        Q_plus <- (gageQ$Q_cms)/Q0
-#        dQplus_dt <- diff(Q_plus)/1
-#        Q_plus <- Q_plus[-1]
-
-#        Q_plus <- Q_plus[dQplus_dt < 0] #filter only for 'recession flows', i.e. dQ/dt is negative
-#        dQplus_dt <- dQplus_dt[dQplus_dt < 0]#filter only for 'recession flows', i.e. dQ/dt is negative
-
-#        Q_plus[which(Q_plus == 0)] <- 1e-6 #dummy to not be zero
-#        dQplus_dt[which(dQplus_dt == 0)] <- 1e-6 #dummy to not be zero
-
-#        lm <- tryCatch(lm(log(-1*dQplus_dt)~log(Q_plus)), error=function(m){NA}) #error handling if lm doesn't work b/c of poor gage data or something
-#        if(is.na(lm)){
-#          print('all NAs')
-#          alpha <- 0.925} #default for algorithm
-#        else{
-#          To <- exp(summary(lm)$coefficients[1])^-1
-#          alpha <- exp(-1/To)
-#        } #filtering exponent
-
-#'baseflow_fraction_lynehollick'=sum(gageQ$Qbase_lynehollick*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_lynehollick_singh'=sum(gageQ$Qbase_lynehollick_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_chapman'=sum(gageQ$Qbase_chapman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_chapman_singh'=sum(gageQ$Qbase_chapman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_jakeman'=sum(gageQ$Qbase_jakeman*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_jakeman_singh'=sum(gageQ$Qbase_jakeman_singh*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-#'baseflow_fraction_maxwell'=sum(gageQ$Qbase_maxwell*60*60*24)/sum(gageQ$Q_cms*60*60*24),
-
-
-#Qbase_chapman_singh = gr_baseflow(Q_cms, method='chapman', a=alpha),
-#                 Qbase_jakeman_singh = gr_baseflow(Q_cms, method='jakeman', a=alpha),
-#                 Qbase_lynehollick_singh = gr_baseflow(Q_cms, method='lynehollick', a=alpha),
-#                 Qbase_lynehollick = gr_baseflow(Q_cms, method='lynehollick'),
-#                 Qbase_chapman = gr_baseflow(Q_cms, method='chapman'),
-#                 Qbase_jakeman = gr_baseflow(Q_cms, method='jakeman'),
-#                 Qbase_maxwell = gr_baseflow(Q_cms, method='maxwell'), #Chapman-maxwell, our preferred method
-
-#, 'alpha', 'baseflow_fraction_lynehollick', 'baseflow_fraction_chapman', 'baseflow_fraction_jakeman', 'baseflow_fraction_maxwell', 'baseflow_fraction_lynehollick_singh', 'baseflow_fraction_chapman_singh', 'baseflow_fraction_jakeman_singh')) %>%

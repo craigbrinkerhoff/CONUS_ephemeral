@@ -1,71 +1,101 @@
 ##########################
 ## Craig Brinkerhoff
-## Functions to validation ephemeral WOTUS model against EPA/Corps in situ WOTUS classifications
+## Functions to validate/verify the ephemeral river map against EPA WOTUS Jurisdictional Determinations (JDs), as well as streamgauges
 ## Summer 2022
 ##########################
 
+
+
 #' Prep and clean EPA WOTUS Jurisdictional Ditinction validation dataset
 #'
-#' @param NULL
+#' Because our model exists only in a paradigm of ephemeral -> intermttent -> perennial, we only keep these categories (for both river and lakes. NOT wetlands)
+#' See the actual dataset for the descriptions of these codes
+#' KEEP:
+#'  A1: Traditionally navigable waters (i.e. perennial) (both rivers and lakes)
+#'  A2: Perennnial/intermittent tributaries to traditionally navigable waters (both rivers and lakes)
+#'  A3: Tributary lake/pond that contributes water to traditionally navigatable waters
+#'  B3: ephemeral streams
+#'  B4, B10: Stormwater control features (B4 == 'sheetflow')
+#'  B5: Ditches
+#'  B7: Artifically irrigated features
+#'  B8: artifical lakes/ponds
+#'  B3: Ephemeral features
+#'  RHAB codes for A1-4 and B3: Features classified under the older (and stricter) River and Harbors Act. Includes some ephemeral sites.
+#'
+#'REMOVE (basically non-surface water determinations: riparian/upland/cropland/groundwater/wastewater) determinations, as the NHD is stricly a drainage representing the flowing features and NOT adjacent/upland ones
+#'  All upland/dryland/isolated features with codes like UPLAND, DRYLAND, ISOLATE
+#'  A4: wetlands that abut A1-A3 and/or are seasonally innundated by A1-A3
+#'  B1: wetlands/lakes/ponds that aren't connected to network, i.e. 'non adjacent'
+#'  B2, B11: Groundwater features
+#'  B6: Converted croplands (from wetlands, so basically drainged wetlands)
+#'  B9: upland water-filled depressions
+#'  B12: Wastewater plants
+#'  All other section 10 features removed
+#'
+#' @name prepValDF
+#'
+#' @note Be aware of the expilict repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
+#'
+#' @param path_to_data: character string for path to data repo
 #'
 #' @import readr
+#' @import dplyr
 #'
-#' @return prepared validation set (as dataframe)
+#' @return df of prepared validation set
 prepValDF <- function(path_to_data){
   `%notin%` <- Negate(`%in%`)
 
   #load in validation dataset
-    #Queried "Clean Water Act Approved Jurisdictional Determinations" database on 6/20/2022 for all JDs requested by landowners
-    #n= 156,147 (pre cleaning and fixing) Number is very high because of repeat assessments at sites, and multiple assessments along an NHD reach (handled later)
-  validationDF <- read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
+    #Queried "Clean Water Act Approved Jurisdictional Determinations" database on 06/20/2022 for all JDs requested by landowners.
+    #filter for desiscions made under NWPR ruling (post 2020) because these are actually specifying ephemeral features as their own classes
+  validationDF <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
+  validationDF <- dplyr::filter(validationDF, `JD Basis` == 'NWPR')
 
-  #clean up this mess of a dataset...
-    #because our model exists only in a paradigm of ephemeral -> intermttent -> perennial, we only keep these categories (for both river and lakes. NOT wetlands)
-  #KEEP:
-    #A1: Traditionally navigable waters (i.e. perennial) (both rivers and lakes)
-    #A2: Perennnial/intermittent tributaries to traditionally navigable waters (both rivers and lakes)
-    #B3: Ephemeral features
-  #REMOVE:
-    # All upland/dryland data removed
-    # All wetlands removed
-    # All wastewater plants removed
-    # All storm runoff / tile drainage removed
-    # All Section 10 features removed (special classes involving coastal features)
-  validationDF <- filter(validationDF, substr(`Resource Types`, 1, 2) %in% c('A1', 'A2', 'A3', 'B3')) %>%
+  #Filter dataset to include features we care about (see function documentation for rational here)
+  validationDF <- dplyr::filter(validationDF, substr(`Resource Types`, 1, 2) %in% c('A1', 'A2', 'A3', 'B3', 'B4', 'B5', 'B7', 'B8', 'B10') | substr(`Resource Types`, 1, 4) == 'RHAB') %>%
       select(`JD ID`, `Resource Types`, `Project ID`, Longitude, Latitude, `Water of the U.S.`, HUC8)
 
   colnames(validationDF) <- c('JD_ID', 'resource_type', 'project_id', 'long', 'lat', 'wotus_class', 'huc8')
   validationDF$huc4 <- substr(validationDF$huc8, 1, 4)
 
-  validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3', 'ephemeral', 'perennial') #note that perennial here is actually perennial/intermittent, it's shotened for simplicity :)
+  #reclassify as epehemeral/not ephemeral.
+  validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3' | substr(validationDF$resource_type, 1, 5) == 'RHAB3', 'ephemeral', 'non_ephemeral')
 
   return(validationDF)
 }
+
+
 
 #' Snaps EPA WOTUS Jurisdictional distinctions to HUC4 river networks:
 #'    1) auto-finds the correct UTM zone to project data
 #'    2) gets distance between NHD reach and tagged WOTUS distinction point
 #'
-#' Also also grabs USGS data and appends adds it to the validation set
+#' Also grabs USGS gagues that fit 'non-ephemeral' status and appends adds them to the validation set
+#'
+#' @name snapValidateToNetwork
 #'
 #' @param path_to_data: path to data directory
 #' @param validationDF: EPA/Corps WOTUS Jurisdictional distinction dataset (pre-cleaned and prepped)
-#' @param rivNetFin: model result river network (as data.frame)
 #' @param USGS_data: USGS gauge IDs and 'no flow fractions'
 #' @param nhdGages: loopup table linking USGS gages to nhd reach ids
+#' @param rivNetFin: model result river network (as data.frame)
 #' @param huc4id: HUC4 id for current network
+#' @param noFlowGageThresh: Threshold for % of year the gage runs dry that is allowable for rivers that are 'certainly non-ephemeral'
 #'
 #' @import sf
-#' '@import dplyr
+#' @import dplyr
 #'
-#' @return sf object with WOTUS validation points associated with NHD reaches (and their respective dicstance [m] from the reach)
-snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4id) {
+#' @return df with WOTUS validation points associated with NHD reaches (and their respective dicstance [m] from the reach)
+snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4id, noFlowGageThresh) {
+  indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #indiana-effected basins
+
   #do by basin to speed up processing
   validationDF <- dplyr::filter(validationDF, huc4 %in% huc4id)
 
   #handle regions with no validation data
   if(nrow(validationDF) == 0){
     return(data.frame('NHDPlusID'=NA,
+                      'dataset'=NA,
                       'snap_distance_m'=NA,
                       'network_utm_zone'=NA,
                       'JD_ID'=NA,
@@ -84,11 +114,36 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
                  coords = c("long", "lat"),
                  crs = 4269)
 
-  #read in shapefiles
+  #read in shapefiles, depending on indiana-effect or not
   huc2 <- substr(huc4id, 1, 2)
   dsnPath <- paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', huc4id, '_HU4_GDB/NHDPLUS_H_', huc4id, '_HU4_GDB.gdb')
-  nhd <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
-  nhd <- sf::st_zm(nhd)
+  if(huc4id %in% indiana_hucs) {
+    nhd <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/indiana/indiana_fixed_', huc4id, '.shp'))
+    nhd <- sf::st_zm(nhd)
+    colnames(nhd)[10] <- 'WBArea_Permanent_Identifier'
+    colnames(nhd)[23] <- 'Shape'
+    st_geometry(nhd)= 'Shape'
+  }
+  else{
+    nhd <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
+    nhd <- sf::st_zm(nhd)
+    nhd <- fixGeometries(nhd)
+  }
+
+  #set up stream order and Q for filtering nhd identical to model
+  NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
+  NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
+  nhd <- dplyr::left_join(nhd, NHD_HR_EROM, by='NHDPlusID')
+  nhd <- dplyr::left_join(nhd, NHD_HR_VAA, by='NHDPlusID')
+  nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
+  nhd$Q_cms <- nhd$QEMA * 0.0283 #cfs to cms
+  if(huc4id %in% indiana_hucs){
+    thresh <- c(2,2,2,2,3,2,3,2) #see README file
+    thresh <- thresh[which(indiana_hucs == huc4id)]
+    nhd$StreamOrde <- ifelse(nhd$indiana_fl == 1, nhd$StreamOrde - thresh, nhd$StreamOrde)
+  }
+
+  nhd <- dplyr::filter(nhd, StreamOrde > 0 & Q_cms > 0)
 
   #extract coords from river network
   coords <- sf::st_coordinates(sf::st_centroid(nhd$Shape)) #get each line centroid
@@ -100,30 +155,32 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
   validationDF <- sf::st_transform(validationDF, epsg)
   nhd <- sf::st_transform(nhd, epsg)
 
-  #get nearest river to each point
+  #snap each point to nearest river
   nearestIndex <- sf::st_nearest_feature(validationDF, nhd)
 
-  #remove those beyond the max snapping distance
+  #Get the actual snapping distance
   distance <- sf::st_distance(validationDF, nhd[nearestIndex,], by_element = TRUE)
 
   #build snapped validation set
   out <- data.frame('NHDPlusID'=nhd[nearestIndex,]$NHDPlusID,
+                    'dataset'='EPA',
                     'snap_distance_m'=sf::st_distance(validationDF, nhd[nearestIndex,], by_element = TRUE),
                     'network_utm_zone'=utm_zone)
   out <- cbind(out, validationDF)
 
   #join model results with validation data
   out <- as.data.frame(out)
-  rivNetFin <- select(rivNetFin, c('NHDPlusID', 'perenniality', 'StreamOrde'))
-  out <- left_join(out, rivNetFin, by='NHDPlusID')
+  rivNetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'StreamOrde'))
+  out <- dplyr::left_join(out, rivNetFin, by='NHDPlusID')
 
   #join usgs gauges to flesh out training set
-  USGS_data <- left_join(USGS_data, nhdGages, by=c('gageID'='GageIDMA'))
-  USGS_data <- filter(USGS_data, no_flow_fraction < 0.05 & NHDPlusID %in% rivNetFin$NHDPlusID) #if average year the river is flowing > 50% of the time, it's almost certainly non-ephemeral
-  USGS_data <- left_join(USGS_data, rivNetFin, by='NHDPlusID')
+  USGS_data <- dplyr::left_join(USGS_data, nhdGages, by=c('gageID'='GageIDMA'))
+  USGS_data <- dplyr::filter(USGS_data, no_flow_fraction < noFlowGageThresh & NHDPlusID %in% rivNetFin$NHDPlusID) #if average year the river is flowing > 90% of the time, it's almost certainly non-ephemeral
+  USGS_data <- dplyr::left_join(USGS_data, rivNetFin, by='NHDPlusID')
   if(nrow(USGS_data) > 0){
-    USGS_data$distinction <- 'perennial'
+    USGS_data$distinction <- 'non_ephemeral'
     USGS_out <- data.frame('NHDPlusID'=USGS_data$NHDPlusID,
+                      'dataset'='USGS',
                       'snap_distance_m'=0,
                       'network_utm_zone'=NA,
                       'JD_ID'=NA,
@@ -135,7 +192,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
                       "distinction"=USGS_data$distinction,
                       "geometry"=NA,
                       "perenniality"=USGS_data$perenniality,
-                      'StreamOrde'=NA) #not actually, but doesn't matter for these because they're not ephemeral)
+                      'StreamOrde'=USGS_data$StreamOrde)
 
     out <- rbind(out, USGS_out)
   }
@@ -143,57 +200,87 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
   return(out)
 }
 
-#' Creates confusion matrix for model valdation
+
+
+#' Adds our field-assessed river classifications from the Northeast US to the validation data frame
 #'
-#' @param verifyDF: combo df of all verification tables for each HUC4
+#' @name addOurFieldData
+#'
+#' @param rivNetFin_0106: 0106 river network, needed to pair field data in 0106 with model results
+#' @param rivNetFin_0108: 0108 river network, needed to pair field data in 0108 with model results
+#' @param our field-assessed river ephemerality classifications in New England (summer 2022)
+#'
+#' @import dplyr
+#'
+#' @return updated combined_validation df
+addOurFieldData <- function(rivNetFin_0106, rivNetFin_0108, path_to_data, field_dataset){
+  #get model results
+  df_0106 <- dplyr::filter(rivNetFin_0106, NHDPlusID %in% field_dataset$NHDPlusID)
+  df_0106 <- dplyr::select(df_0106, c('NHDPlusID', 'perenniality', 'StreamOrde'))
+
+  df_0108 <- dplyr::filter(rivNetFin_0108, NHDPlusID %in% field_dataset$NHDPlusID)
+  df_0108 <- dplyr::select(df_0108, c('NHDPlusID', 'perenniality', 'StreamOrde'))
+
+  field_dataset_0106 <- dplyr::left_join(df_0106, field_dataset)
+  field_dataset_0108 <- dplyr::left_join(df_0108, field_dataset)
+
+  field_dataset <- rbind(field_dataset_0106, field_dataset_0108)
+
+  #update validation table
+  field_dataset$method <- field_dataset$name
+  field_dataset$dataset <- 'this_study'
+  field_dataset$snap_distance_m <- 0 #dummy value to keep in dataset
+  field_dataset$network_utm_zone <- NA
+  field_dataset$JD_ID <- NA
+  field_dataset$resource_type <- NA
+  field_dataset$project_id <- NA
+  field_dataset$wotus_class <- NA
+  field_dataset$huc8 <- NA
+  field_dataset$distinction <- field_dataset$classification
+  field_dataset$geometry <- NA
+
+  field_dataset <- dplyr::select(field_dataset, c('method', 'NHDPlusID', 'dataset', 'snap_distance_m', 'network_utm_zone', 'JD_ID', 'resource_type', 'project_id', 'wotus_class', 'huc8', 'huc4', 'distinction', 'geometry', 'perenniality', 'StreamOrde'))
+  return(field_dataset)
+}
+
+
+
+#' Validates the ephemeral mapping model
+#'
+#' @name validateModel
+#'
+#' @param combined_validation: combo df of all verification tables for each HUC4
+#' @param ourFieldData: prepped df of our field-mapped stream classifications in the Northeast US
 #' @param snappingThresh: snapping threshold for 'on the NHD'
 #'
-#' @return confusion matrix. Figure saved to file
-validateModel <- function(combined_validation, snappingThresh){
+#' @import dplyr
+#' @import tidyr
+#'
+#' @return df containing ephemeral mapping validation results
+validateModel <- function(combined_validation, ourFieldData, snappingThresh){
+  #join datasets
+  combined_validation <- rbind(combined_validation, ourFieldData)
 
-  verifyDF <- tidyr::drop_na(combined_validation, 'NHDPlusID') #remove empty columns that arise from empty validation HUC regions
+  #remove empty columns that arise from empty validation HUC regions
+  verifyDF <- tidyr::drop_na(combined_validation, 'NHDPlusID')
   verifyDF$snap_distance_m <- as.numeric(verifyDF$snap_distance_m)
 
-  totNHD <- nrow(verifyDF[!duplicated(verifyDF$NHDPlusID) & verifyDF$distinction == 'ephemeral',])
+  #all ephemeral-classed rivers, regardless of NHD river presence
+  totNHD_tot <- nrow(verifyDF[!duplicated(verifyDF$NHDPlusID) & verifyDF$distinction == 'ephemeral',])
+
+  #filter for sites on the NHD (via some snapping threshold)
   verifyDF <- dplyr::filter(verifyDF, snap_distance_m < snappingThresh)
 
   #take most frequent JD per NHD reach
   verifyDFfin <- verifyDF %>%
-        group_by(NHDPlusID) %>%
-        count(distinction) %>% #most frequent EPA JD per reach is assigned, after removing ones beyond the snap distance
-        slice(which.max(n))
+        dplyr::group_by(NHDPlusID) %>%
+        dplyr::slice_min(snap_distance_m, with_ties=FALSE, n=1) #if more than one, take the one that is closest to the line. If tied, our hands are behind our back and we just take the first (not ideal but what can you do?)
 
-  #add model results back
-  verifyDF <- select(verifyDF, c('NHDPlusID', 'perenniality', 'huc4', 'StreamOrde'))
-  verifyDF <- verifyDF[!duplicated(verifyDF$NHDPlusID),]#drop columns for multiple JDs on same reach (model result is duplicated so it's fine)
-  verifyDFfin <- left_join(verifyDFfin, verifyDF, by='NHDPlusID') #join model results to finished product
-
-  onNHD <- nrow(verifyDFfin[verifyDFfin$distinction == 'ephemeral',]) #EPA JDs on the High res NHD
-
-  theme_set(theme_classic())
-
-  #confusion matrix
-  cm <- as.data.frame(caret::confusionMatrix(factor(verifyDFfin$perenniality), factor(verifyDFfin$distinction))$table)
-  cm$Prediction <- factor(cm$Prediction, levels=rev(levels(cm$Prediction)))
-  cfMatrix <- ggplot(cm, aes(Reference, Prediction,fill=factor(Freq))) +
-    geom_tile() +
-    geom_text(aes(label=Freq), size=15)+
-    scale_fill_manual(values=c('grey', 'grey', '#1b9e77', '#1b9e77')) +
-    labs(x = "Observed Class",y = "Model Class") +
-    scale_x_discrete(labels=c("Ephemeral","Intermittent/Perennial")) +
-    scale_y_discrete(labels=c("Intermittent\n/Perennial","Ephemeral")) +
-    theme(legend.position = "none",
-          axis.text=element_text(size=24),
-          axis.title=element_text(size=28,face="bold"),
-          legend.text = element_text(size=17),
-          legend.title = element_text(size=17, face='bold'))
-
-  #write to file
-  ggsave('cache/verify_cf.jpg', cfMatrix, width=10, height=8)
-  write_csv(verifyDFfin, 'cache/validationResults.csv')
+  #EPA ephemeral-classed JDs on the NHD
+  onNHD_tot <- nrow(verifyDFfin[verifyDFfin$distinction == 'ephemeral',])
 
   return(list('validation_fin'=verifyDFfin,
-              'eph_features_on_nhd'=onNHD,
-              'eph_features_off_nhd'=totNHD - onNHD,
-              'all_validation_features'=nrow(verifyDF)))
+              'eph_features_on_nhd_tot'=onNHD_tot,
+              'eph_features_off_nhd_tot'=totNHD_tot - onNHD_tot,
+              'all_validation_features'=nrow(verifyDFfin)))
 }

@@ -1,1 +1,7 @@
-slurmstepd-cpu009: error: *** JOB 3063086 ON cpu009 CANCELLED AT 2022-07-01T14:14:11 ***
+
+Attaching package: 'dplyr'
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
