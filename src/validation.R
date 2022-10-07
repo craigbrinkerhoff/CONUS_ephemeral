@@ -1,8 +1,6 @@
-##########################
 ## Craig Brinkerhoff
 ## Functions to validate/verify the ephemeral river map against EPA WOTUS Jurisdictional Determinations (JDs), as well as streamgauges
 ## Summer 2022
-##########################
 
 
 

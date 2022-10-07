@@ -1,8 +1,6 @@
-############
 ## Craig Brinkerhoff
 ## Spring 2022
 ## Main functions for classifying ephemeral streams along the NHD (and calculating water volumes in ephemeral streams)
-#################
 
 
 
@@ -22,7 +20,7 @@
 #'
 #' @return df of NHD hydrograpy with mean monthly water table depths attached.
 extractData <- function(path_to_data, huc4){
-  ########SETUP-----------------------------------------------
+  ########SETUP
   indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #indiana-effected basins
 
   sf::sf_use_s2(FALSE)
@@ -41,7 +39,7 @@ extractData <- function(path_to_data, huc4){
                                          'Hawaii'))) #remove non CONUS states/territories
   states <- sf::st_union(states)
 
-  ########PULL IN DATA--------------------------------------------------------------
+  ########PULL IN DATA
   #Fan et al 2017 water table depth model
   wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))   #monthly averages for hourly model runs for 2004-2014
 
@@ -139,7 +137,7 @@ extractData <- function(path_to_data, huc4){
   nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$Q_cms, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, nhd$c, nhd$f)
   nhd$width_m <- mapply(width_func, nhd$waterbody, nhd$Q_cms, nhd$a, nhd$b)
 
-  ########EXTRACT RASTER MODELS AND DATA TO NHD--------------------------------------
+  ########EXTRACT RASTER MODELS AND DATA TO NHD
   #convert back to terra to do extractions
   nhd <- terra::vect(nhd)
 
@@ -148,7 +146,27 @@ extractData <- function(path_to_data, huc4){
   nlcd <- terra::crop(nlcd, basin)
 
   #extract average land cover along stream channel
-  nhd_nlcd <- terra::extract(nlcd, nhd, fun='mean', na.rm=T)
+  m <- c(0,NA, #ignore non-land pixels
+         11,10,
+         12,10,
+         21,20, #developed
+         22,20, #developed
+         23,20, #developed
+         24,20, #developed
+         31,30,
+         41,40,
+         42,40,
+         43,40,
+         51,50,
+         52,50,
+         71,60, #there is no nlcd category 60 for some reason so we do this to later take a mean
+         81,70, #cultivated
+         82,70, #cultivated
+         90,80,
+         95,80)
+  rclmat <- matrix(m, ncol=2, byrow=TRUE)
+  nlcd <- terra::classify(nlcd, rclmat, include.lowest=TRUE)
+  nhd_nlcd <- terra::extract(nlcd, nhd, fun=function(x){return(mean(x, na.rm=T))})#'mean', na.rm=T)
 
   #extract mean monthly water table depths
   nhd_wtd_01 <- terra::extract(wtd$WTD_1, nhd, fun=summariseWTD)
@@ -168,12 +186,12 @@ extractData <- function(path_to_data, huc4){
   nhd_conus <- sf::st_intersection(sf::st_as_sf(nhd), states)
   nhd$conus <- ifelse(nhd$NHDPlusID %in% nhd_conus$NHDPlusID, 1,0)
 
-  #Wrangle everything into a leightweight routing table (no sptial info anymore)
+  #Wrangle everything into a lightweight routing table (no spatial info anymore)
   nhd_df <- as.data.frame(nhd)
   nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'LengthKM', 'width_m', 'depth_m'))
 
-  nhd_df$nlcd_broad <- as.numeric(round(nhd_nlcd$landcover, -1)) #round to broad categoeries, i.e. forest, cultivated, urban, etc.
-  nhd_df$nlcd_broad <- ifelse(nhd_df$conus == 0, 0, nhd_df$nlcd_broad)
+  nhd_df$nlcd_broad <- as.numeric(round(nhd_nlcd$landcover, -1)) #round to broad categories, i.e. forest, cultivated, urban, etc.
+  nhd_df$nlcd_broad <- ifelse(nhd_df$conus == 0, 0, nhd_df$nlcd_broad) #don't tabulate non-CONUS streams
 
   nhd_df$wtd_m_min_01 <- as.numeric(nhd_wtd_01$WTD_1.min)
   nhd_df$wtd_m_median_01 <- as.numeric(nhd_wtd_01$WTD_1.median)
@@ -260,11 +278,10 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
   #remove streams with absolutely no mean annual flow (can't compute flowing...)
   nhd_df <- dplyr::filter(nhd_df, Q_cms > 0)
 
-  ######INTIAL PASS AT ASSIGNING PERENNIALITY------------------
-    #just run it with median for now
+  ######INTIAL PASS AT ASSIGNING PERENNIALITy: using median water table depth (function handles non-CONUS streams in its calculation)
   nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus)
 
-  #####ROUTING---------------------------
+  #####ROUTING
   #now, route through network and identify 'perched perennial rivers', i.e. those supposedly above the water table that are always flowing because of upstream perennial rivers
   #sort rivers from upstream to downstream
   nhd_df <- dplyr::filter(nhd_df, HydroSeq != 0)
@@ -310,12 +327,12 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 #' @return dataframe with runoff coefficients at HUC level 4 scale
 calcRunoffEff <- function(path_to_data, huc4_c){
 
-  #read in HUC4 basin------------------
+  ##READ IN HUC4 BASIN
   huc2 <- substr(huc4_c, 1, 2)
   basin <- st_read(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
   basin <- dplyr::filter(basin, huc4 == huc4_c)
 
-  #SETUP RUNOFF DATA----------------------------------
+  ##SETUP RUNOFF DATA
   HUC4_runoff <- read.table(paste0(path_to_data, '/for_ephemeral_project/HUC4_runoff_mm.txt'), header=TRUE)
   HUC4_runoff$huc4 <- as.character(HUC4_runoff$huc_cd)   #setup IDs
   HUC4_runoff$huc4 <- ifelse(nchar(HUC4_runoff$huc_cd)==3, paste0('0', HUC4_runoff$huc_cd), HUC4_runoff$huc_cd)
@@ -325,12 +342,12 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 
   basin <- vect(basin)
 
-  #SETUP MEAN DAILY PRECIP DATA-----------------------------------
+  ##SETUP MEAN DAILY PRECIP DATA
   precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/precip.V1.0.day.ltm.nc')) #raster must be used for this, NOT terra in its current form
   precip <- raster::rotate(precip)
   precip_mean <- rast(mean(precip, na.rm=T)) #get long term mean for 1981-2010, converted to terra spatRaster
 
-  #reproject
+  ##REPROJECT
   basin <- project(basin, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
   precip_mean <- project(precip_mean, "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ")
 
@@ -345,7 +362,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
   basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0429', 562.3712, basin$runoff_ma_mm_yr) #m3/s to mm/yr using HUC4 0414
   basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0430', 562.3712, basin$runoff_ma_mm_yr) #m3/s to mm/yr using HUC4 0414
 
-  #runoff efficecincy
+  #runoff efficiency
   basin$runoff_eff <- basin$runoff_ma_mm_yr / basin$precip_ma_mm_yr #efficiency of P to streamflow routing
 
   #save as rds file
@@ -431,26 +448,144 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 #'
 #' @return summary statistics
 collectResults <- function(nhd_df, numFlowingDays, huc4){
-  #concatenate and generate intial (not scaled) results
+  #concatenate and generate initial (not scaled) results
   results_nhd <- data.frame(
     'huc4'=huc4,
     'num_flowing_dys'=numFlowingDays,
-    'percEph_cultivated' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$nlcd_broad == 80)/sum(nhd_df$perenniality == 'ephemeral'), #80 is the NLCD code for cultivated lands
-    'percEph_developed' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$nlcd_broad == 20)/sum(nhd_df$perenniality == 'ephemeral'), #20 is the NLCD code for developed lands
-    'percEph_cult_devp' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$nlcd_broad %in% c(20,80))/sum(nhd_df$perenniality == 'ephemeral'), #both cultivated and ceveloped
     'notEphNetworkLength' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM, na.rm=T),
     'ephemeralNetworkLength' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T),
+    'ephemeralCultDevpNetworkLength'=sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$nlcd_broad %in% c(20,70),]$LengthKM, na.rm=T),
     'totalNotEphQ' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$Q_cms, na.rm=T),
     'totalephmeralQ_flowing' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms, na.rm=T)* (365/numFlowingDays), #scale to 'flowingQ'
-    'totalephmeralQ' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms, na.rm=T))
+    'totalephmeralQ' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$Q_cms, na.rm=T),
+    'n'=nrow(nhd_df))
 
   results_nhd$percQ_eph_flowing <- results_nhd$totalephmeralQ_flowing / (results_nhd$totalNotEphQ + results_nhd$totalephmeralQ_flowing)
   results_nhd$percQ_eph <- results_nhd$totalephmeralQ / (results_nhd$totalNotEphQ + results_nhd$totalephmeralQ)
-
   results_nhd$percLength_eph <- results_nhd$ephemeralNetworkLength / (results_nhd$ephemeralNetworkLength + results_nhd$notEphNetworkLength)
+  results_nhd$percLength_eph_cult_devp =  results_nhd$ephemeralCultDevpNetworkLength/((results_nhd$ephemeralNetworkLength + results_nhd$notEphNetworkLength))
 
   return(results_nhd)
 }
+
+
+
+#' Fits horton laws to ephemeral data and calculates number of additional stream orders to match the observed ephemeral data occurence off  network
+#'
+#' @name scalingFunc
+#'
+#' @param validationResults: completed snapped and cleaned WOTUS JD validation dataset
+#'
+#' @import dplyr
+#'
+#' @return list of properties obtained from horton fitting: new minimum order ('ephMinOrder'), desired epehemeral frequncy ('desiredFreq'), horton model ('horton_lm'), horton coefficient ('Rb')
+scalingFunc <- function(validationResults){
+  desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, what we want to scale too
+  
+  df <- validationResults$validation_fin
+  df <- dplyr::filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gages, which are always perennial anyway
+  
+  df <- dplyr::group_by(df, StreamOrde) %>%
+    dplyr::summarise(n=n())
+  
+  #fit model for Horton number of streams per order
+  lm <- lm(log(n)~StreamOrde, data=df)
+  Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
+  ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0) #algebraically solve for smallest order in the system
+  df_west <- df
+  
+  return(list('desiredFreq'=desiredFreq,
+              'df'=df,
+              'ephMinOrder'=ephMinOrder,
+              'horton_lm'=lm,
+              'Rb'=  Rb)) #https://www.engr.colostate.edu/~ramirez/ce_old/classes/cive322-Ramirez/CE322_Web/Example_Horton_html.htm
+}
+
+
+
+#' Scales model results to additional stream order(s) if necessary. Horton ratio used in this calcualtion comes from the NHD 3rd order calculated ratio (to be somehere in the middle of the network)
+#'
+#' @name scalingByBasin
+#'
+#' @param scalingModel: Horton laws, already fit to ephemeral field data
+#' @param rivNetFin: nhd hydrography for a given huc4 basin
+#' @param results: results file for a given huc4 basin
+#' @param huc4: HUC4 basin code
+#'
+#' @import dplyr
+#'
+#' @return updated results dataframe with scaled and scaled_flowing results
+scalingByBasin <- function(scalingModel, rivNetFin, results, huc4){
+  #fit horton laws to this river system (east vs west of Mississippi, different scaling)
+  numNewOrders <- 1 - scalingModel$ephMinOrder
+  
+  #num flowing days per earlier rain analysis
+  numFlowingDays <- results$num_flowing_dys
+  
+  #number and average discharge of ephemeral streams
+  df <- dplyr::filter(rivNetFin, perenniality == 'ephemeral') %>%
+    dplyr::group_by(StreamOrde) %>%
+    dplyr::summarise(n=n(),
+                     Qbar = mean(Q_cms, na.rm=T),
+                     Qbar_adj = mean(Q_cms, na.rm=T) * (365/numFlowingDays))
+  
+  #rewrte stream orders for scaling (when appropritate)
+  if(numNewOrders > 0){
+    df$old_orders <- df$StreamOrde
+    df$StreamOrde <- df$StreamOrde + numNewOrders
+    
+    #get horton ratios
+    lm <- lm(log(n)~StreamOrde, data=df)
+    Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
+    lm2 <- lm(log(Qbar)~StreamOrde, data=df)
+    Rq <- exp(lm2$coefficient[2]) #Horton law parameter for mean Q
+    lm3 <- lm(log(Qbar_adj)~StreamOrde, data=df)
+    Rq_f <- exp(lm3$coefficient[2]) #Horton law parameter for mean flowing Q
+    
+    #scale to new minimum order
+    for (i in 1:numNewOrders){
+      new <- data.frame('StreamOrde'=i, 'n'=NA, 'Qbar'=NA)
+      new$old_orders <- NA
+      new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
+      if(i ==1){ #do first order first (as its different)
+        new$Qbar <- (df[df$StreamOrde == 3,]$Qbar)/(Rq^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+        new$Qbar_adj <- (df[df$StreamOrde == 3,]$Qbar_adj)/(Rq_f^(df[df$StreamOrde == 3,]$StreamOrde - 1)) #ratio using 3rd order
+      }
+      else{ #do all other additional orders (if necessary)
+        new$Qbar <- df[df$StreamOrde == 1,]$Qbar*Rq^(i-1)
+        new$Qbar_adj <- df[df$StreamOrde == 1,]$Qbar*Rq_f^(i-1)
+      }
+      df <- rbind(df, new)
+    }
+    
+    df <- df[order(df$StreamOrde), ]
+    
+    #get water volume in additional stream order
+    additionalQ <- sum(df[1:numNewOrders,]$Qbar * df[1:numNewOrders,]$n) #mean annual
+    additionalQ_flowing <- sum(df[1:numNewOrders,]$Qbar_adj * df[1:numNewOrders,]$n) #mean annual flowing
+    
+    scalingFlag <- 1
+  }
+  
+  #when no additional scaling is done
+  else{
+    additionalQ <- 0
+    additionalQ_flowing <- 0
+    scalingFlag <- 0
+  }
+  
+  #adding scaled results to previous results
+  results$totalephmeralQ_scaled <- results$totalephmeralQ + additionalQ #mean annual
+  results$totalephmeralQ_flowing_scaled <- results$totalephmeralQ_flowing + additionalQ_flowing #mean annual flowing
+  
+  results$percQ_eph_scaled <- results$totalephmeralQ_scaled / (results$totalephmeralQ_scaled + results$totalNotEphQ) #mean annual percent
+  results$percQ_eph_flowing_scaled <- results$totalephmeralQ_flowing_scaled / (results$totalephmeralQ_flowing_scaled + results$totalNotEphQ) #mean annual flowing percent
+  
+  results$scalingFlag <- scalingFlag
+  
+  return(results)
+}
+
 
 
 
@@ -474,7 +609,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
   for(i in threshs){
     validationResults <- validateModel(combined_validation, ourFieldData, i)
 
-    #validation test-----------------------
+    #validation test
     df <- validationResults$validation_fin
     df$TP <- ifelse(df$distinction == 'ephemeral' & df$perenniality == 'ephemeral', 1, 0)
     df$FP <- ifelse(df$distinction == 'non_ephemeral' & df$perenniality == 'ephemeral', 1, 0)
@@ -483,7 +618,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 
     basinAccuracy <- round((sum(df$TP, na.rm=T) + sum(df$TN, na.rm=T))/(sum(df$TP, na.rm=T) + sum(df$TN, na.rm=T) + sum(df$FN, na.rm=T) + sum(df$FP, na.rm=T)),2)
 
-    #scaling test-------------------------
+    #scaling test
     desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, eventual number we want to scale too
 
     df <- validationResults$validation_fin

@@ -1,8 +1,27 @@
-#########################
 ## Utility functions
 ## Spring 2022
 ## Craig Brinkerhoff
-#########################
+
+
+
+
+#' Calculates index for potential for water quality degradation due to NWPR + ephemeral streams
+#' 
+#' @name ephemeralIndexFunc
+#' 
+#' @param contribution: dimension 1: ephemeral contribution to streamflow
+#' @param contribution: dimension 2: ephemeral flow frequency
+#' @param contribution: dimension 3: potential for ephemeral contribution to point-source pollution
+#' 
+#' @return mean of the three dimensions (equation S9)
+ephemeralIndexFunc <- function(contribution, landuse, frequency) {
+  #make num flowing days a percent
+  frequency <- frequency/365
+  
+  #return metric
+  return(mean(c(contribution, frequency, landuse)))
+}
+
 
 
 
@@ -23,21 +42,6 @@ summariseWTD <- function(wtd){
               'min'=min,
               'max'=max))
 }
-
-
-#' Fins most frequent thing (for getting dominant land cover per stream reach)
-#'
-#' @name find_mode
-#'
-#' @param v: vector of things along a stream reach
-#'
-#' @return out: mode of x
-find_mode <- function(v) {
-  v <- v[is.na(v)==0]
-   uniqv <- unique(v)
-   uniqv[which.max(tabulate(match(v, uniqv)))]
-}
-
 
 
 #' width for rivers
@@ -86,7 +90,7 @@ depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
 
 
 
-#' Calculates river ephemerality status using Fan et al 2017 monthly WTD
+#' Calculates river ephemerality status using Fan et al 2017 monthly WTD (accounting for non-CONUS streams)
 #'
 #' @name perenniality_func_fan
 #'
@@ -223,25 +227,4 @@ addingRunoffMemory <- function(precip, memory, thresh){
     }
     precip <- sum(precip >= thresh)
     return(precip)
-}
-
-
-Pload_rel_func <- function(ephStreams, sampleSize, Pconc_kg_m3, pointSourceLoading_kg_2012, numFlowingDays){
-  sampledEph <- ephStreams[sample(1:nrow(ephStreams), sampleSize), ]
-
-  Pload_kg_yr <- Pconc_kg_m3 * sampledEph$Q_cms *(365/numFlowingDays) * 86400 * 365 #[kg/yr]
-  Pload_kg_yr <- sum(Pload_kg_yr)
-  out <- Pload_kg_yr / (pointSourceLoading_kg_2012 + Pload_kg_yr)
-
-  return(out)
-}
-
-
-Pload_func <- function(ephStreams, sampleSize, Pconc_kg_m3, numFlowingDays){
-  sampledEph <- ephStreams[sample(1:nrow(ephStreams), sampleSize), ]
-
-  Pload_kg_yr <- Pconc_kg_m3 * sampledEph$Q_cms *(365/numFlowingDays) * 86400 * 365 #[kg/yr]
-  Pload_kg_yr <- sum(Pload_kg_yr)
-
-  return(Pload_kg_yr)
 }

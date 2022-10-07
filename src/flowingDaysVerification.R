@@ -1,15 +1,13 @@
-#############
 ## Craig Brinkerhoff
 ## Summer 2022
 ## Gathers and builds verification figure for the numFlowingDays model, compared against gathered field data
-#############
 
 
 
 #' wrangles existing (published) ephemeral field data to calculate 'number of flowing days' for their respective basins
 #'
 #' @name wrangleFlowingFieldData
-#' data comes from the following field studies (all saved in data repo except the DUke FOrest data which is hardcoded here):
+#' data comes from the following field studies (all saved in data repo except the Duke FOrest data which is hardcoded here):
 #'
 #' Duke Forest, NC: https://doi.org/10.1002/hyp.11301 (1 years data)
 #' Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
@@ -41,7 +39,7 @@ wrangleFlowingFieldData <- function(path_to_data){
   more_arizona <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/stromberg_etal_2017.csv'))
   geulph <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ontario.csv'))
 
-  #wrangle Mohave Yuma----------------------------------------------------------------------------
+  #wrangle Mohave Yuma
   colnames(mohaveYuma) <- c('site', 'drainage_area_km2', 'elevation_m', 'period_of_record', 'num_flowing_events', 'ma_num_flowing_events', 'reference')
   mohaveYuma$watershed <- 'mohave_yuma'
   mohaveYuma$period_of_record_yrs <- c(3, 2, 4, 2, 3, 1, 3, 2, 4, 1, 4, 2, 4, 1, 2, 4, 3, 2)
@@ -49,7 +47,7 @@ wrangleFlowingFieldData <- function(path_to_data){
   mohaveYuma$ma_num_flowing_days <- mohaveYuma$num_flowing_days/(mohaveYuma$period_of_record_yrs)
   mohaveYuma <- mohaveYuma %>% dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days'))
 
-  #wrangling walnut gulch-----------------------------------------------------------
+  #wrangling walnut gulch
   walnutGulch <- tidyr::gather(walnutGulch, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 6","Flume 7","Flume 11","Flume 15","Flume 103","Flume 104", "Flume 112", "Flume 121", "Flume 125"))
   walnutGulch$date <- paste0(walnutGulch$Year, '-', walnutGulch$Month, '-', walnutGulch$Day)
   walnutGulch$date <- lubridate::as_date(walnutGulch$date)
@@ -64,7 +62,7 @@ wrangleFlowingFieldData <- function(path_to_data){
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs)) %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days'))
 
-  #wrangling Santa Rita----------------------------------------------------------
+  #wrangling Santa Rita
   santaRita <- tidyr::gather(santaRita, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 5","Flume 6","Flume 7","Flume 8"))
   santaRita$date <- paste0(santaRita$Year, '-', santaRita$Month, '-', santaRita$Day)
   santaRita$date <- lubridate::as_date(santaRita$date)
@@ -79,7 +77,7 @@ wrangleFlowingFieldData <- function(path_to_data){
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs)) %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days'))
 
-  #wrangling reynolds creek------------------------------------------------------------
+  #wrangling reynolds creek
   reynoldsCreek$date <- paste0(reynoldsCreek$year, '-', reynoldsCreek$month, '-', reynoldsCreek$day)
   reynoldsCreek$date <- lubridate::as_date(reynoldsCreek$date)
   reynoldsCreek$drainage_area_km2 <- ifelse(reynoldsCreek$site == 'summitWash', 83*0.01,
@@ -100,7 +98,7 @@ wrangleFlowingFieldData <- function(path_to_data){
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs)) %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days'))
 
-  #wrangling Kentucky Robinson Forest------------------------------------------------------------
+  #wrangling Kentucky Robinson Forest
   kentucky$period_of_record_yrs <- kentucky$period_of_record_dys / 365
 
   #done seperately for different datasets with different sampling frequencies
@@ -110,26 +108,26 @@ wrangleFlowingFieldData <- function(path_to_data){
   kentucky <- kentucky %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days'))
 
-  # #add Duke Forest-----------------------------------------------------------------------------------
+  # #add Duke Forest
   dukeForest <- data.frame('watershed'='dukeForest',
                            'site'='a',
                            'period_of_record_yrs'=1,
                            'drainage_area_km2'=3.3*0.01,
                            'ma_num_flowing_days'=(365*0.44)*0.37)
 
-  #add Montoyas watershed, urban system near Albuquerque, New Mexico---------------------------------------------------------------------
+  #add Montoyas watershed, urban system near Albuquerque, New Mexico
   montoyas <- data.frame('watershed'='montoyas',
                            'site'='a',
                            'period_of_record_yrs'=7, #2008-2014
                            'drainage_area_km2'=142,
                            'ma_num_flowing_days'=10/7)#10 flowing days, averaged over 7 years. See paper
 
-  #add additional arizona data------------------------------------------------------------------------------
+  #add additional arizona data
   more_arizona$ma_num_flowing_days <- (more_arizona$period_of_record_yrs*365*((24*60/10)*more_arizona$perc_record_flowing))/(more_arizona$period_of_record_yrs*365) #have to convert 10' sampling frequency to daily average
   more_arizona <- more_arizona %>%
     dplyr::select(c('watershed', 'site', 'drainage_area_km2', 'period_of_record_yrs', 'ma_num_flowing_days'))
 
-  #add ontario data -----------------------------------------------------------------------------------------
+  #add ontario data
     #already in number of flowing events per rain events (see paper), so no need to convert to 'daily resolution'.
     #Further, they only sampled July-Oct, so we double there number to capture springtime (Mar-June) flow which we assume as ~equivalent frequency. The other third of the year (winter) we assume no streamflow in Ontario.
   ontario <- data.frame('watershed'='geulph',
@@ -138,7 +136,7 @@ wrangleFlowingFieldData <- function(path_to_data){
                            'drainage_area_km2'=mean(geulph$drainage_area_km2),
                            'ma_num_flowing_days'=mean(geulph$num_flowing_events) * 2) #assumed equivlanet in springtime and zero flow in wintertime, so flowing at this frequency 2/3s of the year
 
-  #bring it allllllllll together----------------------------------------------------------------------
+  #bring it allllllllll together
   results_all <- rbind(walnutGulch, santaRita, reynoldsCreek, mohaveYuma, kentucky, dukeForest, more_arizona, montoyas, ontario)
 
   output <- results_all %>%
@@ -179,7 +177,7 @@ wrangleFlowingFieldData <- function(path_to_data){
 flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_results){
   og_data <- validationData
 
-  #read in all HUC4 basins------------------
+  #read in all HUC4 basins
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
   for(i in codes_huc02[-1]){
     basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons

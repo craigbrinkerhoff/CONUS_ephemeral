@@ -1,8 +1,6 @@
-################
 ## Code to re-orient precip data from 0 - 360 longitudes to -180 - 180. This was done locally on my PC and the code is included here for posterity's sake.
 ## Craig Brinkerhoff
 ## Summer 2022
-###############
 
 library(raster)
 

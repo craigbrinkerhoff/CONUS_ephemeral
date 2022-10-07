@@ -1,8 +1,6 @@
-############
 ## Craig Brinkerhoff
 ## functions to make shapefiles from results (both model and validation results)
 ## Summer 2022
-#############
 
 
 
@@ -19,7 +17,7 @@
 #'
 #' @return print statement as it writes to file + the sf object shapefile
 saveShapefile <- function(path_to_data, codes_huc02, combined_results){
-  #read in all HUC4 basins------------------
+  #read in all HUC4 basins
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name'))
   for(i in codes_huc02[-1]){
     basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name')) #basin polygons
@@ -33,7 +31,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   basins_overall$percQ_eph_flowing_scaled <- round(basins_overall$percQ_eph_flowing_scaled, 2)
   basins_overall$num_flowing_dys <- round(basins_overall$num_flowing_dys, 0)
 
-  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQ_eph_flowing_scaled', 'percQ_eph_scaled', 'percLength_eph', 'percEph_cult_devp', 'geometry'))
+  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQ_eph_flowing_scaled', 'percQ_eph_scaled', 'percLength_eph', 'percLength_eph_cult_devp', 'geometry'))
 
   return(list('note'='see cache/results_fin.shp',
               'shapefile'=basins_overall))
@@ -54,7 +52,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 #'
 #' @return summary stats for validation + the sf object shapefile
 saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
-  #read in all HUC2 basins------------------
+  #read in all HUC2 basins
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU2.shp')) %>% dplyr::select(c('huc2', 'name'))
   for(i in codes_huc02[-1]){ #join HUC04 and HUC09 because of too limited data
     basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU2.shp')) %>% dplyr::select(c('huc2', 'name')) #basin polygons

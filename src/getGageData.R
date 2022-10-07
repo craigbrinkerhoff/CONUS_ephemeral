@@ -1,8 +1,6 @@
-#####################
 ## Craig Brinkerhoff
 ## Spring 2022
 ## Functions for getting mean annual flow and flow frequency at USGS streamgages along the NHD
-#####################
 
 
 
@@ -88,12 +86,12 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
     }
     if(length(sites)==0){next} #some zones don't have gages joined to NHD after QA/QC (HUC04 for example)
 
-    ##########CALCUALTE BASEFLOW AND MEAN ANNUAL FLOW------------------------------
+    ##########CALCUALTE MEAN ANNUAL FLOW
     results <- data.frame()
     k <- 1
-    if(!file.exists(paste0('cache/training/trainingData_', m, '.rds'))){
+    if(!file.exists(paste0('cache/training/trainingData_', m, '.rds'))){ #check if site has already been run
       for(i in sites){
-        gageQ <- tryCatch(readNWISstat(siteNumbers = i,
+        gageQ <- tryCatch(readNWISstat(siteNumbers = i, #check if site mets our date requirements
                                        parameterCd = '00060', #discharge
                                        startDate = '1970-10-01',
                                        endDate = '2018-09-30'),
@@ -109,7 +107,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
         gageQ$Q_cms <- gageQ$mean_va*0.0283 #cfs to cms
         gageQ$Q_cms <- round(gageQ$Q_cms, 3) #round to 1 decimal to handle low-flow errors following Zipper et al 2021
 
-        #ACTUALLY CALCULATE MEAN ANNUAL FLOW-------------------------------------
+        #ACTUALLY CALCULATE MEAN ANNUAL FLOW
         gageQ <- select(gageQ, c('site_no', 'Q_cms', 'month_nu')) %>%
           mutate(Q_MA = mean(gageQ$Q_cms, na.rm=T),
                  date=1:nrow(gageQ),
@@ -128,7 +126,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
 
     write_rds(results, paste0('cache/training/trainingData_', m, '.rds'))
 
-    Sys.sleep(60) #wait 1 minute to USGS doesn't get overwhelmed :)
+    Sys.sleep(60) #wait 1 minute to USGS doesn't get angry :)
    }
   }
 

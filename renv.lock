@@ -138,6 +138,38 @@
         "backports"
       ]
     },
+    "batchtools": {
+      "Package": "batchtools",
+      "Version": "0.9.15",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "1f8105b6e7c01c37b58559fbf91425e3",
+      "Requirements": [
+        "R6",
+        "backports",
+        "base64url",
+        "brew",
+        "checkmate",
+        "data.table",
+        "digest",
+        "fs",
+        "progress",
+        "rappdirs",
+        "stringi",
+        "withr"
+      ]
+    },
+    "biscale": {
+      "Package": "biscale",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "43427f94ce2cfcb1cebc5b06dedd0460",
+      "Requirements": [
+        "classInt",
+        "ggplot2"
+      ]
+    },
     "bit": {
       "Package": "bit",
       "Version": "4.0.4",
@@ -171,6 +203,14 @@
         "xfun",
         "yaml"
       ]
+    },
+    "brew": {
+      "Package": "brew",
+      "Version": "1.0-7",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "38875ea52350ff4b4c03849fc69736c8",
+      "Requirements": []
     },
     "bslib": {
       "Package": "bslib",
@@ -215,6 +255,16 @@
         "recipes",
         "reshape2",
         "withr"
+      ]
+    },
+    "checkmate": {
+      "Package": "checkmate",
+      "Version": "2.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "147e4db6909d8814bb30f671b49d7e06",
+      "Requirements": [
+        "backports"
       ]
     },
     "class": {
@@ -478,6 +528,17 @@
       "Requirements": [
         "future",
         "globals"
+      ]
+    },
+    "future.batchtools": {
+      "Package": "future.batchtools",
+      "Version": "0.10.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ed6d40f78a5761934d6d3ba77d7ddac2",
+      "Requirements": [
+        "batchtools",
+        "future"
       ]
     },
     "generics": {
