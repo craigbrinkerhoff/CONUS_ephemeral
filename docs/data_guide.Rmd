@@ -14,6 +14,13 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Resolution/Scale:** 1km
   - **Years:** 2004-2014
 
+- 2019 CONUS National Land Cover Dataset (NLCD) v 2.0 (June 2021)
+  - **Filename:** `NLCD_2019/nlcd_HUCxx.tif`
+  - **Data:** https://developers.google.com/earth-engine/datasets/catalog/USGS_NLCD_RELEASES_2019_REL_NLCD
+  - **Paper:** https://www.sciencebase.gov/catalog/item/5f21cef582cef313ed940043
+  - **Resolution/Scale:** 30m (downscaled to 1km)
+  - **Years:** 2019
+
 - CONUS Long-Term Gauge-Based Daily Precip Model
   - **Filename:** `dailyPrecip_1980_2010.gri`
     - aggregated to yearly via `src/netcdf_prep.R`
@@ -52,11 +59,3 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Data:** Summer 2022
   - **Method followed:** https://files.nc.gov/ncdeq/Water%20Quality/Surface%20Water%20Protection/401/Policies_Guides_Manuals/StreamID_v_4point11_Final_sept_01_2010.pdf
   - **Resolution/Scale:** NA
-
-## No longer used
-- CONUS Water Table Depth Model
-  - **Filename:** `conus_MF6_SS_Unconfined_250_dtw.tif`
-  - **Data:** https://doi.org/10.5066/P91LFFN1
-  - **Paper:** https://doi.org/10.1029/2019WR026724
-  - **Resolution/Scale:** 250m
-  - **Years:** 2000-2013

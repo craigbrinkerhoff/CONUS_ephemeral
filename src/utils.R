@@ -14,11 +14,10 @@
 #' @param contribution: dimension 3: potential for ephemeral contribution to point-source pollution
 #' 
 #' @return mean of the three dimensions (equation S9)
-ephemeralIndexFunc <- function(contribution, landuse, frequency) {
-  #make num flowing days a percent
-  frequency <- frequency/365
+ephemeralIndexFunc <- function(contribution, landuse, frequency, maxContrib, minContrib) {
+  #normalize contribution to 0-1
+  contribution <- (contribution - minContrib) / (maxContrib - minContrib) 
   
-  #return metric
   return(mean(c(contribution, frequency, landuse)))
 }
 
@@ -133,6 +132,27 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
 
 #' Use network routing to clean up WTD model predicted ephemerality, i.e. those downstream of perennial rivers (that can't happen unless the stream entirely runs dry!!)
 #'
+#' @name getdQdX
+#'
+#' @param fromNode: upstream-end reach node
+#' @param toNode_vec: full network vector of downstream-end reach nodes
+#' @param curr_perr: current perenniality status
+#' @param curr_Q: reach discharge [m3/s]
+#' @param Q_vec: full network vector of discharges [m3/s]
+#'
+#' @return dQ/dx for every ephemeral reach
+getdQdX <- function(fromNode, toNode_vec, curr_perr, curr_Q, Q_vec){
+  upstream_reaches <- which(toNode_vec == fromNode)
+  upstreamQ <- sum(Q_vec[upstream_reaches], na.rm=T)
+
+  out <- curr_Q - upstreamQ #dQ/dx per stream reach
+  return(out) 
+}
+
+
+
+#' Use network routing to clean up WTD model predicted ephemerality, i.e. those downstream of perennial rivers (that can't happen unless the stream entirely runs dry!!)
+#'
 #' @name routing_func
 #'
 #' @param fromNode: upstream-end reach node
@@ -227,4 +247,20 @@ addingRunoffMemory <- function(precip, memory, thresh){
     }
     precip <- sum(precip >= thresh)
     return(precip)
+}
+
+
+
+
+#' Propogates linear combination of uniform Qlat errors given a sample size and sigma term. Returns in km3/yr
+#'
+#' @name QlaterrorPropogation
+#'
+#' @param sigma: uniform uncertainty term (1 sigma)
+#' @param n: number of reaches/terms to sum
+#'
+#' @return linear, uniform, error propagation [km3/yr]
+QlaterrorPropogation <- function(sigma, n) {
+  out <- sqrt(sigma^2*n)*365*86400*1e-9 #km3/yr sqrt(n)*sigma*86400*365*1e-9
+  return(out)
 }

@@ -42,7 +42,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
   accuracyFig <- ggplot(results) +
     geom_sf(aes(fill=basinAccuracy), color='black', size=0.3) +
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
-    scale_fill_gradientn(name='Classification Accuracy',
+    scale_fill_gradientn(name='Ephemeral classification accuracy',
                          colors =c("#d73027", "#ffffbf", "#4575b4"),
                          limits=c(0.60,1),
                          breaks=c(0.60, 0.65, 0.70, 0.75, 0.80,0.85, 0.90,0.95, 1.0),
@@ -89,92 +89,6 @@ mappingValidationFigure <- function(val_shapefile_fin){
   
   ggsave('cache/validationMap.jpg', comboPlot, width=15, height=18)
   return('see cache/validationMap.jpg')
-}
-
-
-
-
-
-#' create main results paper figure (fig 1)
-#'
-#' @name flowingMapFigureFunction
-#'
-#' @param shapefile_fin: final sf object with model results
-#'
-#' @import sf
-#' @import dplyr
-#' @import ggplot2
-#' @import cowplot
-#'
-#' @return main model results figure (also writes figure to file)
-flowingMapFigureFunction <- function(shapefile_fin) {
-  theme_set(theme_classic())
-
-  ##GET DATA
-  results <- shapefile_fin$shapefile
-
-  # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
-  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
-                                         'American Samoa',
-                                         'Commonwealth of the Northern Mariana Islands',
-                                         'Guam',
-                                         'District of Columbia',
-                                         'Puerto Rico',
-                                         'United States Virgin Islands',
-                                         'Hawaii'))) #remove non CONUS states/territories
-  states <- st_union(states)
-
-  #results shapefile
-  results <- dplyr::filter(results, is.na(percQ_eph_flowing_scaled)==0)
-  results$percQ_eph_flowing_scaled <- results$percQ_eph_flowing_scaled * 100
-  
-  #bin all model results for mapping purposes (manual palette specification)
-  results$perc_binned <- ifelse(results$percQ_eph_flowing_scaled <= 15, '0-15',
-                                ifelse(results$percQ_eph_flowing_scaled <= 30, '15-30',
-                                       ifelse(results$percQ_eph_flowing_scaled <= 45, '30-45',
-                                              ifelse(results$percQ_eph_flowing_scaled <= 60, '45-60',
-                                                     ifelse(results$percQ_eph_flowing_scaled <= 75, '60-75',
-                                                            ifelse(results$percQ_eph_flowing_scaled <= 90, '75-90','90-100'))))))
-
-  #HISTOGRAM INSET
-  ephVolumeHist <- ggplot(results, aes(x=percQ_eph_flowing_scaled))+
-    geom_histogram(color='black', fill='#cab2d6', size=1, bins = 20) +
-    xlab('') +
-    ylab('Count') +
-    theme(axis.title = element_text(size=18, face='bold'),
-          axis.text = element_text(size=15,face='bold'))
-
-  #MAIN MAP-----------------------------------------------
-  results_map <- ggplot(results) +
-    draw_plot(ephVolumeHist,
-              x = -128,
-              y = 25.5,
-              width = 25,
-              height = 5.5)+ #histogram
-    geom_sf(aes(fill=perc_binned),
-            color='black',
-            size=0.5) +
-    geom_sf(data=states,
-            color='black',
-            size=1.25,
-            alpha=0)+
-    scale_fill_manual(name='% streamflow exported via U.S.\nephemeral streams when flowing',
-                      values = c("#264653", "#2A9D8F", "#E9C46A", "#F4A261", "#EB886F", '#E76F51', '#E45C3A'),
-                      breaks=c('0-15','15-30','30-45','45-60','60-75', '75-90', '90-100'), #palette color breaks for legend
-                      guide = guide_legend(direction = "horizontal",
-                                           title.position = "top"))+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.25, 0.05))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
-          legend.title = element_text(face = "bold", size = 20),
-          legend.text = element_text(family = "Futura-Medium", size = 18))+
-    guides(fill = guide_legend(nrow = 1))+
-    xlab('')+
-    ylab('')
-
-    ggsave('cache/flowingMap.jpg', results_map, width=20, height=15)
-    return('see cache/flowingMap.jpg')
 }
 
 
@@ -278,7 +192,8 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law of stream numbers and snapping thresholds
   theme_set(theme_classic())
 
-  forPlot <- tidyr::gather(out, key=key, value=value, c('mae', 'ephMinOrder'))
+  forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to accuracy Plot
+  forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'ephMinOrder'))
   tradeOffPlot <- ggplot(forPlot, aes(thresh, value, color=key)) +
         geom_point(size=7) +
         geom_line(linetype='dashed', size=1) +
@@ -291,24 +206,24 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
           legend.position='bottom')
   ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=9, height=8)
 
-  #check sensitvity of classification accuracy to snapping threshold
-  accuracyPlot <- ggplot(out, aes(thresh, basinAccuracy)) +
-        geom_point(size=7, color='darkgreen') +
-        geom_line(linetype='dashed', size=1, color='darkgreen') +
-        geom_vline(xintercept=10, linetype='dashed', size=1)+
-        xlab('Snapping Threshold [m]') +
-        ylab('Classification Accuracy')+
-        ylim(0,1)+
-        theme(axis.text=element_text(size=20),
-          axis.title=element_text(size=22,face="bold"),
-          legend.text = element_text(size=17))
+  #check sensitivity of classification accuracy to snapping threshold
+  accuracyPlot <- ggplot(out, aes(x=factor(thresh), y=basinAccuracy.basinAccuracy*100, fill=factor(thresh))) +
+    geom_boxplot(size=1.75, color='black', color='lightblue') +
+    stat_summary(fun = mean, geom = "point", col = "darkred", size=6) +
+    scale_fill_brewer(palette='Set3')+
+    xlab('Snapping Threshold [m]') +
+    ylab('Classification Accuracy [%]')+
+    ylim(0,100)+
+    theme(axis.text=element_text(size=20),
+      axis.title=element_text(size=22,face="bold"),
+      legend.position = 'none')
   ggsave('cache/acc_sens_to_snapping.jpg', accuracyPlot, width=9, height=8)
 
   return(list('tradeOffPlot'=tradeOffPlot,
               'accuracyPlot'=accuracyPlot))
 }
 
-#' Build figure showing determination of runoff threshold (and comparisonagainst geomorphic model)
+#' Build figure showing determination of runoff threshold (and comparison against geomorphic model)
 #'
 #' @name runoffThreshCalibPlot
 #'
@@ -393,9 +308,11 @@ eromVerification <- function(USGS_data, nhdGages){
   #save number of gauges to file for later reference
   write_rds(list('gages_w_sufficent_data'=nrow(qma),
                  'gages_on_nhd'=nrow(assessmentDF)),
-            'cache/gageNumbers.rds')
+                 'cache/gageNumbers.rds')
 
   assessmentDF <- tidyr::drop_na(assessmentDF)
+  
+  model_se <- summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$sigma #model standard error
 
   eromVerification_QDMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QDMA)) +
     geom_abline(linetype='dashed', color='darkgrey', size=2)+
@@ -438,44 +355,8 @@ eromVerification <- function(USGS_data, nhdGages){
   #write to file
   ggsave('cache/eromVerification.jpg', plot_fin, width=10, height=15)
   
-  return(plot_fin)
-}
-
-
-
-#' Creates confusion matrix from ephemeral mapping validation exercise
-#'
-#' @name buildConfusionMatrix
-#'
-#' @param verifyDFfin: results of validation exercise
-#'
-#' @import caret
-#' @import ggplot
-#'
-#' @return confusion matrix. Figure saved to file.
-buildConfusionMatrix <- function(verifyDFfin){
-  theme_set(theme_classic())
-  
-  cm <- as.data.frame(caret::confusionMatrix(factor(verifyDFfin$perenniality), factor(verifyDFfin$distinction))$table)
-  cm$Prediction <- factor(cm$Prediction, levels=rev(levels(cm$Prediction)))
-  
-  cfMatrix <- ggplot(cm, aes(Reference, Prediction,fill=factor(Freq))) +
-    geom_tile() +
-    geom_text(aes(label=Freq), size=15)+
-    scale_fill_manual(values=c('grey', 'grey', '#1b9e77', '#1b9e77')) +
-    labs(x = "Observed Class",y = "Model Class") +
-    scale_x_discrete(labels=c("Ephemeral","Not Ephemeral")) +
-    scale_y_discrete(labels=c("Not Ephemeral","Ephemeral")) +
-    theme(legend.position = "none",
-          axis.text=element_text(size=24),
-          axis.title=element_text(size=28,face="bold"),
-          legend.text = element_text(size=17),
-          legend.title = element_text(size=17, face='bold'))
-  
-  ggsave('cache/verify_cf.jpg', cfMatrix, width=10, height=8)
-  write_csv(verifyDFfin, 'cache/validationResults.csv')
-  
-  return(cfMatrix)
+  return(list('plot_fin'=plot_fin,
+              'model_se'=model_se))
 }
 
 
@@ -513,4 +394,65 @@ buildScalingModelFig <- function(scalingModel){
   
   ggsave('cache/scalingModel.jpg', plot, width=9, height=8)
   return(plot)
+}
+
+
+
+
+
+#' create ephemeral losing stream basin figure
+#'
+#' @name losingStreamMap
+#'
+#' @param shapefile_fin: final sf object with model results
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#'
+#' @return losing basim figure (also writes figure to file)
+losingStreamMap <- function(shapefile_fin){
+  theme_set(theme_classic())
+  
+  ##GET DATA
+  results <- shapefile_fin$shapefile
+  
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  #states <- st_union(states)
+  
+  #setup
+  results$losing <- ifelse(round(results$percQ_eph,2) > 1, 'Losing Basins', 'Not Losing Basins')
+  
+  #MAIN MAP-------------------------------------------------
+  results_map <- ggplot(results) +
+    geom_sf(aes(fill=losing), #actual map
+            color='black',
+            size=0.5) +
+    geom_sf(data=states,
+            color='black',
+            size=1.25,
+            alpha=0)+
+    scale_fill_brewer(name='',
+                       palette='Dark2')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(.20, 0.05))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 20),
+          legend.text = element_text(family = "Futura-Medium", size = 18))+
+    guides(fill = guide_legend(nrow = 1))+
+    xlab('')+
+    ylab('')
+  
+  ggsave('cache/losingBasins.jpg', results_map, width=20, height=15)
+  return('see cache/losingBasins.jpg')
 }

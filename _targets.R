@@ -84,23 +84,24 @@ mapped <- tar_map(
                   '1801', '1802', '1803', '1804', '1805', '1806', '1807', '1808', '1809', '1810')
        ),
        names = "huc4",
-       tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #calculate runoff efficiency per HUC4 basin
        tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
        tar_target(rivNetFin, getPerenniality(extractedRivNet, huc4, threshold, error, 'median')), #calculate perenniality
-       tar_target(runoffThresh, calcRunoffThresh(rivNetFin)),
-       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_real, runoffMemory_real)), #calculate ballpark number of flowing days
-       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_low, runoffMemory_low)), #calculate ballpark number of flowing days under low runoff scenario
-       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_high, runoffMemory_high)), #calculate ballpark number of flowing days under high runoff scenario
-       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_med_low, runoffMemory_med_low)), #calculate ballpark number of flowing days under low runoff scenario
-       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_med_high, runoffMemory_med_high)), #calculate ballpark number of flowing days under high runoff scenario
-       tar_target(results, collectResults(rivNetFin, numFlowingDays, huc4)), #calculate basin statistics using streamflow model
-       tar_target(scaledResult, scalingByBasin(scalingModel, rivNetFin, results, huc4)), #scale to additonal ephemeral orders vis Horton Laws
+       tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #normal
+          tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)),
+       tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #calculate runoff efficiency per HUC4 basin
+       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_real, runoffMemory_real, 0)), #calculate ballpark number of flowing days
+          tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using MC techniques
+          tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_low, runoffMemory_low, 0)), #calculate ballpark number of flowing days under low runoff scenario
+          tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_high, runoffMemory_high, 0)), #calculate ballpark number of flowing days under high runoff scenario
+          tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_med_low, runoffMemory_med_low, 0)), #calculate ballpark number of flowing days under low runoff scenario
+          tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_med_high, runoffMemory_med_high, 0)), #calculate ballpark number of flowing days under high runoff scenario
+       tar_target(rivNetFin_scaled, scaleNetwork(rivNetFin, scalingModel, huc4)), #dQdX is updated in non-ephemeral headwater streams using the horton scaling model
+       tar_target(results, collectResults(rivNetFin_scaled, numFlowingDays, huc4)), #calculate basin statistics using streamflow model
        tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)))
+
 
 #############ACTUAL PIPLINE, COMBINING STATIC BRANCHING, AGGREGATION TARGETS, AND ALL OTHER TARGETS--------------------------------------
 list(
-     ##farmed targets
-  
      #######GATHER, PREP, AND VALIDATE STREAMFLOWS VIA USGS GAUGES
      tar_target(nhdGages, getNHDGages(path_to_data, codes_huc02)), #gages joined to NHD a priori, used for erom verification
      tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculates mean observed flow 1970-2018 to verify erom model
@@ -110,7 +111,7 @@ list(
 
      ##########GATHER AND PREP FIELD DATA ON NUMBER OF FLOWING DAYS PER YEAR IN EPHEMERAL CHANNELS
      tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data)),
-     tar_target(flowingDaysValidation, flowingValidate(flowingFieldData, path_to_data, codes_huc02, combined_results)),
+     tar_target(flowingDaysValidation, flowingValidate(flowingFieldData, path_to_data, codes_huc02, combined_results, combined_numFlowingDays_mc)),
      tar_target(flowingDaysCalibrate, flowingValidateSensitivityWrapper(flowingFieldData, runoffEffScalar_real, runoffMemory_real, c(0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.50, 0.75, 1), path_to_data, combined_runoffEff)),
 
      ##########GATHER, PREP, AND VALIDATE OUR EPHEMERAL MAPPING VALIDATION SETP
@@ -126,21 +127,21 @@ list(
      ##########RUN & VALIDATE MODEL PER HUC4 see above tar_map() object). Also runs numFlowingDays 'sensitivty' analysis per HUC4. Also also snaps WOTUS validation data to hydrography per HUC4
      mapped,
      
-     
-     
-     
-     ## master targets
 
      #########AGGREGATE BY-BASIN RESULTS
      tar_combine(combined_runoffEff, mapped$runoffEff, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_results, mapped$scaledResult, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model results across branches
+     tar_combine(combined_results, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model results across branches
      tar_combine(combined_numFlowingDays, mapped$numFlowingDays, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_numFlowingDays_low, mapped$numFlowingDays_low, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_numFlowingDays_high, mapped$numFlowingDays_high, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_numFlowingDays_med_low, mapped$numFlowingDays_med_low, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_numFlowingDays_med_high, mapped$numFlowingDays_med_high, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
-     tar_combine(combined_validation, mapped$snappedValidation, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model validation results across branches
+        tar_combine(combined_numFlowingDays_mc, mapped$numFlowingDays_mc, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
+        tar_combine(combined_numFlowingDays_low, mapped$numFlowingDays_low, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
+        tar_combine(combined_numFlowingDays_high, mapped$numFlowingDays_high, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
+        tar_combine(combined_numFlowingDays_med_low, mapped$numFlowingDays_med_low, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
+        tar_combine(combined_numFlowingDays_med_high, mapped$numFlowingDays_med_high, command = c(!!!.x), deployment='main'),  #aggregate model results across branches
+        tar_combine(combined_validation, mapped$snappedValidation, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model validation results across branches
      tar_combine(combined_runoffThresh, mapped$runoffThresh, command = c(!!!.x), deployment='main'),
+     
+     #########UNCERTAINTY ANALYSIS FOR DISCHARGE    
+     tar_target(ephemeralContributionError, QlaterrorPropogation(exp(EROM_figure$model_se), sum(combined_results$n_eph))), #for ephemeral discharge contribution
      
      ##########MAKE FINAL SHAPEFILES WITH RESULTS
      tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results), deployment='main'), #model results shapefile
@@ -150,8 +151,7 @@ list(
      tar_target(fig1, mainFigureFunction(shapefile_fin, rivNetFin_0107, rivNetFin_1009, rivNetFin_1709, rivNetFin_1305), deployment='main'), #fig 1
      tar_target(fig2, flowingFigureFunction(shapefile_fin, flowingDaysValidation), deployment='main'), #fig 2
      tar_target(fig3, landUseMapFunction(shapefile_fin), deployment='main'), #fig 3
-     tar_target(fig4, bivariateMapFunction(shapefile_fin, rivNetFin_1025), deployment='main'), #fig 4
-     tar_target(fig4_new, combinedMetricPlot(shapefile_fin), deployment='main'), #fig 4 maybe new?
+     tar_target(fig4, combinedMetricPlot(shapefile_fin), deployment='main'), #fig 4 maybe new?
 
      ##########BUILD SUPPLEMENTRY FIGURES
      tar_target(EROM_figure, eromVerification(USGS_data, nhdGages), deployment='main'), #figures for validating discharges
@@ -160,8 +160,8 @@ list(
      tar_target(snappingSensitivityFig, snappingSensitivityFigures(compareSnappingThreshs), deployment='main'), #figures for snapping thresh sensitivity analysis
      tar_target(scalingModelFig, buildScalingModelFig(scalingModel), deployment='main'), #figures for snapping thresh sensitivity analysis
      tar_target(flowingDaysCalibrateFig, runoffThreshCalibPlot(flowingDaysCalibrate, combined_runoffThresh)), #figure for empirical runoff threshold calibration
-     tar_target(flowingMap, flowingMapFigureFunction(shapefile_fin), deployment='main'), #ephemeral influence map using 'mean annual flowing Q'
      tar_target(validationMap, mappingValidationFigure(val_shapefile_fin), deployment='main'),
+     tar_target(losingMap, losingStreamMap(shapefile_fin), deployment='main'),
 
      #########GENERATE GUIDE TO DATA/MODEL INPUTS
      tar_render(data_guide, "docs/data_guide.Rmd", deployment='main') #data guide
