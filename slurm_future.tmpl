@@ -4,8 +4,8 @@
 #SBATCH --error=<%= log.file %>
 #SBATCH --ntasks=1
 #SBATCH --mem-per-cpu=10000
-#SBATCH -t 48:00:00  # Job time limit 2 days (just in case)
-#SBATCH -p gpu-preempt
+#SBATCH -t 24:00:00  # Job time limit 2 days (just in case)
+#SBATCH -p ceewater_cjgleason-cpu
 
 module load netcdf-c
 

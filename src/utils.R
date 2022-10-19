@@ -10,15 +10,17 @@
 #' @name ephemeralIndexFunc
 #' 
 #' @param contribution: dimension 1: ephemeral contribution to streamflow
-#' @param contribution: dimension 2: ephemeral flow frequency
-#' @param contribution: dimension 3: potential for ephemeral contribution to point-source pollution
+#' @param landuse: dimension 2: ephemeral flow frequency
+#' @param frequency: dimension 3: potential for ephemeral contribution to point-source pollution
 #' 
 #' @return mean of the three dimensions (equation S9)
-ephemeralIndexFunc <- function(contribution, landuse, frequency, maxContrib, minContrib) {
-  #normalize contribution to 0-1
-  contribution <- (contribution - minContrib) / (maxContrib - minContrib) 
-  
-  return(mean(c(contribution, frequency, landuse)))
+ephemeralIndexFunc <- function(contribution, landuse, frequency, maxContrib, minContrib, maxLanduse, minLanduse, maxFreq, minFreq) {
+  #re-scale yto 0-1
+  contribution <- (contribution - minContrib) / (maxContrib - minContrib)
+  landuse <- (landuse - minLanduse) / (maxLanduse - minLanduse) 
+  frequency <- (frequency - minFreq) / (maxFreq - minFreq)
+
+  return(mean(c(contribution, landuse, frequency)))
 }
 
 
@@ -169,19 +171,20 @@ routing_func <- function(fromNode, toNode_vec, curr_perr, perenniality_vec, curr
   upstream_reaches <- which(toNode_vec == fromNode)
 
   foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1) #scenario where incoming foreign reach is likely not ephemeral (used in final else if statement)
-
+  
+  out <- curr_perr #otherwise, leave as is
+  
   if(all(is.na(upstream_reaches)) & curr_order > 1){ #implicit routing from other upstream HUC4 basins that flow into this one: if reach order > 1 and no upstream reaches in this huc basin, then set to perennial. Assumption is that it is mainstem and therefore likely perennial
-    return('non_ephemeral')
+    out <- 'non_ephemeral'
   }
   else if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #if anything directly upstream is 100% perennial, then so is this river!! Conceptually makes sense at annual timescales, annd also handles some noise in the water table model assigning 'ephemeral' to high order streams
-    return('non_ephemeral')
+    out <- 'non_ephemeral'
   }
   else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers inflowing from Canada/Mexico
-    return('non_ephemeral')
+    out <- 'non_ephemeral'
   }
-  else{
-    return(curr_perr) #otherwise, leave as is
-  }
+  
+  return(out)
 }
 
 

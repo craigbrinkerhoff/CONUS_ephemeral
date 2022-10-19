@@ -5,3 +5,18 @@ The following objects are masked from 'package:base':
 
     intersect, setdiff, setequal, union
 
+Error in `tar_throw_run()`:
+! callr subprocess failed: could not start R, exited with non-zero status, has crashed or was killed
+Visit https://books.ropensci.org/targets/debugging.html for debugging advice.
+Backtrace:
+    x
+ 1. \-targets::tar_make_future(workers = 50)
+ 2.   \-targets:::callr_outer(...)
+ 3.     \-base::tryCatch(...)
+ 4.       \-base tryCatchList(expr, classes, parentenv, handlers)
+ 5.         \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 6.           \-value[[3L]](cond)
+ 7.             \-targets::tar_throw_run(...)
+ 8.               \-rlang::abort(...)
+Execution halted
+slurmstepd-ceewater-cpu009: error: Detected 1 oom-kill event(s) in step 3740998.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.

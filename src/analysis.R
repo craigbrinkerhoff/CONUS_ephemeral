@@ -100,8 +100,9 @@ extractData <- function(path_to_data, huc4){
 
   #Convert to more useful values
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
-  nhd$Q_cms <- nhd$QEMA * 0.0283 #cfs to cms
-
+  nhd$Q_cms <- nhd$QDMA * 0.0283 #cfs to cms. Use unadjusted Q because Qlat gets screwed up with the adjusted values. Plus, this still has a reasonable model performance
+  nhd$Q_cms_adj <- nhd$QEMA*0.0283
+  
   #handle indiana-effected basin stream orders
   if(huc4 %in% indiana_hucs){
     thresh <- c(2,2,2,2,3,2,3,2) #see README file
@@ -188,7 +189,7 @@ extractData <- function(path_to_data, huc4){
 
   #Wrangle everything into a lightweight routing table (no spatial info anymore)
   nhd_df <- as.data.frame(nhd)
-  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'LengthKM', 'width_m', 'depth_m'))
+  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m'))
 
   nhd_df$nlcd_broad <- as.numeric(round(nhd_nlcd$landcover, -1)) #round to broad categories, i.e. forest, cultivated, urban, etc.
   nhd_df$nlcd_broad <- ifelse(nhd_df$conus == 0, 0, nhd_df$nlcd_broad) #don't tabulate non-CONUS streams
@@ -283,7 +284,15 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 
   ######INTIAL PASS AT ASSIGNING PERENNIALITY: using median water table depth (function handles non-CONUS streams in its calculation)
   nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus)
-
+  
+  
+  #recast lakes/reservoirs as perennial. Model can't account for 'ephemeral' ponds and they aren't relevant in WOTUS context anyway
+  nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) == 558 & is.na(nhd_df$width_m)== 1, 'non_ephemeral', nhd_df$perenniality)
+  
+  #some streams adjacent to swamp/marsh are tagged as artificial paths (i.e. lakes) for some reason.
+      #We can use the lack of assigned widths to lakes/reservoirs to remap these FCodes to streams, i.e. 460
+  nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & is.na(nhd_df$width_m)== 0, '46000', nhd_df$FCode_riv)
+  
   #####ROUTING
   #now, route through network and identify 'perched perennial rivers', i.e. those supposedly above the water table that are always flowing because of upstream perennial rivers
   #sort rivers from upstream to downstream
@@ -306,12 +315,10 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 
   nhd_df$perenniality <- perenniality_vec
   nhd_df$dQdX_cms <- dQdX_vec
-
-  #remove ephemeral ponds from 'ephemeral' as WOTUS only wants streams
-    #use Fcode to only keep streams and remove canals, ditches, lakes/reservoirs
-    #some streams width adjacent to swamp/marsh are tagged as artifical paths (i.e. lakes) for some reason. We can use the lack of assigned widths to lakes/reservoirs to remap these FCodes to streams, i.e. 460
-  nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & is.na(nhd_df$width_m)== 0, '46000', nhd_df$FCode_riv)
+  
+  #use Fcode to only keep streams and remove canals, ditches, lakes/reservoirs retroactively as WOTUS only wants streams
   nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) != '460', 'non_ephemeral', nhd_df$perenniality)
+  
 
   out <- nhd_df %>% dplyr::select('NHDPlusID','ToNode', 'StreamOrde', 'FCode_riv', 'FCode_waterbody','AreaSqKm', 'TotDASqKm', 'Q_cms', 'dQdX_cms', 'width_m', 'LengthKM', 'perenniality', 'nlcd_broad')
   return(out)
@@ -581,9 +588,9 @@ scaleNetwork <- function(rivNetFin, scalingModel, huc4){
     #Use median relative dQdX for 'trouble reaches' (using the smallest non-scaled order in the model via numNewOrders)
     medianQratio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$dQdX_cms / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$Q_cms)
 
-    #REDISTRIBUTE ACCUMULATED FLOW FROM TERMINAL, NON-EPHEMERAL STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
+    #REDISTRIBUTE ACCUMULATED FLOW FROM TERMINAL, NON-EPHEMERAL (domestic) STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
     #first, get the 'trouble' reaches that this applies to (note: this code assumes only one additional scaled order is being added....)
-    rivNetFin$trouble <- ifelse(rivNetFin$perenniality != 'ephemeral' & rivNetFin$StreamOrde == numNewOrders & (rivNetFin$dQdX_cms == rivNetFin$Q_cms), 1,0) #terminal non-ephemeral streams that need dQ re-mapped to account for upland ephemeral scaled contributions accumulated in these reaches
+    rivNetFin$trouble <- ifelse(rivNetFin$perenniality == 'non_ephemeral' & rivNetFin$StreamOrde == numNewOrders & (rivNetFin$dQdX_cms == rivNetFin$Q_cms), 1,0) #terminal non-ephemeral streams that need dQ re-mapped to account for upland ephemeral scaled contributions accumulated in these reaches
     
     #update trouble reach dQdX using the scaled Qbar as the fromNode discharge value
     rivNetFin$dQdX_cms <- ifelse(rivNetFin$trouble == 1, (rivNetFin$Q_cms - rivNetFin$Q_cms*medianQratio), rivNetFin$dQdX_cms) #cms
@@ -712,4 +719,22 @@ collectResults <- function(rivNetFin_scaled, numFlowingDays, huc4){
   results_nhd$percNumFlowingDys <- results_nhd$num_flowing_dys / 365
   
   return(results_nhd)
+}
+
+
+
+#' Adds ephemeral index to combined results
+#'
+#' @name addEphemeralIndex
+#'
+#' @param combined_results: combined target of results
+#'
+#' @return summary statistics
+addEphemeralIndex <- function(combined_results_init){
+  combined_results_init$ephemeralIndex <- mapply(ephemeralIndexFunc, combined_results_init$percQ_eph, combined_results_init$percLength_eph_cult_devp, combined_results_init$percNumFlowingDys,
+                                            max(combined_results_init$percQ_eph, na.rm=T), min(combined_results_init$percQ_eph, na.rm=T),
+                                            max(combined_results_init$percLength_eph_cult_devp, na.rm=T), min(combined_results_init$percLength_eph_cult_devp, na.rm=T),
+                                            max(combined_results_init$percNumFlowingDys, na.rm=T), min(combined_results_init$percNumFlowingDys, na.rm=T))
+  
+  return(combined_results_init)
 }
