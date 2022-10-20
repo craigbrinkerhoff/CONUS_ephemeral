@@ -19,4 +19,4 @@ Backtrace:
  7.             \-targets::tar_throw_run(...)
  8.               \-rlang::abort(...)
 Execution halted
-slurmstepd-ceewater-cpu009: error: Detected 1 oom-kill event(s) in step 3740998.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.
+slurmstepd-ceewater-cpu008: error: Detected 1 oom-kill event(s) in step 3759944.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.

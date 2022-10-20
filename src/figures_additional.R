@@ -4,7 +4,7 @@
 
 
 
-#' create main validation paper figure (fig 3)
+#' create main validation paper figure
 #'
 #' @name mappingValidationFigure
 #'
@@ -38,16 +38,21 @@ mappingValidationFigure <- function(val_shapefile_fin){
   #crop to CONUS
   results <- sf::st_intersection(results, states)
   
-  results$basinAccuracy <- round(results$basinAccuracy*100, 0)
+  results$basinTSS <- round(results$basinTSS, 2)
   
-  ##ACCURACY MAP---------------------------------------------
-  accuracyFig <- ggplot(results) +
-    geom_sf(aes(fill=basinAccuracy), color='black', size=0.3) +
-    geom_sf(data=states, color='black', size=1.5, alpha=0)+
-    scale_fill_gradientn(name='Ephemeral classification accuracy',
+  ##TSS MAP---------------------------------------------
+  tssFig <- ggplot(results) +
+    geom_sf(aes(fill=basinTSS), #actual map
+            color='black',
+            size=0.5)+
+    geom_sf(data=states, #conus boundary
+            color='black',
+            size=1.25,
+            alpha=0)+
+    scale_fill_gradientn(name='Ephemeral TSS Score',
                          colors =c("#d73027", "#ffffbf", "#4575b4"),
-                         limits=c(60,100),
-                         breaks=c(60,65,70,75,80,85,90,95, 100),
+                         #limits=c(60,100),
+                         #breaks=c(60,65,70,75,80,85,90,95, 100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
@@ -89,10 +94,108 @@ mappingValidationFigure <- function(val_shapefile_fin){
   A
   B
   "
-  comboPlot <- patchwork::wrap_plots(A=accuracyFig, B=numberFig, design=design)
+  comboPlot <- patchwork::wrap_plots(A=tssFig, B=numberFig, design=design)
   
   ggsave('cache/validationMap.jpg', comboPlot, width=15, height=18)
   return('see cache/validationMap.jpg')
+}
+
+
+
+
+#' create main validation paper figure number 2
+#'
+#' @name mappingValidationFigure2
+#'
+#' @param val_shapefile_fin: final validation sf object with model results
+#''
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#' @import patchwork
+#'
+#' @return main model validation figure (also writes figure to file)
+mappingValidationFigure2 <- function(val_shapefile_fin){
+  theme_set(theme_classic())
+  
+  ##GET DATA
+  results <- val_shapefile_fin$shapefile
+  
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  states <- sf::st_union(states)
+  
+  #crop to CONUS
+  results <- sf::st_intersection(results, states)
+  
+  results$basinSensitivity <- round(results$basinSensitivity*100, 0)
+  results$basinSpecificity <- round(results$basinSpecificity*100, 0)
+  
+  ##Sensitivity MAP---------------------------------------------
+  sensFig <- ggplot(results) +
+    geom_sf(aes(fill=basinSensitivity), #actual map
+            color='black',
+            size=0.5)+
+    geom_sf(data=states, #conus boundary
+            color='black',
+            size=1.25,
+            alpha=0)+
+    scale_fill_gradientn(name='Ephemeral Classification Sensitivity',
+                         colors =c("#d73027", "#ffffbf", "#4575b4"),
+                         limits=c(45,100),
+                         guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
+    labs(tag='A')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(.2, 0.125),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 18),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.box.background = element_rect(colour = "black"))+
+    xlab('')+
+    ylab('')
+  
+  ##Specificity MAP------------------------------------------------
+  specFig <- ggplot(results) +
+    geom_sf(aes(fill=basinSpecificity), color='black', size=0.3) +
+    geom_sf(data=states, color='black', size=1.5, alpha=0)+
+    scale_fill_gradientn(name='Ephemeral Classification Specificity',
+                         colors =c("#d73027", "#ffffbf", "#4575b4"),
+                         limits=c(45,100),
+                         guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
+    labs(tag='B')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(.2, 0.125),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 18),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.box.background = element_rect(colour = "black"))+
+    xlab('')+
+    ylab('')
+  
+  ##COMBO PLOT------------------------------
+  design <- "
+  A
+  B
+  "
+  comboPlot <- patchwork::wrap_plots(A=sensFig, B=specFig, design=design)
+  
+  ggsave('cache/validationMap2.jpg', comboPlot, width=15, height=18)
+  return('see cache/validationMap2.jpg')
 }
 
 

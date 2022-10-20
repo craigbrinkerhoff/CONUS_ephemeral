@@ -28,15 +28,12 @@ path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to d
 codes_huc02 <- c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
 
 #ehemeral mapping parameters
-threshold <- -1 #[m] buffer around 0m depth to capture the free surface (west is first & east is second)
+threshold <- -0.01 #[m] buffer around 0m depth to capture the free surface
 error <- 0 #[ignored] to add a bit of an error tolerance to the ephemeral mapping thresholding
 
 #ephemeral mapping validation parameters
 noFlowGageThresh <- 0.05 #[percent] no flow fraction for USGS gauge, used to determine which gauges are certainly not-ephemeral and can be included in the validation dataset (set very low to be sure)
 snappingThresh <- 10 #[m] see object compareSnappingThreshs for output that informs this 'expert assignment'
-
-#num flowing days parameter
-#runoff_thresh <- 0.25 #[mm/dy] a priori runoff threshold for flow generation for a storm event. Equivalent to 0.01mm/hr all day
 
 #flowing days parameters
   #runoffEffScalar [percent]: sensitivity parameter to use to perturb model sensitivity to runoff efficiency: % of runoff ratio to add or subtract
@@ -164,6 +161,7 @@ list(
      tar_target(scalingModelFig, buildScalingModelFig(scalingModel), deployment='main'), #figures for snapping thresh sensitivity analysis
      tar_target(flowingDaysCalibrateFig, runoffThreshCalibPlot(flowingDaysCalibrate, combined_runoffThresh)), #figure for empirical runoff threshold calibration
      tar_target(validationMap, mappingValidationFigure(val_shapefile_fin), deployment='main'),
+     tar_target(validationMap2, mappingValidationFigure2(val_shapefile_fin), deployment='main'),     
      tar_target(losingMap, losingStreamMap(shapefile_fin), deployment='main'),
      tar_target(comboHydrographyMaps, hydrographyFigure(shapefile_fin, rivNetFin_0108, rivNetFin_1023, rivNetFin_0313, rivNetFin_1503,
                                                         rivNetFin_1306, rivNetFin_0804, rivNetFin_0501, rivNetFin_1703,
