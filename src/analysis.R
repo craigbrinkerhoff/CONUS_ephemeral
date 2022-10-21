@@ -586,17 +586,20 @@ scaleNetwork <- function(rivNetFin, scalingModel, huc4){
     df$cultDevpCummLength <- df[numNewOrders,]$length * cultDevpRatio
 
     #Use median relative dQdX for 'trouble reaches' (using the smallest non-scaled order in the model via numNewOrders)
-    medianQratio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$dQdX_cms / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$Q_cms)
+    medianQratio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$dQdX_cms / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$Q_cms) #ratio of increasing downstream flow
+    medianARatio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$AreaSqKm / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$TotDASqKm) #ratio of increasing downstream drainage area
 
-    #REDISTRIBUTE ACCUMULATED FLOW FROM TERMINAL, NON-EPHEMERAL (domestic) STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
+    #REDISTRIBUTE ACCUMULATED FLOW (AND DRAINAGE AREA) FROM TERMINAL, NON-EPHEMERAL (domestic) STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
     #first, get the 'trouble' reaches that this applies to (note: this code assumes only one additional scaled order is being added....)
     rivNetFin$trouble <- ifelse(rivNetFin$perenniality == 'non_ephemeral' & rivNetFin$StreamOrde == numNewOrders & (rivNetFin$dQdX_cms == rivNetFin$Q_cms), 1,0) #terminal non-ephemeral streams that need dQ re-mapped to account for upland ephemeral scaled contributions accumulated in these reaches
     
     #update trouble reach dQdX using the scaled Qbar as the fromNode discharge value
     rivNetFin$dQdX_cms <- ifelse(rivNetFin$trouble == 1, (rivNetFin$Q_cms - rivNetFin$Q_cms*medianQratio), rivNetFin$dQdX_cms) #cms
+    rivNetFin$AreaSqKm <- ifelse(rivNetFin$trouble == 1, rivNetFin$AreaSqKm - rivNetFin$AreaSqKm*medianARatio, rivNetFin$AreaSqKm) #km2
     
-    #Re-distribute this scaled accumulated flow (via scaled Qbar) for every trouble reach's upland ephemeral network
+    #Re-distribute this scaled accumulated flow/drainage area for every trouble reach's upland ephemeral network
     additionalQ_cms <- sum(rivNetFin[rivNetFin$trouble == 1,]$Q_cms*medianQratio, na.rm=T) #mean annual cms
+    additionalA_km2 <- sum(rivNetFin[rivNetFin$trouble == 1,]$AreaSqKm*medianARatio, na.rm=T) #km2
 
     #GET NUMBER, LENGTH, AND DISCHARGE IN ADDITIONAL STREAM ORDER(s)------------------
     additionalCultDevpLength_km <- sum(df[1:numNewOrders,]$cultDevpCummLength) #km applied to entire network
@@ -607,6 +610,7 @@ scaleNetwork <- function(rivNetFin, scalingModel, huc4){
   #if no additional scaling is done (doesn't actually happen in this setup)
   else{
     additionalQ_cms <- 0
+    additionalA_km2 <- 0
     additionalLength_km <- 0
     additionalCultDevpLength_km <- 0
     additionalN <- 0
@@ -614,6 +618,7 @@ scaleNetwork <- function(rivNetFin, scalingModel, huc4){
   
   return(list('rivNet_scaled'=rivNetFin,
               'additionalQ_cms'=additionalQ_cms,
+              'additionalA_km2' = additionalA_km2,
               'additionalLength_km'=additionalLength_km,
               'additionalCultDevpLength_km'=additionalCultDevpLength_km,
               'additionalN_total'=additionalN))
@@ -695,30 +700,63 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 collectResults <- function(rivNetFin_scaled, numFlowingDays, huc4){
   #breakup list into important bits
   nhd_df <- rivNetFin_scaled$rivNet_scaled
-  additionalQ_cms <- rivNetFin_scaled$additionalQ_cms
+  additionalQ_cms <- rivNetFin_scaled$additionalQ_cms #cms
   additionalN_total <- rivNetFin_scaled$additionalN_total #scaled ephemeral streams
   additionalCultDevpLength_km <- rivNetFin_scaled$additionalCultDevpLength_km
   additionalLength_km <- rivNetFin_scaled$additionalLength_km
+  additionalA_km2 <- rivNetFin_scaled$additionalA_km2 #km2
   
   #concatenate and generate initial (not scaled) results
   results_nhd <- data.frame(
     'huc4'=huc4,
     'num_flowing_dys'=numFlowingDays,
+    
     'notEphNetworkLength_km' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM, na.rm=T),
     'ephemeralNetworkLength_km' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T) + additionalLength_km,
     'ephemeralCultDevpNetworkLength_km'=sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$nlcd_broad %in% c(20,70),]$LengthKM, na.rm=T) + additionalCultDevpLength_km,
-    'totalephemeralQ_cms'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$dQdX_cms, na.rm=T) + additionalQ_cms, #with 'trouble' reaches fixed and scaled in scalinddQdX()
-    'totalNotEphQ_cms'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$dQdX_cms, na.rm=T), #with 'trouble' reaches fixed in scalinddQdX()
-    'n_eph'=nrow(nhd_df[nhd_df$perenniality == 'ephemeral',]),
+    
+    'totalephemeralQ_cms'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$dQdX_cms, na.rm=T) + additionalQ_cms, #with 'trouble' reaches fixed and scaled in scaleNetwork()
+    'totalNotEphQ_cms'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$dQdX_cms, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
+    
+    'totalephemeralArea_km2'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$AreaSqKm, na.rm=T) + additionalA_km2, #with 'trouble' reaches fixed and scaled in scaleNetwork()
+    'totalNotEphArea_km2'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$AreaSqKm, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
+    
+    'n_eph'=nrow(nhd_df[nhd_df$perenniality == 'ephemeral',]), #num streams
     'n_noteph'=nrow(nhd_df[nhd_df$perenniality != 'ephemeral',]),
     'additionalN_total'=additionalN_total)
   
   #get the relative percents (uses accumulated Q because the accumulated terms cancel out; avoids difficult calculations of accumulated flow)
   results_nhd$percQ_eph <- results_nhd$totalephemeralQ_cms / (results_nhd$totalNotEphQ_cms + results_nhd$totalephemeralQ_cms)
+  results_nhd$percArea_eph <- results_nhd$totalephemeralArea_km2 / (results_nhd$totalNotEphArea_km2 + results_nhd$totalephemeralArea_km2)
   results_nhd$percLength_eph_cult_devp =  results_nhd$ephemeralCultDevpNetworkLength_km/((results_nhd$ephemeralNetworkLength_km + results_nhd$notEphNetworkLength_km))
   results_nhd$percNumFlowingDys <- results_nhd$num_flowing_dys / 365
   
   return(results_nhd)
+}
+
+
+
+
+getResultsByOrder <- function(rivNetFin_scaled, huc4){
+  nhd_df <- rivNetFin_scaled$rivNet_scaled
+  
+  #percents by order
+  results_by_order_Q <- dplyr::group_by(nhd_df, StreamOrde, perenniality) %>%
+    dplyr::summarise(totalQ = sum(dQdX_cms)) %>%
+    dplyr::mutate(eph_flag = ifelse(perenniality == 'ephemeral',1,0)) %>%
+    dplyr::group_by(StreamOrde) %>%
+    dplyr::summarise(percQ_eph_order = sum(totalQ*eph_flag)/sum(totalQ))
+  
+  #percents by order
+  results_by_order_Area <- dplyr::group_by(nhd_df, StreamOrde, perenniality) %>%
+    dplyr::summarise(totalArea = sum(AreaSqKm)) %>%
+    dplyr::mutate(eph_flag = ifelse(perenniality == 'ephemeral',1,0)) %>%
+    dplyr::group_by(StreamOrde) %>%
+    dplyr::summarise(percArea_eph_order = sum(totalArea*eph_flag)/sum(totalArea))
+  
+  out <- dplyr::left_join(results_by_order_Q, results_by_order_Area, by='StreamOrde')
+  
+  return(out)
 }
 
 

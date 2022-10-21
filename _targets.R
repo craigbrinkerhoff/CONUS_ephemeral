@@ -94,6 +94,7 @@ mapped <- tar_map(
           tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, combined_runoffEff, runoffThresh, runoffEffScalar_med_high, runoffMemory_med_high, 0)), #calculate ballpark number of flowing days under high runoff scenario
        tar_target(rivNetFin_scaled, scaleNetwork(rivNetFin, scalingModel, huc4)), #dQdX is updated in non-ephemeral headwater streams using the horton scaling model
        tar_target(results, collectResults(rivNetFin_scaled, numFlowingDays, huc4)), #calculate basin statistics using streamflow model
+       tar_target(results_by_order, getResultsByOrder(rivNetFin_scaled, huc4)),
        tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)))
 
 
@@ -127,7 +128,8 @@ list(
 
      #########AGGREGATE BY-BASIN RESULTS
      tar_combine(combined_runoffEff, mapped$runoffEff, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model targets across branches
-     tar_combine(combined_results_init, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model targets across branches
+     tar_combine(combined_results, mapped$results, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model targets across branches
+     tar_combine(combined_results_by_order, mapped$results_by_order, command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),  #aggregate model targets across branches
      tar_combine(combined_numFlowingDays, mapped$numFlowingDays, command = c(!!!.x), deployment='main'),  #aggregate model targets across branches
         tar_combine(combined_numFlowingDays_mc, mapped$numFlowingDays_mc, command = c(!!!.x), deployment='main'),  #aggregate model targets across branches
         tar_combine(combined_numFlowingDays_low, mapped$numFlowingDays_low, command = c(!!!.x), deployment='main'),  #aggregate model targets across branches
@@ -138,7 +140,7 @@ list(
      tar_combine(combined_runoffThresh, mapped$runoffThresh, command = c(!!!.x), deployment='main'),
      
      #############ADD EPHEMERAL INDEX
-     tar_target(combined_results, addEphemeralIndex(combined_results_init)),
+   #  tar_target(combined_results, addEphemeralIndex(combined_results_init)),
      
      #########UNCERTAINTY ANALYSIS FOR DISCHARGE    
      tar_target(ephemeralContributionError, QlaterrorPropogation(exp(EROM_figure$model_se), sum(combined_results$n_eph))), #for ephemeral discharge contribution
@@ -150,8 +152,10 @@ list(
      #########GENERATE MANUSCRIPT FIGURES
      tar_target(fig1, mainFigureFunction(shapefile_fin, rivNetFin_0107, rivNetFin_1009, rivNetFin_1407, rivNetFin_1305), deployment='main'), #fig 1
      tar_target(fig2, flowingFigureFunction(shapefile_fin, flowingDaysValidation), deployment='main'), #fig 2
-     tar_target(fig3, landUseMapFunction(shapefile_fin), deployment='main'), #fig 3
-     tar_target(fig4, combinedMetricPlot(shapefile_fin), deployment='main'), #fig 4 maybe new?
+    # tar_target(fig3, landUseMapFunction(shapefile_fin), deployment='main'), #fig 3
+     tar_target(fig3n, areaMapFunction(shapefile_fin, val_shapefile_fin), deployment='main'), #fig 3new
+   #  tar_target(fig4, combinedMetricPlot(shapefile_fin), deployment='main'), #fig 4 maybe new?
+     tar_target(fig4n, streamOrderPlot(combined_results_by_order), deployment='main'), #fig 4 maybe new?
 
      ##########BUILD SUPPLEMENTRY FIGURES
      tar_target(EROM_figure, eromVerification(USGS_data, nhdGages), deployment='main'), #figures for validating discharges

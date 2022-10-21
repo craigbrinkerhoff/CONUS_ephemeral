@@ -416,6 +416,90 @@ landUseMapFunction <- function(shapefile_fin) {
 
 
 
+#' create ephemeral drainage area paper figure (fig 3)
+#'
+#' @name areaMapFunction
+#'
+#' @param shapefile_fin: final sf object with model results
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#'
+#' @return land use results figure (also writes figure to file)
+areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
+  theme_set(theme_classic())
+  
+  ##GET DATA
+  results <- shapefile_fin$shapefile
+  regions <- val_shapefile_fin$shapefile
+  
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  states <- st_union(states)
+  
+  #set up regional boundaries
+  # regions <- sf::st_intersection(regions, results)
+  # regions$region <- ifelse(regions$huc2 %in% c('01', '02', '03','08'), 'East Coast',
+  #                                            ifelse(regions$huc2 %in% c('04', '05', '06', '07', '09'), 'Midwest',
+  #                                                   ifelse(regions$huc2 %in% c('11', '12','10'), 'Plains',
+  #                                                          ifelse(regions$huc2 %in% c('13', '14', '15', '16'), 'Southwest', "West Coast"))))
+  # 
+  # regions <- regions %>%
+  #   dplyr::group_by(region) %>%
+  #   dplyr::summarise(m=mean(basinAccuracy)) %>%
+  #   st_cast()
+
+  #results shapefile
+  results$percArea_eph <- round(results$percArea_eph*100,0)
+  
+  #MAIN MAP-------------------------------------------------
+  results_map <- ggplot(results) +
+    geom_sf(aes(fill=percArea_eph), #actual map
+            color='black',
+            size=0.5) +
+    geom_sf(data=states,
+            color='black',
+            size=1.25,
+            alpha=0)+
+    # geom_sf(data=regions,
+    #         aes(color=region),
+    #         size=1.5,
+    #         alpha=0)+
+    scale_fill_gradientn(name='% ephemeral drainage area',
+                         colors=c('white', '#2c6e49', '#173B27'),
+                         limits=c(0,100),
+                         guide = guide_colorbar(direction = "horizontal",
+                                                title.position = "bottom"))+
+    scale_color_brewer(name='',
+                       palette='Dark2',
+                       guide='none')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(.20, 0.1),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 20),
+          legend.text = element_text(family = "Futura-Medium", size = 18))+
+    xlab('')+
+    ylab('')
+  
+  ggsave('cache/paper_figures/fig3_n.jpg', results_map, width=20, height=15)
+  return('see cache/paper_figures/fig3_n.jpg')
+}
+
+
+
+
+
 #' create ephemeral index paper figure (fig 4)
 #'
 #' @name combinedMetricPlot
@@ -497,4 +581,78 @@ combinedMetricPlot <- function(shapefile_fin) {
   
   ggsave('cache/paper_figures/fig4.jpg', comboPlot, width=20, height=17)
   return('cache/paper_figures/fig4.jpg')
+}
+
+
+
+
+
+streamOrderPlot <- function(combined_results_by_order){
+  theme_set(theme_classic())
+  
+  #get regions
+  combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
+  combined_results_by_order$region <- ifelse(combined_results_by_order$huc2 %in% c('01', '02', '03','08'), 'East Coast',
+                                                    ifelse(combined_results_by_order$huc2 %in% c('04', '05', '06', '07', '09'), 'Midwest',
+                                                           ifelse(combined_results_by_order$huc2 %in% c('11', '12','10'), 'Plains',
+                                                                         ifelse(combined_results_by_order$huc2 %in% c('13', '14', '15', '16'), 'Southwest', "West Coast"))))
+  
+  ####SUMMARY STATS-------------------
+  forPlot <- dplyr::group_by(combined_results_by_order, StreamOrde, region) %>%
+    summarise(percQ_eph_order_median = median(percQ_eph_order*100),
+              percQ_eph_order_min = quantile(percQ_eph_order*100,0.25),
+              percQ_eph_order_max = quantile(percQ_eph_order*100,0.75),
+              percArea_eph_order_median = median(percArea_eph_order*100),
+              percArea_eph_order_min = quantile(percArea_eph_order*100,0.25),
+              percArea_eph_order_max = quantile(percArea_eph_order*100,0.75))
+
+  
+  ####DISCHARGE PLOT--------------------
+  plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order_median, group=region)) +
+    geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.3, size=0.25) +
+    geom_line(size=2)+
+    geom_point(size=8)+
+    xlab('') +
+    ylab('% Ephemeral runoff per basin')+
+    scale_fill_manual(name='',
+                      values=c('#5f0f40', '#9a031e', '#fb8b24', '#52796f', '#0f4c5c'))+
+    scale_color_manual(name='',
+                       values=c('#5f0f40', '#9a031e', '#fb8b24', '#52796f', '#0f4c5c'))+
+    ylim(0,100)+
+    labs(tag='A')+
+    theme(axis.title = element_text(size=20, face='bold'),
+          axis.text = element_text(size=20,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.position='none')
+  
+  ####AREA PLOT--------------------
+  plotArea <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percArea_eph_order_median, group=region)) +
+    geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.3, size=0.25) +
+    geom_line(size=2)+
+    geom_point(size=8)+
+    xlab('Stream Order') +
+    ylab('% Ephemeral drainage area per basin')+
+    scale_fill_manual(name='',
+                      values=c('#5f0f40', '#9a031e', '#fb8b24', '#52796f', '#0f4c5c'))+
+    scale_color_manual(name='',
+                      values=c('#5f0f40', '#9a031e', '#fb8b24', '#52796f', '#0f4c5c'))+
+    ylim(0,100)+
+    labs(tag='B')+
+    theme(axis.title = element_text(size=20, face='bold'),
+          axis.text = element_text(size=20,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.position='bottom',
+          legend.text = element_text(size=20))
+  
+  design <- "
+    A
+    B
+  "
+  
+  comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, design=design)
+  
+  
+  ggsave('cache/paper_figures/fig4_n.jpg', comboPlot, width=12, height=15)
 }

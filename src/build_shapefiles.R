@@ -29,7 +29,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 
   #round for mapping
   basins_overall$num_flowing_dys <- round(basins_overall$num_flowing_dys, 0)
-  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'ephemeralCultDevpNetworkLength_km', 'totalephemeralQ_cms', 'percQ_eph', 'percLength_eph_cult_devp', 'percNumFlowingDys', 'ephemeralIndex', 'geometry'))
+  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'ephemeralCultDevpNetworkLength_km', 'totalephemeralQ_cms', 'totalephemeralArea_km2', 'percQ_eph', 'percLength_eph_cult_devp', 'percNumFlowingDys', 'percArea_eph', 'geometry'))
   basins_overall <- dplyr::filter(basins_overall, is.na(num_flowing_dys)==0) #remove international basins we don't care about
   
   return(list('note'='see cache/results_fin.shp',
