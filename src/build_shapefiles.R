@@ -1,5 +1,5 @@
 ## Craig Brinkerhoff
-## functions to make shapefiles from results (both model and validation results)
+## functions to build shapefiles from results (both model and validation results)
 ## Summer 2022
 
 
@@ -28,13 +28,18 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   basins_overall <- dplyr::left_join(basins_overall, combined_results, by='huc4')
 
   #round for mapping
-  basins_overall$num_flowing_dys <- round(basins_overall$num_flowing_dys, 0)
-  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'ephemeralCultDevpNetworkLength_km', 'totalephemeralQ_cms', 'totalephemeralArea_km2', 'percQ_eph', 'percLength_eph_cult_devp', 'percNumFlowingDys', 'percArea_eph', 'geometry'))
-  basins_overall <- dplyr::filter(basins_overall, is.na(num_flowing_dys)==0) #remove international basins we don't care about
+  #basins_overall$num_flowing_dys <- round(basins_overall$num_flowing_dys, 0)
+  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQEph_exported', 'percAreaEph_exported', 'QEph_exported_cms', 'AreaEph_exported_km2', 'geometry')) #'num_flowing_dys'
+  basins_overall <- dplyr::filter(basins_overall, is.na(percQEph_exported)==0) #remove international basins we don't care about
   
   return(list('note'='see cache/results_fin.shp',
               'shapefile'=basins_overall))
 }
+
+
+
+
+
 
 
 

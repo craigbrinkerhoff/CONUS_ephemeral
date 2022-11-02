@@ -1,13 +1,13 @@
 ## Craig Brinkerhoff
 ## Summer 2022
-## Gathers and builds verification figure for the numFlowingDays model, compared against gathered field data
+## Functions for building verification dataset and testing num flowing days sensitivity
 
 
 
 #' wrangles existing (published) ephemeral field data to calculate 'number of flowing days' for their respective basins
 #'
 #' @name wrangleFlowingFieldData
-#' data comes from the following field studies (all saved in data repo except the Duke Forest data which is hardcoded here):
+#' @note data comes from the following field studies (all saved in data repo except the Duke Forest data which is hardcoded here):
 #'
 #' Duke Forest, NC: https://doi.org/10.1002/hyp.11301 (1 years data)
 #' Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
@@ -176,7 +176,8 @@ wrangleFlowingFieldData <- function(path_to_data){
 
 
 
-#' Sptially joins field flowing days dataset to HUC4 basins (and takes HUC4 average when necessary)
+
+#' Spatially joins field flowing days dataset to HUC4 basins (and takes HUC4 average when necessary)
 #'
 #' @name flowingValidate
 #'
@@ -184,6 +185,7 @@ wrangleFlowingFieldData <- function(path_to_data){
 #' @param path_to_data: path to data repo
 #' @param codes_huc02: all HUC2 basins
 #' @param combined_results: all HUC4 basin model results
+#' @param combined_numFlowingDays_mc: vector of number flowing days from monte carlo simulation (to calc sigma)
 #'
 #' @import sf
 #' @import dplyr
@@ -219,7 +221,7 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
 
 
 
-#' Pseudo-calibrates a streamflow threshold for what counts as flow
+#' Calibrates a streamflow threshold for what counts as flow
 #'
 #' @name flowingValidateSensitivityWrapper
 #'

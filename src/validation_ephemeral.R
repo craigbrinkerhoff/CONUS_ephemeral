@@ -32,7 +32,7 @@
 #'
 #' @name prepValDF
 #'
-#' @note Be aware of the expilict repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
+#' @note Be aware of the explicit repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
 #'
 #' @param path_to_data: character string for path to data repo
 #'
@@ -197,6 +197,8 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
   return(out)
 }
+
+
 
 
 

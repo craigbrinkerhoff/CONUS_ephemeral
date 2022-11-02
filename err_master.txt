@@ -6,7 +6,8 @@ The following objects are masked from 'package:base':
     intersect, setdiff, setequal, union
 
 Error in `tar_throw_run()`:
-! callr subprocess failed: could not start R, exited with non-zero status, has crashed or was killed
+! callr subprocess failed: Can't subset columns that don't exist.
+x Column `num_flowing_dys` doesn't exist.
 Visit https://books.ropensci.org/targets/debugging.html for debugging advice.
 Backtrace:
     x
@@ -19,4 +20,3 @@ Backtrace:
  7.             \-targets::tar_throw_run(...)
  8.               \-rlang::abort(...)
 Execution halted
-slurmstepd-ceewater-cpu008: error: Detected 1 oom-kill event(s) in step 3759944.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.

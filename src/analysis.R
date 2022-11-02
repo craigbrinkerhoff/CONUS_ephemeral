@@ -1,7 +1,6 @@
+## Main functions for running the analysis. Calls the actual model functions from ~/src/model.R
 ## Craig Brinkerhoff
 ## Spring 2022
-## Main functions for classifying ephemeral streams along the NHD (and calculating water volumes in ephemeral streams)
-
 
 
 #' Preps hydrography shapefiles into leightweight routing tables. Part of this is extracting 1) monthly water table depth and 2) average land cover type at each NHD flowline.
@@ -42,10 +41,6 @@ extractData <- function(path_to_data, huc4){
   ########PULL IN DATA
   #Fan et al 2017 water table depth model
   wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))   #monthly averages for hourly model runs for 2004-2014
-
-  #USGS NLCD 2019 (downscaled to 1km a priori in google earth engine to speed up processing)
-  nlcd <- terra::rast(paste0(path_to_data, '/NLCD_2019/nlcd_HUC', huc2, '.tif'))
-  nlcd <- terra::project(nlcd, crs(wtd))
 
   #HUC4 basin at hand
   basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
@@ -113,6 +108,11 @@ extractData <- function(path_to_data, huc4){
   #assign waterbody type for depth modeling
   nhd$waterbody <- ifelse(is.na(nhd$WBArea_Permanent_Identifier)==0 & is.na(nhd$LakeAreaSqKm) == 0 & nhd$LakeAreaSqKm > 0, 'Lake/Reservoir', 'River')
 
+  #fix erronous IDs for matching basins for routing (manually identifed in CO2 projects)
+  if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100384878,]$StreamOrde <- 8}   #fix erronous 'divergent' reach in the Ohio mainstem (matching Indiana file upstream)
+  if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100569580,]$ToNode <- 22000100085737} #from/to node ID typo (from Ohio River to Missouri River) so I manually fix it
+  if(huc4 == '0706'){nhd[nhd$NHDPlusID == 22000400022387,]$StreamOrde <- 7} #error in stream order calculation because reach is miss-assigned as stream order 0 (on divergent path) which isn't true. Easiest to just skip over the reach because it's just a connector into the Misssissippi River (from Wisconsin river)
+  
   #no divergent channels, i.e. all downstream routing flows into a single downstream reach.
   nhd <- dplyr::filter(nhd, StreamOrde > 0)
 
@@ -144,30 +144,6 @@ extractData <- function(path_to_data, huc4){
 
   #clip models to basin at hand
   wtd <- terra::crop(wtd, basin)
-  nlcd <- terra::crop(nlcd, basin)
-
-  #extract average land cover along stream channel
-  m <- c(0,NA, #ignore non-land pixels
-         11,10,
-         12,10,
-         21,20, #developed
-         22,20, #developed
-         23,20, #developed
-         24,20, #developed
-         31,30,
-         41,40,
-         42,40,
-         43,40,
-         51,50,
-         52,50,
-         71,60, #there is no nlcd category 60 for some reason so we do this to later take a mean
-         81,70, #cultivated
-         82,70, #cultivated
-         90,80,
-         95,80)
-  rclmat <- matrix(m, ncol=2, byrow=TRUE)
-  nlcd <- terra::classify(nlcd, rclmat, include.lowest=TRUE)
-  nhd_nlcd <- terra::extract(nlcd, nhd, fun=function(x){return(mean(x, na.rm=T))})#'mean', na.rm=T)
 
   #extract mean monthly water table depths
   nhd_wtd_01 <- terra::extract(wtd$WTD_1, nhd, fun=summariseWTD)
@@ -189,10 +165,7 @@ extractData <- function(path_to_data, huc4){
 
   #Wrangle everything into a lightweight routing table (no spatial info anymore)
   nhd_df <- as.data.frame(nhd)
-  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m'))
-
-  nhd_df$nlcd_broad <- as.numeric(round(nhd_nlcd$landcover, -1)) #round to broad categories, i.e. forest, cultivated, urban, etc.
-  nhd_df$nlcd_broad <- ifelse(nhd_df$conus == 0, 0, nhd_df$nlcd_broad) #don't tabulate non-CONUS streams
+  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'TerminalPa', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m'))
 
   nhd_df$wtd_m_min_01 <- as.numeric(nhd_wtd_01$WTD_1.min)
   nhd_df$wtd_m_median_01 <- as.numeric(nhd_wtd_01$WTD_1.median)
@@ -259,9 +232,12 @@ extractData <- function(path_to_data, huc4){
 
 
 
+
+
+
 #' Estimates reach perenniality status for the NHD
 #'
-#' @name getPerenniality
+#' @name routeModel
 #' 
 #' @note the dQdX in here assumes no scaling for the one scenario where it matters: headwater non_ephemeral streams that have 'upland scaled ephemeral streams'.
 #'        That is done in the scalingByBasin function. In this one scenario, ephemeral the ephemeral dQdX component is thus underrepresented in these results (but NOT the scaled results)
@@ -271,20 +247,21 @@ extractData <- function(path_to_data, huc4){
 #' @param thresh: threshold for 'persistent surface groundwater'
 #' @param err: error tolerance for calculation. This should reflect reisdual model error in the groundwater flow model
 #' @param summarizer: metric to summarise wtd along the reach: min, max, mean, or mode. Default is median
+#' @param upstreamDF: data frame of 'exporting Q reaches' for basins from previous level
 #'
 #' @import dplyr
 #' @import readr
 #'
 #' @return NHD hydrography with perenniality status
-getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
-  huc2 <- substr(huc4, 1, 2)
+routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
+
+    huc2 <- substr(huc4, 1, 2)
 
   #remove streams with absolutely no mean annual flow
   nhd_df <- dplyr::filter(nhd_df, Q_cms > 0)
 
   ######INTIAL PASS AT ASSIGNING PERENNIALITY: using median water table depth (function handles non-CONUS streams in its calculation)
   nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus)
-  
   
   #recast lakes/reservoirs as perennial. Model can't account for 'ephemeral' ponds and they aren't relevant in WOTUS context anyway
   nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) == 558 & is.na(nhd_df$width_m)== 1, 'non_ephemeral', nhd_df$perenniality)
@@ -305,24 +282,54 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
   perenniality_vec <- as.vector(nhd_df$perenniality)
   order_vec <- as.vector(nhd_df$StreamOrde)
   Q_vec <- as.vector(nhd_df$Q_cms)
+  Area_vec <- as.vector(nhd_df$TotDASqKm)
   dQdX_vec <- as.vector(nhd_df$Q_cms)
+  dArea_vec <- as.vector(nhd_df$AreaSqKm)
+  percQEph_vec <- rep(1, length(fromNode_vec))
+  percAreaEph_vec <- rep(1, length(fromNode_vec))
+  
+  if(is.na(upstreamDF) == 0){ #to skip doing this in level 0
+    upstreamDF <- dplyr::filter(upstreamDF, downstreamBasin == huc4)
+    
+    toNode_vec <- c(toNode_vec, upstreamDF$exported_ToNode)
+    Q_vec <- c(Q_vec, upstreamDF$exported_Q_cms)
+    Area_vec <- c(Area_vec, upstreamDF$exported_Area_km2)
+    percQEph_vec <- c(percQEph_vec, upstreamDF$exported_percQEph_reach)
+    percAreaEph_vec <- c(percAreaEph_vec, upstreamDF$exported_percAreaEph_reach)
+    perenniality_vec <- c(perenniality_vec, upstreamDF$exported_perenniality)
+  }
 
   #run vectorized model
   for (i in 1:nrow(nhd_df)) {
-    perenniality_vec[i] <- routing_func(fromNode_vec[i], toNode_vec, perenniality_vec[i], perenniality_vec, order_vec[i], order_vec, Q_vec[i], Q_vec)
-    dQdX_vec[i] <- getdQdX(fromNode_vec[i], toNode_vec, perenniality_vec[i], Q_vec[i], Q_vec)
+    perenniality_vec[i] <- perenniality_func_update(fromNode_vec[i], toNode_vec, perenniality_vec[i], perenniality_vec, order_vec, Q_vec[i], Q_vec) #update perenniality given the upstream classification
+    dQdX_vec[i] <- getdQdX(fromNode_vec[i], toNode_vec, perenniality_vec[i], Q_vec[i], Q_vec)# get lateral discharge / new water / reache's contribution
+    percQEph_vec[i] <- getPercEph(fromNode_vec[i], toNode_vec, perenniality_vec[i], dQdX_vec[i], dArea_vec[i], Q_vec[i], Q_vec, percQEph_vec, 'discharge') #calculate perc water volume ephemeral
+    percAreaEph_vec[i] <- getPercEph(fromNode_vec[i], toNode_vec, perenniality_vec[i], dQdX_vec[i], dArea_vec[i], Area_vec[i], Area_vec, percAreaEph_vec, 'drainageArea') #calculate perc water volume ephemeral
+  }
+  
+  #remove upstream Qs added to the vector temporarily
+  if(is.na(upstreamDF) == 0){
+    Q_vec <- Q_vec[1:nrow(nhd_df)]
+    Area_vec <- Area_vec[1:nrow(nhd_df)]
+    percQEph_vec <- percQEph_vec[1:nrow(nhd_df)]
+    percAreaEph_vec <- percAreaEph_vec[1:nrow(nhd_df)]
+    perenniality_vec <- perenniality_vec[1:nrow(nhd_df)]
   }
 
   nhd_df$perenniality <- perenniality_vec
   nhd_df$dQdX_cms <- dQdX_vec
+  nhd_df$percQEph_reach <- percQEph_vec
+  nhd_df$percAreaEph_reach <- percAreaEph_vec
   
   #use Fcode to only keep streams and remove canals, ditches, lakes/reservoirs retroactively as WOTUS only wants streams
   nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) != '460', 'non_ephemeral', nhd_df$perenniality)
   
 
-  out <- nhd_df %>% dplyr::select('NHDPlusID','ToNode', 'StreamOrde', 'FCode_riv', 'FCode_waterbody','AreaSqKm', 'TotDASqKm', 'Q_cms', 'dQdX_cms', 'width_m', 'LengthKM', 'perenniality', 'nlcd_broad')
+  out <- nhd_df %>% dplyr::select('NHDPlusID','ToNode', 'TerminalPa', 'StreamOrde', 'FCode_riv', 'FCode_waterbody','AreaSqKm', 'TotDASqKm', 'Q_cms', 'dQdX_cms', 'width_m', 'LengthKM', 'perenniality', 'percQEph_reach', 'percAreaEph_reach')
   return(out)
 }
+
+
 
 
 #' Calculate runoff ratio per HUC4 basin
@@ -339,7 +346,6 @@ getPerenniality <- function(nhd_df, huc4, thresh, err, summarizer){
 #'
 #' @return dataframe with runoff coefficients at HUC level 4 scale
 calcRunoffEff <- function(path_to_data, huc4_c){
-
   ##READ IN HUC4 BASIN
   huc2 <- substr(huc4_c, 1, 2)
   basin <- st_read(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name')) #basin polygons
@@ -386,12 +392,15 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 
 
 
+
+
 #' Calculates a first-order runoff-generation threshold [mm/dy] using geomorphic scaling a characteristic minimum headwater stream width from Allen et al. 2018
 #' Will run Monte Carlo uncertainty simulation if munge_mc is on
 #' 
 #' @name calcRunoffThresh
 #'
 #' @param rivnet: basin hydrography model
+#' @param munge_mc: binary indicating whether to run nromal model or MC uncertainty
 #'
 #' @import readr
 #'
@@ -428,6 +437,8 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
 
 
 
+
+
 #' Calculates a first-order 'number flowing days' per HUC4 basin using long-term runoff ratio and daily precip for 1980-2010.
 #' Will run Monte Carlo analysis for uncertainty if the munge is turned on
 #'
@@ -439,6 +450,7 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
 #' @param runoff_thresh: [mm] a priori runoff threshold for 'streamflowflow generation'
 #' @param runoffEffScalar: [percent] sensitivty parameter to use to perturb model sensitivty to runoff efficiency
 #' @param runoffMemory: sensitivity parameter to test 'runoff memory' in number of flowing days calculation: even if rain stops, there will be some overland flow and interflow that are delayed in their reaching the river
+#' @param munge_mc: binary indicating whether to run nromal model or MC uncertainty
 #'
 #' @import terra
 #' @import raster
@@ -489,7 +501,9 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 
 
 
-#' Fits horton laws to ephemeral data and calculates number of additional stream orders to match the observed ephemeral data occurence off  network
+
+
+#' Fits horton laws to ephemeral data and calculates number of additional stream orders to re-produce the observed ephemeral data distribution
 #'
 #' @name scalingFunc
 #'
@@ -523,111 +537,9 @@ scalingFunc <- function(validationResults){
 
 
 
-#' Scales model results to additional stream order(s) if necessary. Horton ratio used in this calcualtion comes from the NHD 3rd order calculated ratio (to be somehere in the middle of the network)
-#'
-#' @name scalingdQdX
-#' 
-#' @note the dQdX is updated (via scaling Qbar) for a single scenario: headwater non_ephemeral streams that have 'upland scaled ephemeral streams'.
-#'       So, the dQdX in the river network files are raw (unaffected by scaling) but here they are obviously changed
-#'
-#' @param rivNetFin: nhd hydrography for a given huc4 basin
-#' @param scalingModel: Horton laws, already fit to ephemeral field data
-#' @param huc4: HUC4 basin code
-#'
-#' @import dplyr
-#'
-#' @return list of needed scaling results + rivnet hydrography model with updated dQdX when appropriate
-scaleNetwork <- function(rivNetFin, scalingModel, huc4){
-  #FIT HORTON SCALING TO EACH BASIN-------------
-  numNewOrders <- 1 - scalingModel$ephMinOrder
-  
-  #length and number of ephemeral streams per stream order
-  df <- dplyr::filter(rivNetFin, perenniality == 'ephemeral') %>%
-    dplyr::group_by(StreamOrde) %>%
-    dplyr::summarise(n=n(), #overall ephemeral scaling
-                     length = mean(LengthKM, na.rm=T))
-  df$cummLength <- ifelse(df$StreamOrde == 1, df$length, NA)
-  for (i in 2:nrow(df)){ #convert to cummulative mean length, used for horton scaling
-    df[i,]$cummLength <- df[i,]$length + sum(df[which(df$StreamOrde < i),]$length, na.rm=T)
-  }
-
-  #rewrite stream orders for scaling (when appropriate, set up for scaling multiple orders even though for our analysis it ends up only doing 1 order)
-  if(numNewOrders > 0){
-    df$old_orders <- df$StreamOrde
-    df$StreamOrde <- df$StreamOrde + numNewOrders
-    
-    #get horton ratios
-    lm <- lm(log(n)~StreamOrde, data=df)
-    Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
-
-    lm2 <- lm(log(cummLength)~StreamOrde, data=df)
-    Rl <- exp(lm2$coefficient[2]) #Horton law parameter for stream order mean length
-    
-    #scale to new minimum order
-    for (i in 1:numNewOrders){
-      new <- data.frame('StreamOrde'=i, 'n'=NA, 'length'=NA, 'cummLength'=NA)
-      new$old_orders <- NA
-      new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
-
-      if(i ==1){ #do first order first (as its different, ratio using 3rd order)
-        new$length <- (df[df$StreamOrde == 3,]$cummLength)/(Rl^(df[df$StreamOrde == 3,]$StreamOrde - 1))* new$n #cummlbar * numstreams
-      }
-      else{ #do all other additional orders (if necessary)
-        new$length <- df[df$StreamOrde == 1,]$cummLength*Rl^(i-1) * new$n #cummlbar * numstreams
-      }
-      df <- rbind(df, new)
-    }
-    
-    df <- df[order(df$StreamOrde), ]
-  
-    #SETUP SCALED PROPERTIES USING THE MOST UPLAND HYDROGRAPHY (i.e. not-scaled) STREAM ORDER------------------------------
-    #cult/devp stream length (using the smallest non-scaled order in the model via numNewOrders)
-    cultDevpRatio <- sum(rivNetFin[rivNetFin$StreamOrde == numNewOrders & rivNetFin$nlcd_broad %in% c(20,70),]$LengthKM)/sum(rivNetFin[rivNetFin$StreamOrde == numNewOrders,]$LengthKM)
-    df$cultDevpCummLength <- df[numNewOrders,]$length * cultDevpRatio
-
-    #Use median relative dQdX for 'trouble reaches' (using the smallest non-scaled order in the model via numNewOrders)
-    medianQratio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$dQdX_cms / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$Q_cms) #ratio of increasing downstream flow
-    medianARatio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$AreaSqKm / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$TotDASqKm) #ratio of increasing downstream drainage area
-
-    #REDISTRIBUTE ACCUMULATED FLOW (AND DRAINAGE AREA) FROM TERMINAL, NON-EPHEMERAL (domestic) STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
-    #first, get the 'trouble' reaches that this applies to (note: this code assumes only one additional scaled order is being added....)
-    rivNetFin$trouble <- ifelse(rivNetFin$perenniality == 'non_ephemeral' & rivNetFin$StreamOrde == numNewOrders & (rivNetFin$dQdX_cms == rivNetFin$Q_cms), 1,0) #terminal non-ephemeral streams that need dQ re-mapped to account for upland ephemeral scaled contributions accumulated in these reaches
-    
-    #update trouble reach dQdX using the scaled Qbar as the fromNode discharge value
-    rivNetFin$dQdX_cms <- ifelse(rivNetFin$trouble == 1, (rivNetFin$Q_cms - rivNetFin$Q_cms*medianQratio), rivNetFin$dQdX_cms) #cms
-    rivNetFin$AreaSqKm <- ifelse(rivNetFin$trouble == 1, rivNetFin$AreaSqKm - rivNetFin$AreaSqKm*medianARatio, rivNetFin$AreaSqKm) #km2
-    
-    #Re-distribute this scaled accumulated flow/drainage area for every trouble reach's upland ephemeral network
-    additionalQ_cms <- sum(rivNetFin[rivNetFin$trouble == 1,]$Q_cms*medianQratio, na.rm=T) #mean annual cms
-    additionalA_km2 <- sum(rivNetFin[rivNetFin$trouble == 1,]$AreaSqKm*medianARatio, na.rm=T) #km2
-
-    #GET NUMBER, LENGTH, AND DISCHARGE IN ADDITIONAL STREAM ORDER(s)------------------
-    additionalCultDevpLength_km <- sum(df[1:numNewOrders,]$cultDevpCummLength) #km applied to entire network
-    additionalLength_km <- sum(df[1:numNewOrders,]$length) #km
-    additionalN <- round(sum(df[1:numNewOrders,]$n),0) #n streams applied to entire network
-  }
-  
-  #if no additional scaling is done (doesn't actually happen in this setup)
-  else{
-    additionalQ_cms <- 0
-    additionalA_km2 <- 0
-    additionalLength_km <- 0
-    additionalCultDevpLength_km <- 0
-    additionalN <- 0
-  }
-  
-  return(list('rivNet_scaled'=rivNetFin,
-              'additionalQ_cms'=additionalQ_cms,
-              'additionalA_km2' = additionalA_km2,
-              'additionalLength_km'=additionalLength_km,
-              'additionalCultDevpLength_km'=additionalCultDevpLength_km,
-              'additionalN_total'=additionalN))
-}
 
 
-
-
-#' Determines an 'ideal snapping threshold'.
+#' Determines an 'ideal snapping threshold' for field ephemerality on the NHD hydrography
 #' This is done by calculating Horton scaling performance (via MAE for number of streams) on ephemeral data, given a set of NHD snapping distance thresholds
 #'
 #' @name scalingTestWrapper
@@ -640,14 +552,14 @@ scaleNetwork <- function(rivNetFin, scalingModel, huc4){
 #' @import dplyr
 #' @import ggplot2
 #'
-#' @return df of senstivity test results
+#' @return df of sensitivity test results
 snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldData){
 
   out <- data.frame()
   for(i in threshs){
     validationResults <- validateModel(combined_validation, ourFieldData, i)
 
-    #validation test per HUC2 region------------------
+    #validation test per HUC2 region
     df <- validationResults$validation_fin
     basinAccuracy <- dplyr::group_by(df, substr(huc4,1,2)) %>% #group by HUC2
       mutate(TP = ifelse(distinction == 'ephemeral' & perenniality == 'ephemeral', 1, 0),
@@ -656,7 +568,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
              FN = ifelse(distinction == 'ephemeral' & perenniality == 'non_ephemeral', 1, 0)) %>%
       summarise(basinAccuracy = round((sum(TP, na.rm=T) + sum(TN, na.rm=T))/(sum(TP, na.rm=T) + sum(TN, na.rm=T) + sum(FN, na.rm=T) + sum(FP, na.rm=T)),2))
 
-    #scaling test across CONUS------------
+    #scaling test across CONUS
     desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, eventual number we want to scale too
 
     df <- validationResults$validation_fin
@@ -688,91 +600,340 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 
 
 
-#' Tabulates model summary statistics at the huc 4 level after scaling additional stream order(s)
+
+
+#' Calculates ephemeral contribution to a basin's export (Q and drainage area)
 #'
-#' @name collectResults
+#' @name getResultsExported
 #'
-#' @param rivNetFin_scaled: list of model and scaled results
-#' @param numFlowingDays: mean annual ephemeral days flowing
+#' @param rivNetFin: model results hydrography
 #' @param huc4: huc basin level 4 code
+#' @param num_flowing_dys: model estimated number of flowing days (basin average)
+#' 
+#' @import dplyr
 #'
-#' @return summary statistics
-collectResults <- function(rivNetFin_scaled, numFlowingDays, huc4){
-  #breakup list into important bits
-  nhd_df <- rivNetFin_scaled$rivNet_scaled
-  additionalQ_cms <- rivNetFin_scaled$additionalQ_cms #cms
-  additionalN_total <- rivNetFin_scaled$additionalN_total #scaled ephemeral streams
-  additionalCultDevpLength_km <- rivNetFin_scaled$additionalCultDevpLength_km
-  additionalLength_km <- rivNetFin_scaled$additionalLength_km
-  additionalA_km2 <- rivNetFin_scaled$additionalA_km2 #km2
+#' @return fraction of exported water and drainage area that is ephemeral
+getResultsExported <- function(nhd_df, huc4, num_flowing_dys){
+  #water volume ephemeral fraction at outlets
+  exportDF <- dplyr::group_by(nhd_df, TerminalPa) %>%
+    dplyr::arrange(desc(Q_cms)) %>% 
+    dplyr::slice(1) %>% #only keep reach with max Q, i.e. the outlet per terminal basin
+    dplyr::ungroup()
+
+  percQEph_exported <- sum(exportDF$Q_cms*exportDF$percQEph_reach)/sum(exportDF$Q_cms)
+  percAreaEph_exported <- sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach)/sum(exportDF$TotDASqKm)
+  n_total <- nrow(nhd_df)
+  n_eph <- sum(nhd_df$perenniality == 'ephemeral')
   
-  #concatenate and generate initial (not scaled) results
-  results_nhd <- data.frame(
-    'huc4'=huc4,
-    'num_flowing_dys'=numFlowingDays,
-    
-    'notEphNetworkLength_km' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM, na.rm=T),
-    'ephemeralNetworkLength_km' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T) + additionalLength_km,
-    'ephemeralCultDevpNetworkLength_km'=sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$nlcd_broad %in% c(20,70),]$LengthKM, na.rm=T) + additionalCultDevpLength_km,
-    
-    'totalephemeralQ_cms'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$dQdX_cms, na.rm=T) + additionalQ_cms, #with 'trouble' reaches fixed and scaled in scaleNetwork()
-    'totalNotEphQ_cms'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$dQdX_cms, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
-    
-    'totalephemeralArea_km2'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$AreaSqKm, na.rm=T) + additionalA_km2, #with 'trouble' reaches fixed and scaled in scaleNetwork()
-    'totalNotEphArea_km2'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$AreaSqKm, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
-    
-    'n_eph'=nrow(nhd_df[nhd_df$perenniality == 'ephemeral',]), #num streams
-    'n_noteph'=nrow(nhd_df[nhd_df$perenniality != 'ephemeral',]),
-    'additionalN_total'=additionalN_total)
-  
-  #get the relative percents (uses accumulated Q because the accumulated terms cancel out; avoids difficult calculations of accumulated flow)
-  results_nhd$percQ_eph <- results_nhd$totalephemeralQ_cms / (results_nhd$totalNotEphQ_cms + results_nhd$totalephemeralQ_cms)
-  results_nhd$percArea_eph <- results_nhd$totalephemeralArea_km2 / (results_nhd$totalNotEphArea_km2 + results_nhd$totalephemeralArea_km2)
-  results_nhd$percLength_eph_cult_devp =  results_nhd$ephemeralCultDevpNetworkLength_km/((results_nhd$ephemeralNetworkLength_km + results_nhd$notEphNetworkLength_km))
-  results_nhd$percNumFlowingDys <- results_nhd$num_flowing_dys / 365
-  
-  return(results_nhd)
+  return(data.frame('percQEph_exported'=percQEph_exported,
+                    'percAreaEph_exported'=percAreaEph_exported,
+                    'QEph_exported_cms'= sum(exportDF$Q_cms*exportDF$percQEph_reach),
+                    'AreaEph_exported_km2'= sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach),
+                    'num_flowing_dys'=num_flowing_dys,
+                    'n_eph'=n_eph,
+                    'n_total'=n_total,
+                    'huc4'=huc4))
 }
 
 
 
 
-getResultsByOrder <- function(rivNetFin_scaled, huc4){
-  nhd_df <- rivNetFin_scaled$rivNet_scaled
-  
+
+
+#' Calculates ephemeral contributions per stream order per basin (Q and drainage area)
+#'
+#' @name getResultsByOrder
+#'
+#' @param rivNetFin: model results hydrography
+#' @param huc4: huc basin level 4 code
+#' 
+#' @import dplyr
+#'
+#' @return ephemeral fraction summary stats by order
+getResultsByOrder <- function(nhd_df, huc4){
+
   #percents by order
-  results_by_order_Q <- dplyr::group_by(nhd_df, StreamOrde, perenniality) %>%
-    dplyr::summarise(totalQ = sum(dQdX_cms)) %>%
-    dplyr::mutate(eph_flag = ifelse(perenniality == 'ephemeral',1,0)) %>%
-    dplyr::group_by(StreamOrde) %>%
-    dplyr::summarise(percQ_eph_order = sum(totalQ*eph_flag)/sum(totalQ))
+  results_by_order_Q <- dplyr::group_by(nhd_df, StreamOrde) %>%
+    dplyr::summarise(percQEph_reach_mean = mean(percQEph_reach),
+                     percQEph_reach_median = median(percQEph_reach),
+                     percQEph_reach_sd = sd(percQEph_reach))
   
-  #percents by order
-  results_by_order_Area <- dplyr::group_by(nhd_df, StreamOrde, perenniality) %>%
-    dplyr::summarise(totalArea = sum(AreaSqKm)) %>%
-    dplyr::mutate(eph_flag = ifelse(perenniality == 'ephemeral',1,0)) %>%
-    dplyr::group_by(StreamOrde) %>%
-    dplyr::summarise(percArea_eph_order = sum(totalArea*eph_flag)/sum(totalArea))
+  results_by_order_Area <- dplyr::group_by(nhd_df, StreamOrde) %>%
+    dplyr::summarise(percAreaEph_reach_mean = mean(percAreaEph_reach),
+                     percAreaEph_reach_median = median(percAreaEph_reach),
+                     percAreaEph_reach_sd = sd(percAreaEph_reach))
   
+  results_by_order_N <- dplyr::group_by(nhd_df, StreamOrde) %>%
+    dplyr::summarise(percNEph = sum(perenniality == 'ephemeral')/n())
+
   out <- dplyr::left_join(results_by_order_Q, results_by_order_Area, by='StreamOrde')
+  out <- dplyr::left_join(out, results_by_order_N, by='StreamOrde')
   
   return(out)
 }
 
 
 
-#' Adds ephemeral index to combined results
+
+
+
+#' Finds model properties for reaches that connect to basins downstream (i.e. the exported values from the basin)
 #'
-#' @name addEphemeralIndex
+#' @name getExportedQ
 #'
-#' @param combined_results: combined target of results
+#' @param model: river network data frame
+#' @param huc4: river network basin code
+#' @param lookUpTable: table indicating the downstream basins (when applicable) for all CONUS basins
 #'
-#' @return summary statistics
-addEphemeralIndex <- function(combined_results_init){
-  combined_results_init$ephemeralIndex <- mapply(ephemeralIndexFunc, combined_results_init$percQ_eph, combined_results_init$percLength_eph_cult_devp, combined_results_init$percNumFlowingDys,
-                                            max(combined_results_init$percQ_eph, na.rm=T), min(combined_results_init$percQ_eph, na.rm=T),
-                                            max(combined_results_init$percLength_eph_cult_devp, na.rm=T), min(combined_results_init$percLength_eph_cult_devp, na.rm=T),
-                                            max(combined_results_init$percNumFlowingDys, na.rm=T), min(combined_results_init$percNumFlowingDys, na.rm=T))
+#' @import dplyr
+#' @import sf
+#'
+#' @return list with 'exported properties' from reaches that connect to basins downstream. List includes rech fromnode (for routing), and reach discharge
+getExportedQ <- function(model, huc4, lookUpTable) {
+  lookUpTable <- dplyr::filter(lookUpTable, HUC4 == huc4)
+  downstreamBasins <- lookUpTable$toBasin #downstream basin ID
+  if(is.na(downstreamBasins)) {
+    out <- data.frame('downstreamBasin'=NA,
+                      'exported_ToNode'=NA,
+                      'exported_Q_cms'=NA,
+                      'exported_Area_km2'=NA,
+                      'exported_percQEph_reach'=NA,
+                      'exported_percAreaEph_reach'=NA,
+                      'exported_perenniality'=NA)
+    return(out)
+  }
   
-  return(combined_results_init)
+  indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #indiana-effected basins
+  
+  out <- data.frame()
+  for(downstreamBasin in downstreamBasins){
+    #grab and prep downstream river network (to then grab the right routing ID)
+    huc2 <- substr(downstreamBasin, 1, 2)
+    dsnPath <- paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', downstreamBasin, '_HU4_GDB/NHDPLUS_H_', downstreamBasin, '_HU4_GDB.gdb')
+    if(downstreamBasin %in% indiana_hucs) {
+      nhd_d <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/indiana/indiana_fixed_', downstreamBasin, '.shp'))
+      nhd_d <- sf::st_zm(nhd_d)
+      colnames(nhd_d)[10] <- 'WBArea_Permanent_Identifier'
+      nhd_d$NHDPlusID <- round(nhd_d$NHDPlusID, 0) #some of these have digits for some reason......
+    }
+    else{
+      nhd_d <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
+      nhd_d <- sf::st_zm(nhd_d)
+      nhd_d <- fixGeometries(nhd_d)
+    }
+    
+    NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
+    NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
+    
+    nhd_d <- dplyr::left_join(nhd_d, NHD_HR_VAA)
+    nhd_d <- dplyr::left_join(nhd_d, NHD_HR_EROM)
+    
+    nhd_d$StreamOrde <- nhd_d$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
+    nhd_d$Q_cms <- nhd_d$QEMA * 0.0283 #cfs to cms
+    nhd_d <- dplyr::filter(nhd_d, Q_cms > 0) #remove streams with no flow
+    nhd_d <- dplyr::filter(nhd_d, StreamOrde > 0 & is.na(HydroSeq)==0 & FlowDir == 1)
+    
+    #filter for correct reach
+    model_filt <- dplyr::filter(model, ToNode %in% nhd_d$FromNode)
+    
+    #handle the basins that flow into great lakes but aren't exports from agreat lake, i.e. no topological connection to lake & thus NA export reach
+    if(nrow(model_filt) == 0){
+      out <- data.frame('downstreamBasin'=downstreamBasin,
+                        'exported_ToNode'=NA,
+                        'exported_Q_cms'=NA,
+                        'exported_Area_km2'=NA,
+                        'exported_percQEph_reach'=NA,
+                        'exported_percAreaEph_reach'=NA,
+                        'exported_perenniality'=NA)
+    }
+    
+    else{
+      exported_ToNode <- model_filt$ToNode
+      exported_Q <- model_filt$Q_cms
+      exported_Area <- model_filt$TotDASqKm
+      exported_percQEph_reach <- model_filt$percQEph_reach
+      exported_percAreaEph_reach <- model_filt$percAreaEph_reach
+      exported_perenniality <- model_filt$perenniality
+      
+      temp <- data.frame('downstreamBasin'=downstreamBasin,
+                         'exported_ToNode'=exported_ToNode,
+                         'exported_Q_cms'=exported_Q,
+                         'exported_Area_km2'=exported_Area,
+                         'exported_percQEph_reach'=exported_percQEph_reach,
+                         'exported_percAreaEph_reach'=exported_percAreaEph_reach,
+                         'exported_perenniality'=exported_perenniality)
+      out <- rbind(out, temp)
+    }
+  }
+  
+  return(out)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' 
+#' 
+#' 
+#' #' Scales model results to additional stream order(s) if necessary. Horton ratio used in this calcualtion comes from the NHD 3rd order calculated ratio (to be somehere in the middle of the network)
+#' #'
+#' #' @name scalingdQdX
+#' #' 
+#' #' @note the dQdX is updated (via scaling Qbar) for a single scenario: headwater non_ephemeral streams that have 'upland scaled ephemeral streams'.
+#' #'       So, the dQdX in the river network files are raw (unaffected by scaling) but here they are obviously changed
+#' #'
+#' #' @param rivNetFin: nhd hydrography for a given huc4 basin
+#' #' @param scalingModel: Horton laws, already fit to ephemeral field data
+#' #' @param huc4: HUC4 basin code
+#' #'
+#' #' @import dplyr
+#' #'
+#' #' @return list of needed scaling results + rivnet hydrography model with updated dQdX when appropriate
+#' scaleNetwork <- function(rivNetFin, scalingModel, huc4){
+#'   #FIT HORTON SCALING TO EACH BASIN-------------
+#'   numNewOrders <- 1 - scalingModel$ephMinOrder
+#'   
+#'   #length and number of ephemeral streams per stream order
+#'   df <- dplyr::filter(rivNetFin, perenniality == 'ephemeral') %>%
+#'     dplyr::group_by(StreamOrde) %>%
+#'     dplyr::summarise(n=n(), #overall ephemeral scaling
+#'                      length = mean(LengthKM, na.rm=T))
+#'   df$cummLength <- ifelse(df$StreamOrde == 1, df$length, NA)
+#'   for (i in 2:nrow(df)){ #convert to cummulative mean length, used for horton scaling
+#'     df[i,]$cummLength <- df[i,]$length + sum(df[which(df$StreamOrde < i),]$length, na.rm=T)
+#'   }
+#'   
+#'   #rewrite stream orders for scaling (when appropriate, set up for scaling multiple orders even though for our analysis it ends up only doing 1 order)
+#'   if(numNewOrders > 0){
+#'     df$old_orders <- df$StreamOrde
+#'     df$StreamOrde <- df$StreamOrde + numNewOrders
+#'     
+#'     #get horton ratios
+#'     lm <- lm(log(n)~StreamOrde, data=df)
+#'     Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter for num streams
+#'     
+#'     lm2 <- lm(log(cummLength)~StreamOrde, data=df)
+#'     Rl <- exp(lm2$coefficient[2]) #Horton law parameter for stream order mean length
+#'     
+#'     #scale to new minimum order
+#'     for (i in 1:numNewOrders){
+#'       new <- data.frame('StreamOrde'=i, 'n'=NA, 'length'=NA, 'cummLength'=NA)
+#'       new$old_orders <- NA
+#'       new$n <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - i)
+#'       
+#'       if(i ==1){ #do first order first (as its different, ratio using 3rd order)
+#'         new$length <- (df[df$StreamOrde == 3,]$cummLength)/(Rl^(df[df$StreamOrde == 3,]$StreamOrde - 1))* new$n #cummlbar * numstreams
+#'       }
+#'       else{ #do all other additional orders (if necessary)
+#'         new$length <- df[df$StreamOrde == 1,]$cummLength*Rl^(i-1) * new$n #cummlbar * numstreams
+#'       }
+#'       df <- rbind(df, new)
+#'     }
+#'     
+#'     df <- df[order(df$StreamOrde), ]
+#'     
+#'     #SETUP SCALED PROPERTIES USING THE MOST UPLAND HYDROGRAPHY (i.e. not-scaled) STREAM ORDER------------------------------
+#'     #cult/devp stream length (using the smallest non-scaled order in the model via numNewOrders)
+#'     cultDevpRatio <- sum(rivNetFin[rivNetFin$StreamOrde == numNewOrders & rivNetFin$nlcd_broad %in% c(20,70),]$LengthKM)/sum(rivNetFin[rivNetFin$StreamOrde == numNewOrders,]$LengthKM)
+#'     df$cultDevpCummLength <- df[numNewOrders,]$length * cultDevpRatio
+#'     
+#'     #Use median relative dQdX for 'trouble reaches' (using the smallest non-scaled order in the model via numNewOrders)
+#'     medianQratio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$dQdX_cms / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$Q_cms) #ratio of increasing downstream flow
+#'     medianARatio <- 1-median(rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$AreaSqKm / rivNetFin[rivNetFin$StreamOrde == numNewOrders+1,]$TotDASqKm) #ratio of increasing downstream drainage area
+#'     
+#'     #REDISTRIBUTE ACCUMULATED FLOW (AND DRAINAGE AREA) FROM TERMINAL, NON-EPHEMERAL (domestic) STREAMS TO UPLAND SCALED EPHEMERAL STREAMS-----------------------------
+#'     #first, get the 'trouble' reaches that this applies to (note: this code assumes only one additional scaled order is being added....)
+#'     rivNetFin$trouble <- ifelse(rivNetFin$perenniality == 'non_ephemeral' & rivNetFin$StreamOrde == numNewOrders & (rivNetFin$dQdX_cms == rivNetFin$Q_cms), 1,0) #terminal non-ephemeral streams that need dQ re-mapped to account for upland ephemeral scaled contributions accumulated in these reaches
+#'     
+#'     #update trouble reach dQdX using the scaled Qbar as the fromNode discharge value
+#'     rivNetFin$dQdX_cms <- ifelse(rivNetFin$trouble == 1, (rivNetFin$Q_cms - rivNetFin$Q_cms*medianQratio), rivNetFin$dQdX_cms) #cms
+#'     rivNetFin$AreaSqKm <- ifelse(rivNetFin$trouble == 1, rivNetFin$AreaSqKm - rivNetFin$AreaSqKm*medianARatio, rivNetFin$AreaSqKm) #km2
+#'     
+#'     #Re-distribute this scaled accumulated flow/drainage area for every trouble reach's upland ephemeral network
+#'     additionalQ_cms <- sum(rivNetFin[rivNetFin$trouble == 1,]$Q_cms*medianQratio, na.rm=T) #mean annual cms
+#'     additionalA_km2 <- sum(rivNetFin[rivNetFin$trouble == 1,]$AreaSqKm*medianARatio, na.rm=T) #km2
+#'     
+#'     #GET NUMBER, LENGTH, AND DISCHARGE IN ADDITIONAL STREAM ORDER(s)------------------
+#'     additionalCultDevpLength_km <- sum(df[1:numNewOrders,]$cultDevpCummLength) #km applied to entire network
+#'     additionalLength_km <- sum(df[1:numNewOrders,]$length) #km
+#'     additionalN <- round(sum(df[1:numNewOrders,]$n),0) #n streams applied to entire network
+#'   }
+#'   
+#'   #if no additional scaling is done (doesn't actually happen in this setup)
+#'   else{
+#'     additionalQ_cms <- 0
+#'     additionalA_km2 <- 0
+#'     additionalLength_km <- 0
+#'     additionalCultDevpLength_km <- 0
+#'     additionalN <- 0
+#'   }
+#'   
+#'   return(list('rivNet_scaled'=rivNetFin,
+#'               'additionalQ_cms'=additionalQ_cms,
+#'               'additionalA_km2' = additionalA_km2,
+#'               'additionalLength_km'=additionalLength_km,
+#'               'additionalCultDevpLength_km'=additionalCultDevpLength_km,
+#'               'additionalN_total'=additionalN))
+#' }
+#' 
+#' 
+#' 
+#' #' Tabulates model summary statistics at the huc 4 level after scaling additional stream order(s)
+#' #'
+#' #' @name collectResults
+#' #'
+#' #' @param rivNetFin_scaled: list of model and scaled results
+#' #' @param numFlowingDays: mean annual ephemeral days flowing
+#' #' @param huc4: huc basin level 4 code
+#' #'
+#' #' @return summary statistics
+#' collectResults <- function(rivNetFin_scaled, numFlowingDays, huc4){
+#'   #breakup list into important bits
+#'   nhd_df <- rivNetFin_scaled$rivNet_scaled
+#'   additionalQ_cms <- rivNetFin_scaled$additionalQ_cms #cms
+#'   additionalN_total <- rivNetFin_scaled$additionalN_total #scaled ephemeral streams
+#'   additionalCultDevpLength_km <- rivNetFin_scaled$additionalCultDevpLength_km
+#'   additionalLength_km <- rivNetFin_scaled$additionalLength_km
+#'   additionalA_km2 <- rivNetFin_scaled$additionalA_km2 #km2
+#'   
+#'   #concatenate and generate initial (not scaled) results
+#'   results_nhd <- data.frame(
+#'     'huc4'=huc4,
+#'     'num_flowing_dys'=numFlowingDays,
+#'     
+#'     'notEphNetworkLength_km' = sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$LengthKM, na.rm=T),
+#'     'ephemeralNetworkLength_km' = sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T) + additionalLength_km,
+#'     'ephemeralCultDevpNetworkLength_km'=sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$nlcd_broad %in% c(20,70),]$LengthKM, na.rm=T) + additionalCultDevpLength_km,
+#'     
+#'     'totalephemeralQ_cms'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$dQdX_cms, na.rm=T) + additionalQ_cms, #with 'trouble' reaches fixed and scaled in scaleNetwork()
+#'     'totalNotEphQ_cms'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$dQdX_cms, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
+#'     
+#'     'totalephemeralArea_km2'=sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$AreaSqKm, na.rm=T) + additionalA_km2, #with 'trouble' reaches fixed and scaled in scaleNetwork()
+#'     'totalNotEphArea_km2'=sum(nhd_df[nhd_df$perenniality != 'ephemeral',]$AreaSqKm, na.rm=T), #with 'trouble' reaches fixed in scaleNetwork()
+#'     
+#'     'n_eph'=nrow(nhd_df[nhd_df$perenniality == 'ephemeral',]), #num streams
+#'     'n_noteph'=nrow(nhd_df[nhd_df$perenniality != 'ephemeral',]),
+#'     'additionalN_total'=additionalN_total)
+#'   
+#'   #get the relative percents (uses accumulated Q because the accumulated terms cancel out; avoids difficult calculations of accumulated flow)
+#'   results_nhd$percQ_eph <- results_nhd$totalephemeralQ_cms / (results_nhd$totalNotEphQ_cms + results_nhd$totalephemeralQ_cms)
+#'   results_nhd$percArea_eph <- results_nhd$totalephemeralArea_km2 / (results_nhd$totalNotEphArea_km2 + results_nhd$totalephemeralArea_km2)
+#'   results_nhd$percLength_eph_cult_devp =  results_nhd$ephemeralCultDevpNetworkLength_km/((results_nhd$ephemeralNetworkLength_km + results_nhd$notEphNetworkLength_km))
+#'   results_nhd$percNumFlowingDys <- results_nhd$num_flowing_dys / 365
+#'   
+#'   return(results_nhd)
+#' }

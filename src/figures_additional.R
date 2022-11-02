@@ -9,7 +9,7 @@
 #' @name mappingValidationFigure
 #'
 #' @param val_shapefile_fin: final validation sf object with model results
-#''
+#'
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
@@ -238,7 +238,9 @@ boxPlots_classification <- function(val_shapefile_fin){
 }
 
 
-#' Makes boxplot summarizing 'sensitivity' results for number flowing days calculation
+
+
+#' Makes boxplot summarizing sensitivity results for number flowing days calculation
 #'
 #' @name boxPlots_sensitivity
 #'
@@ -281,8 +283,10 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
       axis.text.x = element_text(angle = 65, hjust=1))
 
   ggsave('cache/boxPlots_sensitivity.jpg', boxplotsSens, width=10, height=10)
+  
   return(boxplotsSens)
 }
+
 
 
 
@@ -290,7 +294,7 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 #'
 #' @name snappingSensitivityFigures
 #'
-#' @param sensResults: df containing sensitivity analysis results
+#' @param out: df containing sensitivity analysis results
 #'
 #' @import tidyr
 #' @import ggplot2
@@ -330,7 +334,11 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
               'accuracyPlot'=accuracyPlot))
 }
 
-#' Build figure showing determination of runoff threshold (and comparison against geomorphic model)
+
+
+
+
+#' Build figure showing runoff threshold calibration compared against the geomorphic model actually used
 #'
 #' @name runoffThreshCalibPlot
 #'
@@ -338,6 +346,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
 #' @param theoreticalThresholds: vector of by basin runoff thresholds calculated via geomorphic scaling
 #'
 #' @import ggplot2
+#' @import patchwork
 #'
 #' @return ggplot showing claibration (also writes fig to file)
 runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
@@ -386,12 +395,13 @@ runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
   comboPlot <- patchwork::wrap_plots(A=plot, B=plot2, design=design)
   
   ggsave('cache/runoffThresh_fitting.jpg', comboPlot, width=12, height=10)
+  
   return(plot)
 }
 
 
 
-#' Builds discharge verification figure for all gaged NHD reaches (that pass USGS QC/QC) eventually used in model validation
+#' Builds discharge verification figure for river discharge model
 #'
 #' @name eromVerification
 #'
@@ -439,26 +449,6 @@ eromVerification <- function(USGS_data, nhdGages){
           legend.text = element_text(size=17),
           plot.title = element_text(size = 30, face = "bold"))
   
-  # eromVerification_QEMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QEMA)) +
-  #   geom_abline(linetype='dashed', color='darkgrey', size=2)+
-  #   geom_point(size=3, alpha=0.2, color='darkblue')+
-  #   xlab('Observed Mean Annual Flow\n(1970-2018)')+
-  #   ylab('NHD Gage Flow')+
-  #   geom_smooth(method='lm', size=1.5, color='black', se=F)+
-  #   annotate('text', label=paste0('r2: ', round(summary(lm(log(QEMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.001, y=175, size=9)+
-  #   annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QEMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
-  #   annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=100, y=0.001, size=7, color='darkblue')+
-  #   scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
-  #                 labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
-  #   scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
-  #                 labels=c('0.0001','0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
-  #   theme(axis.text=element_text(size=20),
-  #         axis.title=element_text(size=24,face="bold"),
-  #         legend.text = element_text(size=17),
-  #         plot.title = element_text(size = 30, face = "bold"))
-  
- # plot_fin <- plot_grid(eromVerification_QDMA, eromVerification_QEMA, ncol=1)
-  
   #write to file
   ggsave('cache/eromVerification.jpg', eromVerification_QDMA, width=10, height=10)
   
@@ -468,7 +458,9 @@ eromVerification <- function(USGS_data, nhdGages){
 
 
 
-#' create figure detailing Hortonian ephemeral scaling
+
+
+#' create figure for Horton scaling result
 #'
 #' @name buildScalingModelFig
 #'
@@ -507,9 +499,10 @@ buildScalingModelFig <- function(scalingModel){
 
 
 
-#' create ephemeral losing stream basin figure
+
+#' create ephemeral drainage area paper figure
 #'
-#' @name losingStreamMap
+#' @name areaMapFunction
 #'
 #' @param shapefile_fin: final sf object with model results
 #'
@@ -518,12 +511,13 @@ buildScalingModelFig <- function(scalingModel){
 #' @import ggplot2
 #' @import cowplot
 #'
-#' @return losing basim figure (also writes figure to file)
-losingStreamMap <- function(shapefile_fin){
+#' @return land use results figure (also writes figure to file)
+areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
   theme_set(theme_classic())
   
   ##GET DATA
   results <- shapefile_fin$shapefile
+  regions <- val_shapefile_fin$shapefile
   
   # CONUS boundary
   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
@@ -535,33 +529,57 @@ losingStreamMap <- function(shapefile_fin){
                                                 'Puerto Rico',
                                                 'United States Virgin Islands',
                                                 'Hawaii'))) #remove non CONUS states/territories
-  #states <- st_union(states)
+  states <- st_union(states)
   
-  #setup
-  results$losing <- ifelse(round(results$percQ_eph,2) > 1, 'Non-ephemeral contribution < 0 m3/yr', 'Non-ephemeral contribution > 0 m3/yr')
+  #set up regional boundaries
+  # regions <- sf::st_intersection(regions, results)
+  # regions$region <- ifelse(regions$huc2 %in% c('01', '02', '03','08'), 'East Coast',
+  #                                            ifelse(regions$huc2 %in% c('04', '05', '06', '07', '09'), 'Midwest',
+  #                                                   ifelse(regions$huc2 %in% c('11', '12','10'), 'Plains',
+  #                                                          ifelse(regions$huc2 %in% c('13', '14', '15', '16'), 'Southwest', "West Coast"))))
+  # 
+  # regions <- regions %>%
+  #   dplyr::group_by(region) %>%
+  #   dplyr::summarise(m=mean(basinAccuracy)) %>%
+  #   st_cast()
+  
+  #results shapefile
+  results$percArea_eph <- round(results$percAreaEph_exported*100,0) #setup percent
   
   #MAIN MAP-------------------------------------------------
   results_map <- ggplot(results) +
-    geom_sf(aes(fill=losing), #actual map
+    geom_sf(aes(fill=percArea_eph), #actual map
             color='black',
             size=0.5) +
     geom_sf(data=states,
             color='black',
             size=1.25,
             alpha=0)+
-    scale_fill_brewer(name='Basin-wide losing streamflow conditions',
-                       palette='Accent')+
+    # geom_sf(data=regions,
+    #         aes(color=region),
+    #         size=1.5,
+    #         alpha=0)+
+    scale_fill_gradientn(name='% ephemeral drainage area',
+                         colors=c('white', '#2c6e49', '#173B27'),
+                         limits=c(0,100),
+                         guide = guide_colorbar(direction = "horizontal",
+                                                title.position = "bottom"))+
+    scale_color_brewer(name='',
+                       palette='Dark2',
+                       guide='none')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.20, 0.05))+ #legend position settings
+    theme(legend.position = c(.20, 0.1),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 20),
           legend.text = element_text(family = "Futura-Medium", size = 18))+
     xlab('')+
     ylab('')
   
-  ggsave('cache/losingBasins.jpg', results_map, width=20, height=15)
-  return('see cache/losingBasins.jpg')
+  ggsave('cache/drainageAreaMap.jpg', results_map, width=20, height=15)
+  return('see cache/drainageAreaMap.jpg')
 }
+
 
 
 
@@ -615,7 +633,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Connecticut River:\n', round(results[results$huc4 == '0108',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0108',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Connecticut River:\n', round(results[results$huc4 == '0108',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0108',]$percQEph_exported*100,0), '%)'))
   
   ##RIVER NETWORK MAP 1023-------------------------------------------------------------------------------------
   net_1023 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1023_HU4_GDB/NHDPLUS_H_1023_HU4_GDB.gdb', layer='NHDFlowline')
@@ -645,7 +663,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Missouri/Little Sioux\nRiver: ', round(results[results$huc4 == '1023',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1023',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Missouri/Little Sioux\nRiver: ', round(results[results$huc4 == '1023',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1023',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0313-------------------------------------------------------------------------------------
@@ -676,7 +694,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Apalachicola River:\n', round(results[results$huc4 == '0313',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0313',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Apalachicola River:\n', round(results[results$huc4 == '0313',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0313',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 1503-------------------------------------------------------------------------------------
@@ -707,7 +725,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Lower Colorado River:\n', round(results[results$huc4 == '1503',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1503',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Lower Colorado River:\n', round(results[results$huc4 == '1503',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1503',]$percQEph_exported*100,0), '%)'))
   
   ##RIVER NETWORK MAP 1306-------------------------------------------------------------------------------------
   net_1306 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_13/NHDPLUS_H_1306_HU4_GDB/NHDPLUS_H_1306_HU4_GDB.gdb', layer='NHDFlowline')
@@ -737,7 +755,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Upper Pecos River:\n', round(results[results$huc4 == '1306',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1306',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Upper Pecos River:\n', round(results[results$huc4 == '1306',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1306',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0804-------------------------------------------------------------------------------------
@@ -768,7 +786,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Lower Red/Ouachita\nRiver: ', round(results[results$huc4 == '0804',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0804',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Lower Red/Quachita\nRiver: ', round(results[results$huc4 == '0804',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0804',]$percQEph_exported*100,0), '%)'))
   
   ##RIVER NETWORK MAP 0501-------------------------------------------------------------------------------------
   net_0501 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_05/NHDPLUS_H_0501_HU4_GDB/NHDPLUS_H_0501_HU4_GDB.gdb', layer='NHDFlowline')
@@ -798,7 +816,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Allegheny River:\n', round(results[results$huc4 == '0501',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0501',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Allegheny River:\n', round(results[results$huc4 == '0501',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0501',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 1703-------------------------------------------------------------------------------------
@@ -829,7 +847,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Yakima River:\n', round(results[results$huc4 == '1703',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1703',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Yakima River:\n', round(results[results$huc4 == '1703',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1703',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0703-------------------------------------------------------------------------------------
@@ -860,7 +878,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('St. Croix River:\n', round(results[results$huc4 == '0703',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0703',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('St. Croix River:\n', round(results[results$huc4 == '0703',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0703',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0304-------------------------------------------------------------------------------------
@@ -891,7 +909,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Pee Dee River:\n', round(results[results$huc4 == '0304',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0304',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Pee Dee River:\n', round(results[results$huc4 == '0304',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0304',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 1605-------------------------------------------------------------------------------------
@@ -922,7 +940,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Central Lahontan River:\n', round(results[results$huc4 == '1605',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1605',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Central Lahontan River:\n', round(results[results$huc4 == '1605',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1605',]$percQEph_exported*100,0), '%)'))
   
   
   
@@ -954,7 +972,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Lower Gila River:\n', round(results[results$huc4 == '1507',]$totalephemeralQ_cms*86400*365*1e-9,2), ' km3/yr (', round(results[results$huc4 == '1507',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Lower Gila River:\n', round(results[results$huc4 == '1507',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1507',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0317-------------------------------------------------------------------------------------
@@ -985,7 +1003,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Pascagoula River:\n', round(results[results$huc4 == '0317',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0317',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Pascagoula River:\n', round(results[results$huc4 == '0317',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0317',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0506-------------------------------------------------------------------------------------
@@ -1016,7 +1034,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Scioto River:\n', round(results[results$huc4 == '0506',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0506',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Scioto River:\n', round(results[results$huc4 == '0506',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0506',]$percQEph_exported*100,0), '%)'))
   
   
   ##RIVER NETWORK MAP 0103-------------------------------------------------------------------------------------
@@ -1047,7 +1065,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Kennebec River:\n', round(results[results$huc4 == '0103',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0103',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Kennebec River:\n', round(results[results$huc4 == '0103',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0103',]$percQEph_exported*100,0), '%)'))
   
   
   
@@ -1079,7 +1097,7 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Willamette River:\n', round(results[results$huc4 == '1709',]$totalephemeralQ_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1709',]$percQ_eph*100,0), '%)'))
+    ggtitle(paste0('Willamette River:\n', round(results[results$huc4 == '1709',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1709',]$percQEph_exported*100,0), '%)'))
   
   
   ##EXTRACT SHARED LEGEND-----------------
@@ -1118,3 +1136,67 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
   
   return('see cache/hydrographyMaps.jpg')
 }
+
+
+
+
+
+#' #' create ephemeral land use paper figure (fig 3)
+#' #'
+#' #' @name landUseMapFunction
+#' #'
+#' #' @param shapefile_fin: final sf object with model results
+#' #'
+#' #' @import sf
+#' #' @import dplyr
+#' #' @import ggplot2
+#' #' @import cowplot
+#' #'
+#' #' @return land use results figure (also writes figure to file)
+#' landUseMapFunction <- function(shapefile_fin) {
+#'   theme_set(theme_classic())
+#'   
+#'   ##GET DATA
+#'   results <- shapefile_fin$shapefile
+#'   
+#'   # CONUS boundary
+#'   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+#'   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+#'                                                 'American Samoa',
+#'                                                 'Commonwealth of the Northern Mariana Islands',
+#'                                                 'Guam',
+#'                                                 'District of Columbia',
+#'                                                 'Puerto Rico',
+#'                                                 'United States Virgin Islands',
+#'                                                 'Hawaii'))) #remove non CONUS states/territories
+#'   states <- st_union(states)
+#'   
+#'   #results shapefile
+#'   results$ephemeralCultDevpNetworkLength_km <- results$ephemeralCultDevpNetworkLength_km
+#'   results$percLength_eph_cult_devp <- round(results$percLength_eph_cult_devp*100,0)
+#'   
+#'   #MAIN MAP-------------------------------------------------
+#'   results_map <- ggplot(results) +
+#'     geom_sf(aes(fill=percLength_eph_cult_devp), #actual map
+#'             color='black',
+#'             size=0.5) +
+#'     geom_sf(data=states,
+#'             color='black',
+#'             size=1.25,
+#'             alpha=0)+
+#'     scale_fill_gradientn(name='% ephemeral in cultivated/developed land',
+#'                          colors=c('#355070', '#B56576', '#EAAC8B'),
+#'                          guide = guide_colorbar(direction = "horizontal",
+#'                                                 title.position = "bottom"))+
+#'     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+#'     theme(legend.position = c(.20, 0.1),
+#'           legend.key.size = unit(2, 'cm'))+ #legend position settings
+#'     theme(text = element_text(family = "Futura-Medium"), #legend text settings
+#'           legend.title = element_text(face = "bold", size = 20),
+#'           legend.text = element_text(family = "Futura-Medium", size = 18))+
+#'     xlab('')+
+#'     ylab('')
+#'   
+#'   ggsave('cache/contributingArea.jpg', results_map, width=20, height=15)
+#'   return('see cache/contributingArea.jpg')
+#' }
