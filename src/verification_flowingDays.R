@@ -155,7 +155,8 @@ wrangleFlowingFieldData <- function(path_to_data){
     dplyr::group_by(watershed) %>%
     dplyr::summarise(n_flw_d = mean(ma_num_flowing_days,na.rm=T),  #take catchment average across all flumed reaches (if necessary)
                      sd_flw_d = mean(sd_num_flowing_days, na.rm=T), #catchment-average of sd of num flowing days (over time)
-                     num_sample_yrs = round(mean(period_of_record_yrs),0)) %>% #mean across catchment reaches (mean of constants, just to propagate value)
+                     num_sample_yrs = round(mean(period_of_record_yrs),0), #mean across catchment reaches (mean of constants, just to propagate value)
+                     drainage_area_km2 = mean(drainage_area_km2)) %>% 
   dplyr::mutate(lat=c(36.020631, 43.54667, 32.711123, 31.540278, 33.3333333, 35.228431, 43.187, 37.47305556, 31.83341800, 31.66666667, 33.166667), #pulled from associated papers (general coords- Geulph long is moved ~15km east so it fits in model basin 0427)
            long=c(-78.982789, -80.059, -112.831066, -110.334113, -114.50000000, -106.840627, -116.774, -83.14333333, -110.85286400 , -110.00000000, -114.50000000))
             #alphabetical list for data lat/longs
@@ -196,9 +197,6 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
   mcDF <- data.frame('num_flowing_dys_sigma'=combined_numFlowingDays_mc)
   mcDF$huc4 <- substr(row.names(mcDF), 19,23)
   rownames(mcDF) <- NULL
-  
-  #field data
-  og_data <- validationData
 
   #read in all HUC4 basins
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
@@ -211,7 +209,7 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
   basins_overall <- dplyr::left_join(basins_overall, combined_results, by='huc4') #actual results
   basins_overall <- dplyr::left_join(basins_overall, mcDF, by='huc4') #MC uncertainty
   basins_overall <- dplyr::select(basins_overall, c('huc4','name','num_flowing_dys','num_flowing_dys_sigma','geometry'))
-
+  
   #join field data to HUC4 basin results
   validationData <- sf::st_as_sf(validationData, coords = c("long", "lat"), crs=sf::st_crs(basins_overall))
   validationData <- sf::st_intersection(basins_overall, validationData)
@@ -243,7 +241,7 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
     num_flowing_dys <- rep(NA, length(huc4s))
     for(i in runoff_threshs){
       for(k in 1:length(huc4s)){
-        num_flowing_dys[k] <- calcFlowingDays(path_to_data, huc4s[k], combined_runoffEff, i, runoffEffScalar_real, runoffMemory_real,0) #calculate ballpark number of flowing days
+        num_flowing_dys[k] <- calcFlowingDays(path_to_data, huc4s[k], combined_runoffEff, i, runoffEffScalar_real, runoffMemory_real,0)
       }
       temp <- data.frame('huc4'=huc4s,
                          'watershed'=flowingFieldData$watershed,

@@ -90,12 +90,12 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
 #' @param curr_Q: reach discharge [m3/s]
 #' @param Q_vec: full network vector of discharges [m3/s]
 #'
-#' @return dQ/dx per reach
+#' @return dQ per reach
 getdQdX <- function(fromNode, toNode_vec, curr_perr, curr_Q, Q_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
   upstreamQ <- sum(Q_vec[upstream_reaches], na.rm=T)
 
-  out <- curr_Q - upstreamQ #dQ/dx per stream reach
+  out <- curr_Q - upstreamQ #dQ per stream reach
   return(out)
 }
 
@@ -135,13 +135,15 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero (handles ost streamflow too)
   Ephflag <- ifelse(curr_perr == 'non_ephemeral', 0, 1) #dont need to handle this for drainage area
   
+  lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty) #if losing stream, set the weight to zero as it's not contributing anything to the stream
+  out <- weighted.mean(c(upstream_percEphs, Ephflag), c(upstreamProperties, lateralProperty))
 
-  #calculate % ephemeral water volume
-  out <- ((lateralProperty*Ephflag) + upstream_value)/curr_Property
-  
-  #handle impossible values as a result of losing streams. Basically, if losing strem predicts < 0 % water, it's just 0 (and likewise for 100)
-  out <- ifelse(out > 1, 1, out)
-  out <- ifelse(out < 0, 0, out)
+  # #calculate % ephemeral water volume
+  # out <- ((lateralProperty*Ephflag) + upstream_value)/curr_Property
+  # 
+  # #handle impossible values as a result of losing streams. Basically, if losing strem predicts < 0 % water, it's just 0 (and likewise for 100)
+  # out <- ifelse(out > 1, 1, out)
+  # out <- ifelse(out < 0, 0, out)
 
   return(out)
 }

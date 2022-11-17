@@ -145,7 +145,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
   #extract coords from river network
   coords <- sf::st_coordinates(sf::st_centroid(nhd$Shape)) #get each line centroid
-  utm_zone <- long2UTM(mean(coords[,1]))#get approproate UTM zone using mean network longitude
+  utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude
 
   #project to given UTM zone for distance calcs
   epsg <- as.numeric(paste0('326', as.character(utm_zone)))
@@ -273,8 +273,13 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 
   #take most frequent JD per NHD reach
   verifyDFfin <- verifyDF %>%
-        dplyr::group_by(NHDPlusID) %>%
-        dplyr::slice_min(snap_distance_m, with_ties=FALSE, n=1) #if more than one, take the one that is closest to the line. If tied, our hands are behind our back and we just take the first (not ideal but what can you do?)
+    dplyr::group_by(NHDPlusID, distinction) %>%
+    dplyr::mutate(num = n()) %>%
+    dplyr::slice_max(num, with_ties=TRUE) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(NHDPlusID) %>%
+    dplyr::mutate(dups = n()) %>%
+    dplyr::filter(dups == 1)
 
   #EPA ephemeral-classed JDs on the NHD
   onNHD_tot <- nrow(verifyDFfin[verifyDFfin$distinction == 'ephemeral',])
@@ -283,4 +288,52 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
               'eph_features_on_nhd_tot'=onNHD_tot,
               'eph_features_off_nhd_tot'=totNHD_tot - onNHD_tot,
               'all_validation_features'=nrow(verifyDFfin)))
+}
+
+
+
+
+
+
+#' Verifies our routing model can be anticipated by network length and the ephemeral map
+#'
+#' @name tokunaga_eph
+#'
+#' @param rivNetFin: routing model result for basin
+#' @param results: model results for huc4 basin
+#' @param huc4: huc4 basin id
+#'
+#' @import dplyr
+#'
+#' @return df containing routing vs network length analysis
+tokunaga_eph <- function(rivNetFin, results, huc4){
+  #prep results for joining to df
+  results <- data.frame('StreamOrde'=max(rivNetFin$StreamOrde),
+                        'percQEph_exported' = results[1,]$percQEph_exported)
+
+  #calc df for tokunaga
+  out <- rivNetFin %>%
+   # dplyr::filter(LengthKM >= 1)%>%
+    dplyr::group_by(StreamOrde) %>%
+    dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')),
+                     length = sum(LengthKM))%>%
+    dplyr::mutate(length_up_eph = cumsum(length_eph),
+                  length_up = cumsum(length)) %>%
+    dplyr::mutate(Tk_eph = NA,
+                  Tk_all = NA)
+  
+  for(i in 2:nrow(out)){
+    out[i,]$Tk_eph <- out[i-1,]$length_up_eph / out[i,]$length
+    out[i,]$Tk_all <- out[i-1,]$length_up / out[i,]$length
+  }
+  
+  out <- out %>%
+    dplyr::mutate(percEphemeralStreamInfluence_mean = Tk_eph / Tk_all) %>%
+    dplyr::left_join(results, by='StreamOrde') %>%
+         dplyr::slice_max(StreamOrde) %>% #minimum value is the exported one from the max stream orde
+         dplyr::mutate(export = ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428') | any(rivNetFin$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean), #remove great lakes and foreign basins because the network scaling isn't going to work
+                       huc4 = huc4) %>%
+         dplyr::select(c('huc4', 'percQEph_exported', 'export'))
+
+  return(out)
 }

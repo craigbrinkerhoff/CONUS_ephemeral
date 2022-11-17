@@ -4,6 +4,174 @@
 
 
 
+
+#' create primary validation plot for model
+#'
+#' @name validationPlot
+#'
+#' @param tokunaga_df: results from network length assessment
+#' @param USGS_data: USGS mean annual flow observations at streamgauges
+#' @param nhdGages: lookup table pairing USGS gauges to the NHD reaches
+#' @param ephemeralQdataset: additional validation data for some ephemeral streams from USGS reports
+#' @param val_shapefile_fin: final sf object with ephemeral classification validation
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#' @import patchwork
+#'
+#' @return flowing days figure (also writes figure to file)
+validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, val_shapefile_fin){
+  theme_set(theme_classic())
+  
+  
+  #####VALIDATION MAP--------------------------------------------------------
+  ##GET DATA
+  results <- val_shapefile_fin$shapefile
+  
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  states <- sf::st_union(states)
+  
+  #crop to CONUS
+  results <- sf::st_intersection(results, states)
+  
+  # results$basinAccuracy <- round(results$basinAccuracy, 2)
+  
+  ##ACCURACY MAP---------------------------------------------
+  accuracyFig <- ggplot(results) +
+    geom_sf(aes(fill=basinAccuracy*100), #actual map
+            color='black',
+            size=0.5)+
+    geom_sf(data=states, #conus boundary
+            color='black',
+            size=1.25,
+            alpha=0)+
+    scale_fill_gradientn(name='Ephemeral Classification Accuracy [%]',
+                         colors =c('#d73027', 'white', "#4575b4"),
+                         limits=c(0,100),
+                         guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
+    labs(tag='A')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(.2, 0.125),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 18),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.box.background = element_rect(colour = "black"))+
+    xlab('')+
+    ylab('')
+  
+  
+  #####ROUTING VALIDATION---------------------------------------------------
+  #ont plot the great lakes because the network scaling makes no sense
+  forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
+  
+  tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
+    geom_point(size=7, color='#84a59d') +
+    geom_abline(linetype='dashed', size=2, color='darkgrey') +
+    xlim(0,100)+
+    ylim(0,100)+
+    ylab('% Discharge ephemeral') +
+    xlab('% Upstream network ephemeral') +
+    labs(tage='C')+
+    theme(axis.text=element_text(size=20),
+          axis.title=element_text(size=24,face="bold"),
+          legend.text = element_text(size=17),
+          legend.position='bottom',
+          plot.title = element_text(size = 30, face = "bold"),
+          plot.tag = element_text(size=26,
+                                  face='bold'))
+  
+  
+  #####DISCHARGE VALIDATION-------------------------------------------------
+  #rename ephemeral discharge columns to match this df
+  colnames(ephemeralQDataset) <- c('NHDPlusID', 'Q_MA', 'drainageArea_km2', 'QDMA', 'ToTDASqKm')
+  ephemeralQDataset <- dplyr::select(as.data.frame(ephemeralQDataset), c('Q_MA', 'QDMA')) %>%
+    dplyr::mutate(type = 'Ephemeral/Intermittent')
+  
+  #now make plots!
+  theme_set(theme_classic())
+  
+  #add observed meann anual Q (1970-2018 calculated using gage records) to the NHD reaches for erom validation
+  qma <- USGS_data
+  qma <- dplyr::select(qma, c('gageID','Q_MA', 'no_flow_fraction'))
+  assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
+  
+  #save number of gauges to file for later reference
+  write_rds(list('gages_w_sufficent_data'=nrow(qma),
+                 'gages_on_nhd'=nrow(assessmentDF)),
+            'cache/gageNumbers.rds')
+  
+  assessmentDF <- tidyr::drop_na(assessmentDF) %>%
+    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #Messager definition for non-perennilaity is 1 day a year not flowing
+    dplyr::select('Q_MA', 'QDMA', 'type')
+  
+  #join datasets
+  assessmentDF <- rbind(assessmentDF, ephemeralQDataset)
+  assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent", 'Ephemeral'))
+  
+  #Model plot
+  eromVerification_QDMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QDMA, color=type)) +
+    geom_abline(linetype='dashed', color='darkgrey', size=2)+
+    geom_point(size=4)+
+    xlab('Observed Mean Annual Flow')+
+    ylab('USGS Discharge Model')+
+    geom_smooth(method='lm', size=1.5, color='black', se=F)+
+    scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
+    annotate('text', label=paste0('r2: ', round(summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
+    annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QDMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
+    annotate('text', label=paste0(nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
+    scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
+                  labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
+    scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
+                  labels=c('0.0001','0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
+    labs(tag='B')+
+    theme(axis.text=element_text(size=20),
+          axis.title=element_text(size=24,face="bold"),
+          legend.text = element_text(size=17),
+          legend.position='bottom',
+          plot.title = element_text(size = 30, face = "bold"),
+          plot.tag = element_text(size=26,
+                                  face='bold'))
+  
+  
+  
+  
+  
+  
+  ##COMBO PLOT------------------------
+  design <- "
+   AA
+   AA
+   AA
+   BC
+   BC
+   "
+  
+  comboPlot <- patchwork::wrap_plots(A=accuracyFig, B=eromVerification_QDMA, C=tokunagaPlot, design=design)
+  
+  
+  ggsave('cache/validationPlot.jpg', comboPlot, width=20, height=20)
+  return('see cache/validationPlot.jpg')
+  
+}
+
+
+
+
+
 #' create main validation paper figure
 #'
 #' @name mappingValidationFigure
@@ -50,9 +218,8 @@ mappingValidationFigure <- function(val_shapefile_fin){
             size=1.25,
             alpha=0)+
     scale_fill_gradientn(name='Ephemeral TSS Score',
-                         colors =c("#d73027", "#ffffbf", "#4575b4"),
-                         #limits=c(60,100),
-                         #breaks=c(60,65,70,75,80,85,90,95, 100),
+                         colors =c("#d73027", 'white', "#4575b4"), #ffffbf
+                         limits=c(0,1),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
@@ -67,18 +234,18 @@ mappingValidationFigure <- function(val_shapefile_fin){
     xlab('')+
     ylab('')
   
-  ##NUMBER MAP------------------------------------------------
+  ##number MAP------------------------------------------------
   numberFig <- ggplot(results) +
     geom_sf(aes(fill=n_total), color='black', size=0.3) +
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
-    scale_fill_gradientn(name='Number Observations',
+    scale_fill_gradientn(name='Number Observations                ',
                          colors =c("#dadaeb", "#807dba", "#3f007d"),
-                         limits=c(59,1156),
-                         breaks=c(59,300,600,900,1156),
+                         limits=c(48,903),
+                         breaks=c(48,300,600,903),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
-    labs(tag='B')+
+    labs(tag='C')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.2, 0.125),
+    theme(legend.position = c(0.2, 0.125),
           legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 18),
@@ -150,12 +317,12 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
             size=1.25,
             alpha=0)+
     scale_fill_gradientn(name='Ephemeral Classification Sensitivity',
-                         colors =c("#d73027", "#ffffbf", "#4575b4"),
-                         limits=c(45,100),
+                         colors =c("#d73027", 'white',"#4575b4"), #ffffbf
+                         limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.2, 0.125),
+    theme(legend.position = c(0.2, 0.125),
           legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 18),
@@ -171,12 +338,12 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
     geom_sf(aes(fill=basinSpecificity), color='black', size=0.3) +
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
     scale_fill_gradientn(name='Ephemeral Classification Specificity',
-                         colors =c("#d73027", "#ffffbf", "#4575b4"),
-                         limits=c(45,100),
+                         colors =c("#d73027", 'white', "#4575b4"), #ffffbf
+                         limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='B')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.2, 0.125),
+    theme(legend.position = c(0.2, 0.125),
           legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 18),
@@ -223,7 +390,7 @@ boxPlots_classification <- function(val_shapefile_fin){
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
     annotate('text', label=paste0('n = ', nrow(df), ' basins'), x=as.factor('basinSpecificity'), y=0.20, size=8)+
     scale_fill_brewer(palette='Set2') +
-    scale_y_continuous(limits=c(-0.1,1), breaks=c(-0.1,0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))+
+    scale_y_continuous(limits=c(0,1), breaks=c(0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))+
     scale_x_discrete('', labels=c('Accuracy', 'Sensitivity', 'Specificity', 'TSS'))+
     ylab('Value') +
     theme(axis.text=element_text(size=20),
@@ -263,6 +430,8 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
                                  'anumFlowingDays_high'=combined_numFlowingDays_high,
                                  'ynumFlowingDays_med_low'=combined_numFlowingDays_med_low,
                                  'bnumFlowingDays_med_high'=combined_numFlowingDays_med_high)
+  
+  combined_results <- dplyr::filter(combined_results, !is.na(numFlowingDays))
   
   #discharge
   forPlot <- tidyr::gather(combined_results, key=key, value=value, c('numFlowingDays', 'znumFlowingDays_low', 'ynumFlowingDays_med_low', 'anumFlowingDays_high', 'bnumFlowingDays_med_high'))
@@ -311,6 +480,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
         scale_color_brewer(palette='Accent', name='', labels=c('# Scaled Orders', 'MAE of log(N)'))+
         xlab('Snapping Threshold [m]') +
         ylab('Value')+
+        ylim(0,2)+
         theme(axis.text=element_text(size=20),
           axis.title=element_text(size=22,face="bold"),
           legend.text = element_text(size=17),
@@ -371,7 +541,7 @@ runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
   
   plot2 <- ggplot(df, aes(theoreticalThresholds)) +
     geom_density(size=1.25, color='black', fill='lightgreen') +
-    scale_x_log10(limits=c(0.001, 1))+
+    scale_x_log10(limits=c(0.001, 5))+
     labs(tag='B')+
     xlab('Runoff threshold (estimated via theory per basin) [mm/dy]') +
     ylab('Density')+
@@ -401,64 +571,6 @@ runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
 
 
 
-#' Builds discharge verification figure for river discharge model
-#'
-#' @name eromVerification
-#'
-#' @param USGS_data: df of USGS gauges and observed mean annual flow
-#' @param nhdGages: df lookup table of NHD reaches and their respective gauge IDs (and modeled streamflow)
-#'
-#' @import tidyr
-#' @import dplyr
-#' @import ggplot2
-#' @import cowplot
-#'
-#' @return streamflow validation plot (also writes to file)
-eromVerification <- function(USGS_data, nhdGages){
-  theme_set(theme_classic())
-
-  #add observed meann anual Q (1970-2018 calculated using gage records) to the NHD reaches for erom validation
-  qma <- USGS_data
-  qma <- dplyr::select(qma, c('gageID','Q_MA'))
-  assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
-
-  #save number of gauges to file for later reference
-  write_rds(list('gages_w_sufficent_data'=nrow(qma),
-                 'gages_on_nhd'=nrow(assessmentDF)),
-                 'cache/gageNumbers.rds')
-
-  assessmentDF <- tidyr::drop_na(assessmentDF)
-  
-  model_se <- summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$sigma #model standard error
-
-  eromVerification_QDMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QDMA)) +
-    geom_abline(linetype='dashed', color='darkgrey', size=2)+
-    geom_point(size=3, alpha=0.2, color='darkblue')+
-    xlab('Observed Mean Annual Flow\n(1970-2018)')+
-    ylab('USGS Discharge Model')+
-    geom_smooth(method='lm', size=1.5, color='black', se=F)+
-    annotate('text', label=paste0('r2: ', round(summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
-    annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QDMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
-    annotate('text', label=paste0(nrow(assessmentDF), ' gages'), x=100, y=0.001, size=7, color='darkblue')+
-    scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
-                  labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
-    scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
-                  labels=c('0.0001','0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
-    theme(axis.text=element_text(size=20),
-          axis.title=element_text(size=24,face="bold"),
-          legend.text = element_text(size=17),
-          plot.title = element_text(size = 30, face = "bold"))
-  
-  #write to file
-  ggsave('cache/eromVerification.jpg', eromVerification_QDMA, width=10, height=10)
-  
-  return(list('plot_fin'=eromVerification_QDMA,
-              'model_se'=model_se))
-}
-
-
-
-
 
 #' create figure for Horton scaling result
 #'
@@ -469,6 +581,8 @@ eromVerification <- function(USGS_data, nhdGages){
 #' @return figure for explaining Hortonian scaling
 buildScalingModelFig <- function(scalingModel){
   theme_set(theme_classic())
+  
+  scalingModel$ephMinOrder <- round(scalingModel$ephMinOrder,0)
   
   df <- scalingModel$df
   df$label <- 'Field data on hydrography'

@@ -48,9 +48,9 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
 
   #labels for select basins with subplots
   results$ids_west <- ifelse(results$huc4 == '1305', 'B',
-                         ifelse(results$huc4 == '1804', 'E', NA))
-  results$ids_east <- ifelse(results$huc4 == '0107', 'D',
-                          ifelse(results$huc4 == '1407', 'C',NA))
+                         ifelse(results$huc4 == '1804', 'E',
+                                ifelse(results$huc4 == '1407', 'C',NA)))
+  results$ids_east <- ifelse(results$huc4 == '0107', 'D',NA)
 
   #MAIN MAP------------------------------------------------------------------------------
   results_map <- ggplot(results) +
@@ -67,7 +67,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                         segment.size=3,
                         segment.color='#564C4D',
                         show.legend = FALSE,
-                        ylim=c(35,45),
+                        ylim=c(30,45),
                         xlim=c(-127,-125.1))+
     ggsflabel::geom_sf_label_repel(aes(label=ids_east),
                         fontface = "bold",
@@ -77,8 +77,8 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                         show.legend = FALSE,
                         ylim=c(30,40),
                         xlim=c(-72.5,-70))+
-    scale_fill_gradientn(name='% Dishcarge ephemeral',
-                         colors=c('white', '#012a4a'),#164d71
+    scale_fill_gradientn(name='% Discharge ephemeral',
+                         colors=c('white', '#3E1F47'),#164d71
                          guide = guide_colorbar(direction = "horizontal",
                                                 title.position = "bottom"))+
     labs(tag='A')+
@@ -117,7 +117,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Merrimack River:\n', round(results[results$huc4 == '0107',]$totalephemeralQ_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0107',]$percQ_eph,0), '%)'))
+    ggtitle(paste0('Merrimack River:\n', round(results[results$huc4 == '0107',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0107',]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 1407-------------------------------------------------------------------------------------------
   net_1407 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1407_HU4_GDB/NHDPLUS_H_1407_HU4_GDB.gdb', layer='NHDFlowline')
@@ -144,7 +144,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Lower Green River:\n', round(results[results$huc4 == '1407',]$totalephemeralQ_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1407',]$percQ_eph,0), '%)'))
+    ggtitle(paste0('Lower Green River:\n', round(results[results$huc4 == '1407',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1407',]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 1804---------------------------------------------------------------------------
   net_1804 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_18/NHDPLUS_H_1804_HU4_GDB/NHDPLUS_H_1804_HU4_GDB.gdb', layer='NHDFlowline')
@@ -164,14 +164,14 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
     ggspatial::annotation_scale(location = "bl",
                                 height = unit(0.5, "cm"),
                                 text_cex = 1)+
-    labs(tag='B')+
+    labs(tag='E')+
     theme(legend.position = 'none',
           plot.title = element_text(face = "italic", size = 26),
           plot.tag = element_text(size=26,
                                face='bold'))+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('San Joaquin River:\n', round(results[results$huc4 == '1804',]$totalephemeralQ_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1804',]$percQ_eph,0), '%)'))
+    ggtitle(paste0('San Joaquin River:\n', round(results[results$huc4 == '1804',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1804',]$percQ_eph,0), '%)'))
   
 ##RIVER NETWORK MAP 1305-----------------------------------------------------------
   net_1305 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_13/NHDPLUS_H_1305_HU4_GDB/NHDPLUS_H_1305_HU4_GDB.gdb', layer='NHDFlowline')
@@ -198,7 +198,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Rio Grande Endorheic:\n', round(results[results$huc4 == '1305',]$totalephemeralQ_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1305',]$percQ_eph,0), '%)'))
+    ggtitle(paste0('Rio Grande Endorheic:\n', round(results[results$huc4 == '1305',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1305',]$percQ_eph,0), '%)'))
   
     ##EXTRACT SHARED LEGEND-----------------
     hydrography_legend <- cowplot::get_legend(
@@ -250,44 +250,51 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
-streamOrderPlot <- function(combined_results_by_order, combined_results){
+streamOrderPlot <- function(combined_results_by_order, combined_results, theoretical_curve){
   theme_set(theme_classic())
   
   #get regions
   combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
   combined_results_by_order$huc4 <- substr(combined_results_by_order$method, 18, 21)
-  combined_results_by_order$region <- ifelse(combined_results_by_order$huc2 %in% c('01', '02', '03','04', '05', '06', '07', '08', '09'), 'East','West')
-  # combined_results_by_order$region <- ifelse(combined_results_by_order$huc2 %in% c('01', '02', '03','08'), 'East Coast',
-  #                                                   ifelse(combined_results_by_order$huc2 %in% c('04', '05', '06', '07', '09'), 'Midwest',
-  #                                                          ifelse(combined_results_by_order$huc2 %in% c('11', '12','10'), 'Plains',
-  #                                                                        ifelse(combined_results_by_order$huc2 %in% c('13', '14', '15', '16'), 'Southwest', "West Coast"))))
+  east <- c('0101', '0102', '0103', '0104', '0105', '0106', '0107', '0108', '0109', '0110',
+            '0202', '0203', '0206', '0207', '0208', '0204', '0205',
+            '0301', '0302', '0303', '0304', '0305', '0306', '0307', '0308', '0309', '0310', '0311', '0312', '0313', '0314', '0315', '0316', '0317', '0318',
+            '0401', '0402', '0403', '0404', '0405', '0406', '0407', '0408', '0409', '0410', '0411', '0412', '0413', '0414', '0420', '0427', '0429', '0430',
+            '0501', '0502', '0503', '0504', '0505', '0506', '0507', '0508', '0509', '0510', '0511', '0512', '0513', '0514',
+            '0601', '0602', '0603', '0604',
+            '0701', '0703', '0704', '0705', '0707', '0709', '0712', '0713', '0714',
+            '0801', '0803', '0806', '0807', '0809',
+            '0901', '0902', '0903', '0904')
+  west <- combined_results[!(combined_results$huc4 %in% c(east)),]$huc4
+  
+  combined_results_by_order$region <- ifelse(combined_results_by_order$huc4 %in% east, 'East of Mississippi River','West of Mississippi River')
   
   keepHUCs <- combined_results[is.na(combined_results$num_flowing_dys)==0,]$huc4
   combined_results_by_order <- dplyr::filter(combined_results_by_order, huc4 %in% keepHUCs)
   
   ####SUMMARY STATS-------------------
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
-    dplyr::summarise(percQ_eph_order_median = median(percQEph_reach_median*100),
-              percQ_eph_order_min = quantile(percQEph_reach_median*100,0.25),
-              percQ_eph_order_max = quantile(percQEph_reach_median*100,0.75),
-              percArea_eph_order_median = median(percAreaEph_reach_median*100),
-              percArea_eph_order_min = quantile(percAreaEph_reach_median*100,0.25),
-              percArea_eph_order_max = quantile(percAreaEph_reach_median*100,0.75),
-              percN_eph_order_median = median(percNEph*100),
-              percN_eph_order_min = quantile(percNEph*100,0.25),
-              percN_eph_order_max = quantile(percNEph*100,0.75),)
-  
+    dplyr::summarise(percQ_eph_order = mean(percQEph_reach_median*100),
+              percQ_eph_order_min =  ifelse(mean(percQEph_reach_median*100) - sd(percQEph_reach_median*100) < 0,0,mean(percQEph_reach_median*100) - sd(percQEph_reach_median*100)),
+              percQ_eph_order_max =  ifelse(mean(percQEph_reach_median*100) + sd(percQEph_reach_median*100)> 100,100,mean(percQEph_reach_median*100) + sd(percQEph_reach_median*100)),
+              percArea_eph_order = mean(percAreaEph_reach_median*100),
+              percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100) < 0,0,mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100)),
+              percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)> 100,100,mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)),
+              percN_eph_order = mean(percNEph*100),
+              percN_eph_order_min = ifelse(mean(percNEph*100) - sd(percNEph*100) < 0,0,mean(percNEph*100) - sd(percNEph*100)),
+              percN_eph_order_max = ifelse(mean(percNEph*100) + sd(percNEph*100) < 0,0,mean(percNEph*100) + sd(percNEph*100)))
+
   ####DISCHARGE PLOT--------------------
-  plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order_median, group=region)) +
-    geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.4, size=0.25) +
+  plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order, group=region)) +
+    geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.25) +
     geom_line(size=2)+
-    geom_point(size=9)+
+    geom_point(size=11)+
     xlab('Stream Order') +
-    ylab('% ephemeral water volume\n(basin-median)')+
+    ylab('% ephemeral discharge\n(basin medians)')+
     scale_fill_manual(name='',
-                      values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                      values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
-                       values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                       values=c('#688B55', '#2D93AD'))+
     ylim(0,100)+
     labs(tag='C')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -295,19 +302,19 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
           plot.tag = element_text(size=26,
                                   face='bold'),
           legend.position='bottom',
-          legend.text = element_text(size=20))
+          legend.text = element_text(size=24))
 
   ####AREA PLOT--------------------
-  plotArea <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percArea_eph_order_median, group=region)) +
-    geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.4, size=0.25) +
+  plotArea <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percArea_eph_order, group=region)) +
+    geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.25) +
     geom_line(size=2)+
-    geom_point(size=9)+
+    geom_point(size=11)+
     xlab('') +
-    ylab('% ephemeral drainage area\n(basin-median)')+
+    ylab('% ephemeral drainage area\n(basin medians)')+
     scale_fill_manual(name='',
-                      values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                      values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
-                       values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                       values=c('#688B55', '#2D93AD'))+
     ylim(0,100)+
     labs(tag='B')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -318,16 +325,16 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   
   ####N PLOT--------------------
-  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percN_eph_order_median, group=region)) +
-    geom_ribbon(aes(ymin=percN_eph_order_min, ymax=percN_eph_order_max), alpha=0.4, size=0.25) +
+  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percN_eph_order, group=region)) +
+    geom_ribbon(aes(ymin=percN_eph_order_min, ymax=percN_eph_order_max), alpha=0.25) +
     geom_line(size=2)+
-    geom_point(size=9)+
+    geom_point(size=11)+
     xlab('') +
     ylab('% ephemeral streams')+
     scale_fill_manual(name='',
-                      values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                      values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
-                       values=c('#5f0f40', '#9a031e'))+#, '#fb8b24', '#52796f', '#0f4c5c'))+
+                       values=c('#688B55', '#2D93AD'))+
     ylim(0,100)+
     labs(tag='A')+
     theme(axis.title = element_text(size=26, face='bold'),
