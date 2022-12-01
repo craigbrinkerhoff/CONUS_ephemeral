@@ -5,4 +5,3 @@ The following objects are masked from 'package:base':
 
     intersect, setdiff, setequal, union
 
-slurmstepd-ceewater-cpu003: error: *** JOB 4196671 ON ceewater-cpu003 CANCELLED AT 2022-11-10T16:18:31 ***

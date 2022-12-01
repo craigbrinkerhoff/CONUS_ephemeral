@@ -42,6 +42,7 @@ tar_load(validationResults)
 tar_load(val_shapefile_fin)
 val_shapefile_fin <- val_shapefile_fin$shapefile
 tar_load(flowingDaysValidation)
+tar_load(combined_percEph_firstOrder)
 
 #uncertainty results
 tar_load(combined_numFlowingDays_mc)
@@ -90,6 +91,7 @@ relativeFlowFreq <- round((mean(combined_results$num_flowing_dys)/365)*100,0) #%
 nreaches <- sum(combined_results$n_total)
 nDischargeValidation <- nrow(USGS_data)
 nMapValidation <- nrow(validationResults$validation_fin)
+perc_headwater_eph <- round((sum(combined_percEph_firstOrder$num_eph_headwater, na.rm=T) / sum(combined_percEph_firstOrder$num_headwater, na.rm=T))*100,2)
 
 #uncertainty numbers
 mean_numFlowingDays_mc <- round(mean(combined_numFlowingDays_mc),0) #dys

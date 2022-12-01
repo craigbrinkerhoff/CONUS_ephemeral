@@ -72,7 +72,8 @@ mapped_lvl0 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -99,7 +100,8 @@ mapped_lvl1 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -125,7 +127,8 @@ mapped_lvl2 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -151,7 +154,8 @@ mapped_lvl3 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -177,7 +181,8 @@ mapped_lvl4 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -203,7 +208,8 @@ mapped_lvl5 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -229,7 +235,8 @@ mapped_lvl6 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -255,7 +262,8 @@ mapped_lvl7 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -281,7 +289,8 @@ mapped_lvl8 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -308,7 +317,8 @@ mapped_lvl9 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -335,7 +345,8 @@ mapped_lvl10 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -362,7 +373,8 @@ mapped_lvl11 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -389,7 +401,8 @@ mapped_lvl12 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -416,7 +429,8 @@ mapped_lvl13 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -443,7 +457,8 @@ mapped_lvl14 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -470,7 +485,8 @@ mapped_lvl15 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -496,7 +512,8 @@ mapped_lvl16 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -522,7 +539,8 @@ mapped_lvl17 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
@@ -549,8 +567,9 @@ mapped_lvl18 <- tar_map(
       tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)),
- tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
+  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+  tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffThresh, calcRunoffThresh(rivNetFin, 0)), #runoff thresh calculation
       tar_target(runoffThresh_mc, calcRunoffThresh(rivNetFin, 1)), #runoff thresh monte carlo
       tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
@@ -867,6 +886,11 @@ list(
                                                    mapped_lvl6$percEph_tokunga, mapped_lvl7$percEph_tokunga, mapped_lvl8$percEph_tokunga, mapped_lvl9$percEph_tokunga, mapped_lvl10$percEph_tokunga, mapped_lvl11$percEph_tokunga,
                                                    mapped_lvl12$percEph_tokunga, mapped_lvl13$percEph_tokunga, mapped_lvl14$percEph_tokunga, mapped_lvl15$percEph_tokunga, mapped_lvl16$percEph_tokunga, mapped_lvl17$percEph_tokunga, mapped_lvl18$percEph_tokunga), command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),
   
+  
+  tar_combine(combined_percEph_firstOrder, list(mapped_lvl0$percEph_firstOrder, mapped_lvl1$percEph_firstOrder, mapped_lvl2$percEph_firstOrder, mapped_lvl3$percEph_firstOrder, mapped_lvl4$percEph_firstOrder, mapped_lvl5$percEph_firstOrder,
+                                             mapped_lvl6$percEph_firstOrder, mapped_lvl7$percEph_firstOrder, mapped_lvl8$percEph_firstOrder, mapped_lvl9$percEph_firstOrder, mapped_lvl10$percEph_firstOrder, mapped_lvl11$percEph_firstOrder,
+                                             mapped_lvl12$percEph_firstOrder, mapped_lvl13$percEph_firstOrder, mapped_lvl14$percEph_firstOrder, mapped_lvl15$percEph_firstOrder, mapped_lvl16$percEph_firstOrder, mapped_lvl17$percEph_firstOrder, mapped_lvl18$percEph_firstOrder), command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'),
+  
   #MAKE FINAL SHAPEFILES WITH RESULTS
   tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results), deployment='main'), #model results shapefile
   tar_target(val_shapefile_fin, saveValShapefile(path_to_data, codes_huc02, validationResults), deployment='main'), #validation results shapefile (HUC2 level)
@@ -890,7 +914,6 @@ list(
                                                       rivNetFin_1306, rivNetFin_0804, rivNetFin_0501, rivNetFin_1703,
                                                       rivNetFin_0703, rivNetFin_0304, rivNetFin_1605, rivNetFin_1507,
                                                       rivNetFin_0317, rivNetFin_0506, rivNetFin_0103, rivNetFin_1709), deployment='main'),
-  
   tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'),
   tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, wyoming_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404), deployment='main'),
 

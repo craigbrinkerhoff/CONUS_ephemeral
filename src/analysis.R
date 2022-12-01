@@ -119,7 +119,7 @@ extractData <- function(path_to_data, huc4){
   #calculate depths and widths via hydraulic geomtery and lake volume modeling
   nhd$lakeVol_m3 <- 0.533 * (nhd$LakeAreaSqKm*1e6)^1.204 #Cael et al. 2016
 
-  #Calculate and assign lake percents to each throughflow line so that we have fracional lake surface areas and volumes for each throughflow line
+  #Calculate and assign lake percents to each throughflow line so that we have fractional lake surface areas and volumes for each throughflow line
   sumThroughFlow <- dplyr::filter(as.data.frame(nhd), is.na(WBArea_Permanent_Identifier)==0) %>% #This is based on reachLength/total throughflow line reach length
     dplyr::group_by(WBArea_Permanent_Identifier) %>%
     dplyr::summarise(sumThroughFlow = sum(LengthKM))
@@ -165,7 +165,7 @@ extractData <- function(path_to_data, huc4){
 
   #Wrangle everything into a lightweight routing table (no spatial info anymore)
   nhd_df <- as.data.frame(nhd)
-  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'TerminalPa', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m'))
+  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'TerminalPa', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m', 'LakeAreaSqKm'))
 
   nhd_df$wtd_m_min_01 <- as.numeric(nhd_wtd_01$WTD_1.min)
   nhd_df$wtd_m_median_01 <- as.numeric(nhd_wtd_01$WTD_1.median)
@@ -254,17 +254,16 @@ extractData <- function(path_to_data, huc4){
 #'
 #' @return NHD hydrography with perenniality status
 routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
-
-    huc2 <- substr(huc4, 1, 2)
+  huc2 <- substr(huc4, 1, 2)
 
   #remove streams with absolutely no mean annual flow
   nhd_df <- dplyr::filter(nhd_df, Q_cms > 0)
 
   ######INTIAL PASS AT ASSIGNING PERENNIALITY: using median water table depth (function handles non-CONUS streams in its calculation)
-  nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus)
+  nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus, nhd_df$LakeAreaSqKm)
   
   #recast lakes/reservoirs as perennial. Model can't account for 'ephemeral' ponds and they aren't relevant in WOTUS context anyway
-  nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) == 558 & is.na(nhd_df$width_m)== 1, 'non_ephemeral', nhd_df$perenniality)
+  #nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) == 558 & is.na(nhd_df$width_m)== 1, 'non_ephemeral', nhd_df$perenniality)
   
   #some streams adjacent to swamp/marsh are tagged as artificial paths (i.e. lakes) for some reason.
       #We can use the lack of assigned widths to lakes/reservoirs to remap these FCodes to streams, i.e. 460

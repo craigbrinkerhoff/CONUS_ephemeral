@@ -79,7 +79,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
-    geom_point(size=7, color='#84a59d') +
+    geom_point(size=7, color='#335c67') +
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
     xlim(0,100)+
     ylim(0,100)+

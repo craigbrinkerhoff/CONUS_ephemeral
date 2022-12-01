@@ -128,7 +128,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   sf::st_crs(flume_sites) <- sf::st_crs('epsg:26912')
 
   #set up hydrography------------------------------
-  walnut_gulch_hydrography <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/streamlines.shp')
+  # walnut_gulch_hydrography <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/streamlines.shp')
   basin <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/boundary.shp')
   basin <- sf::st_transform(basin, 'epsg:26912')
   
@@ -149,9 +149,9 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   
   #basin map----------------------------------
   map <- ggplot(network, aes(color=perenniality)) +
-    geom_sf(data=walnut_gulch_hydrography, #conus boundary
-            color='darkred',
-            show.legend='line')+
+    # geom_sf(data=walnut_gulch_hydrography, #conus boundary
+    #         color='darkred',
+    #         show.legend='line')+
     geom_sf()+
     geom_sf(data=flume_sites[flume_sites$NHDPlusID %in% flume_sites2$NHDPlusID,],
             color='black',
@@ -198,5 +198,6 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   ggsave('cache/walnutGulch.jpg', comboPlot, width=12, height=12)
   
   return(list('see cache/walnutGulch.jpg',
-              'df'=flume_sites2 %>% select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm'))))
+              'df'=flume_sites2 %>% select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm')),
+              'percQEph_exported'=network[which.max(network$Q_cms),]$percQEph_reach))
 }

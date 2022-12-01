@@ -28,14 +28,19 @@
 #' @param conus: flag for foreign or not
 #'
 #' @return status: perennial, intermittent, or ephemeral
-perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus){
+perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm){
   if(conus == 0){ #foreign stream handling
     return('foreign')
   } else if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0) { #there are some NA WTDs for very short reaches that consist only of 'perennial boundary conditions' in the water table model, i.e. ocean or great lakes
     return('non_ephemeral')
   } else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){
       if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all wtd must not intersect river
-        return('ephemeral')
+        if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following Schmadel 2019
+          return('non_ephemeral')
+        }
+        else{
+          return('ephemeral') 
+        }
       } else{
         return('non_ephemeral')
       }
@@ -127,23 +132,22 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   upstreamProperties <- Property_vec[upstream_reaches]
   upstream_percEphs <- percEph_vec[upstream_reaches]
 
-
+  #set ethier discharge or drainage area
   lateralProperty <- ifelse(property == 'discharge', curr_dQ, curr_dArea)
 
   upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)
 
   #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero (handles ost streamflow too)
-  Ephflag <- ifelse(curr_perr == 'non_ephemeral', 0, 1) #dont need to handle this for drainage area
+  Ephflag <- ifelse(curr_perr == 'non_ephemeral', 0, 1)
   
-  lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty) #if losing stream, set the weight to zero as it's not contributing anything to the stream
+  #if losing stream, set the weight to zero as it's not contributing anything to the stream
+  lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)
+  
+  #weighted mean of the streamflow contributions (lateral + n upstream contributions, weighted by discharge)
   out <- weighted.mean(c(upstream_percEphs, Ephflag), c(upstreamProperties, lateralProperty))
-
-  # #calculate % ephemeral water volume
-  # out <- ((lateralProperty*Ephflag) + upstream_value)/curr_Property
-  # 
-  # #handle impossible values as a result of losing streams. Basically, if losing strem predicts < 0 % water, it's just 0 (and likewise for 100)
-  # out <- ifelse(out > 1, 1, out)
-  # out <- ifelse(out < 0, 0, out)
+  
+  #handle 0 drainage areas creating infinite values (only a handful)
+  out <- ifelse(!(is.finite(out)), 0, out)
 
   return(out)
 }

@@ -313,27 +313,45 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
 
   #calc df for tokunaga
   out <- rivNetFin %>%
-   # dplyr::filter(LengthKM >= 1)%>%
+   # dplyr::filter(!is.na(width_m))%>%
     dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')),
                      length = sum(LengthKM))%>%
     dplyr::mutate(length_up_eph = cumsum(length_eph),
                   length_up = cumsum(length)) %>%
     dplyr::mutate(Tk_eph = NA,
-                  Tk_all = NA)
+                  Tk_all = NA) %>%
+    dplyr::mutate(r2 = summary(lm(log(length)~StreamOrde, data=.))$r.squared)
   
   for(i in 2:nrow(out)){
     out[i,]$Tk_eph <- out[i-1,]$length_up_eph / out[i,]$length
     out[i,]$Tk_all <- out[i-1,]$length_up / out[i,]$length
   }
-  
+
   out <- out %>%
     dplyr::mutate(percEphemeralStreamInfluence_mean = Tk_eph / Tk_all) %>%
     dplyr::left_join(results, by='StreamOrde') %>%
-         dplyr::slice_max(StreamOrde) %>% #minimum value is the exported one from the max stream orde
-         dplyr::mutate(export = ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428') | any(rivNetFin$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean), #remove great lakes and foreign basins because the network scaling isn't going to work
-                       huc4 = huc4) %>%
-         dplyr::select(c('huc4', 'percQEph_exported', 'export'))
+    dplyr::slice_max(StreamOrde) %>% #minimum value is the exported one from the max stream orde
+    dplyr::mutate(export = ifelse((huc4 %in% c('0418', '0419', '0424', '0426', '0428')) |  #remove scenarios that won't work with this scaling: 1) great lakes, 2) > 10% foreign basins, 3) net losing basins
+                                    any(rivNetFin$perenniality == 'foreign') | 
+                                    r2 < 0.97, NA, percEphemeralStreamInfluence_mean),
+                 huc4 = huc4) %>%
+    dplyr::select(c('huc4', 'percQEph_exported', 'export'))
 
   return(out)
+}
+
+
+
+
+ephemeralFirstOrder <- function(rivNetFin, huc4) {
+  eph <- sum(rivNetFin$perenniality == 'ephemeral' & rivNetFin$dQdX_cms == rivNetFin$Q_cms)
+  total <- sum(rivNetFin$dQdX_cms == rivNetFin$Q_cms)
+  
+  out <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #percent headwater reaches that are ephemeral
+  
+  return(data.frame('huc4'=huc4,
+                    'percEph_firstOrder'=out,
+                    'num_eph_headwater'=eph,
+                    'num_headwater'=total))
 }
