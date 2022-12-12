@@ -412,9 +412,19 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys, 0)
   joinedData$num_flowing_dys_sigma <- round(joinedData$num_flowing_dys_sigma, 0)
   
-  #joinedData$flag <- ifelse(is.na(joinedData$se), 'No confidence intervals', '95% confidence intervals')  #ifelse(joinedData$huc4 == '0302', 'Ephemeral + Intermittent', 'Ephemeral') #duke Forest special case
-  joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
+  #take basin average of field data
+  joinedData <- joinedData %>%
+    dplyr::group_by(huc4) %>%
+    dplyr::summarise(name=first(name),
+                     num_flowing_dys = mean(num_flowing_dys),
+                     num_flowing_dys_sigma = mean(num_flowing_dys_sigma),
+                     n_flw_d = mean(n_flw_d),
+                     num_sample_yrs = mean(num_sample_yrs),
+                     n_sites = sum(n_sites))# %>%
+   # dplyr::filter(huc4 != '1012')
   
+  joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
+
   ##MAIN MAP------------------------------------------
   flowingDaysFig <- ggplot(results) +
     geom_sf(aes(fill=num_flowing_dys), #observed
@@ -451,20 +461,22 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   ##VERIFICATION FIGURE------------------
   flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys, ymin=num_flowing_dys-num_flowing_dys_sigma, ymax=num_flowing_dys+num_flowing_dys_sigma, fill=region))+
     geom_abline(size=2, linetype='dashed', color='darkgrey')+
-    geom_pointrange(size=3, fatten=6, pch=23, color='black')+
+    geom_pointrange(size=3, fatten=5, pch=23, color='black')+
+   # geom_smooth(aes(fill=NULL), color='black', method='lm', se=F, size=2, show.legend = FALSE)+
     scale_fill_manual(name='',
                       values=c('#264653', '#2a9d8f'))+
-    ylab('Predicted days/yr (basin avg.)')+
-    xlab('Measured days/yr (catchment avg.)')+
-    ylim(-2,80)+
-    xlim(-2,80)+
+    ylab('Predicted days/yr')+
+    xlab('Measured days/yr')+
+    ylim(0,125)+
+    xlim(0,125)+
     labs(tag='B')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
           plot.title = element_text(size = 30, face = "bold"),
-          legend.position=c(0.85,0.2),
+          legend.position=c(0.20, 0.85),
           legend.title =element_blank(),
           legend.text = element_text(family = "Futura-Medium", size = 26),
+          legend.key = element_rect(fill = "grey"),
           plot.tag = element_text(size=26,
                                   face='bold'),
           legend.spacing.x = unit(1.5, 'cm')) +
@@ -477,8 +489,8 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
    AAAA
    AAAA
    AAAA
-   BBBB
-   BBBB
+   BBCC
+   BBCC
    "
   
   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, design=design)

@@ -32,15 +32,15 @@ getNHDGages <- function(path_to_data, codes_huc02){
     m <- substr(i, 1,2)
     dsnPath <- paste0(path_to_data, "/HUC2_", m, "/NHDPLUS_H_", i, "_HU4_GDB/NHDPLUS_H_", i, "_HU4_GDB.gdb")
     NHD_HR_EROM_gage <- st_read(dsn = dsnPath, layer = "NHDPlusEROMQAMA") #Quality controlled gauges joined to NHD reaches a priori by USGS
-    NHD_HR_EROM <- st_read(dsn = dsnPath, layer = "NHDPlusEROMMA") #mean annual flow table
-    NHD_HR_EROM <- filter(NHD_HR_EROM, GageIDMA %in% NHD_HR_EROM_gage$GageID)
+    NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA") #mean annual flow table
+    NHD_HR_EROM <- dplyr::filter(NHD_HR_EROM, GageIDMA %in% NHD_HR_EROM_gage$GageID)
     temp <- NHD_HR_EROM %>%
-      dplyr::select(c('NHDPlusID', 'QDMA', 'QEMA', 'GageQMA', 'GageIDMA'))
+      dplyr::select(c('NHDPlusID', 'QBMA', 'QEMA', 'GageQMA', 'GageIDMA'))
 
     assessmentDF <- rbind(assessmentDF, temp)
   }
 
-  assessmentDF$QDMA <- assessmentDF$QDMA * 0.0283 #cfs to cms
+  assessmentDF$QBMA <- assessmentDF$QBMA * 0.0283 #cfs to cms
   assessmentDF$QEMA <- assessmentDF$QEMA * 0.0283 #cfs to cms
   assessmentDF$GageQMA <- assessmentDF$GageQMA * 0.0283 #cfs to cms
 

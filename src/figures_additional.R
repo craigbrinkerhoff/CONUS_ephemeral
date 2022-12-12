@@ -13,6 +13,7 @@
 #' @param USGS_data: USGS mean annual flow observations at streamgauges
 #' @param nhdGages: lookup table pairing USGS gauges to the NHD reaches
 #' @param ephemeralQdataset: additional validation data for some ephemeral streams from USGS reports
+#' @param walnutGulch: additional validation data for some ephemeral streams with in situ flume records in Walnut Gulch exp catchment
 #' @param val_shapefile_fin: final sf object with ephemeral classification validation
 #'
 #' @import sf
@@ -22,7 +23,7 @@
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
-validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, val_shapefile_fin){
+validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin){
   theme_set(theme_classic())
   
   
@@ -44,8 +45,6 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   
   #crop to CONUS
   results <- sf::st_intersection(results, states)
-  
-  # results$basinAccuracy <- round(results$basinAccuracy, 2)
   
   ##ACCURACY MAP---------------------------------------------
   accuracyFig <- ggplot(results) +
@@ -74,17 +73,19 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     ylab('')
   
   
-  #####ROUTING VALIDATION---------------------------------------------------
-  #ont plot the great lakes because the network scaling makes no sense
+  #####TOKUNAGA ROUTING VERIFICATION---------------------------------------------------
+  #dont plot the great lakes because the network scaling makes no sense
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
     geom_point(size=7, color='#335c67') +
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
+    geom_smooth(method='lm', se=F, size=1.5, color='black')+
     xlim(0,100)+
     ylim(0,100)+
     ylab('% Discharge ephemeral') +
     xlab('% Upstream network ephemeral') +
+    annotate('text', label=paste0(nrow(forPlot), ' basins'), x=75, y=15, size=7, color='black')+
     labs(tage='C')+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=24,face="bold"),
@@ -96,15 +97,21 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   
   
   #####DISCHARGE VALIDATION-------------------------------------------------
+  #rename walnut gulch discharge columes to match this df
+  walnutGulch <- walnutGulch$df #grab data frame from list
+  colnames(walnutGulch) <- c('NHDPlusID', 'Q_MA', 'drainageArea_km2', 'QBMA','ToTDASqKm')
+  walnutGulch <- dplyr::select(as.data.frame(walnutGulch), c('Q_MA', 'QBMA')) %>%
+    dplyr::mutate(type = 'Ephemeral/Intermittent')
+  
   #rename ephemeral discharge columns to match this df
-  colnames(ephemeralQDataset) <- c('NHDPlusID', 'Q_MA', 'drainageArea_km2', 'QDMA', 'ToTDASqKm')
-  ephemeralQDataset <- dplyr::select(as.data.frame(ephemeralQDataset), c('Q_MA', 'QDMA')) %>%
+  colnames(ephemeralQDataset) <- c('NHDPlusID', 'huc4', 'Q_MA', 'drainageArea_km2', 'QBMA', 'num_flowing_dys','ToTDASqKm', 'gageID')
+  ephemeralQDataset <- dplyr::select(as.data.frame(ephemeralQDataset), c('Q_MA', 'QBMA')) %>%
     dplyr::mutate(type = 'Ephemeral/Intermittent')
   
   #now make plots!
   theme_set(theme_classic())
   
-  #add observed meann anual Q (1970-2018 calculated using gage records) to the NHD reaches for erom validation
+  #add observed mean annual Q (1970-2018 calculated using gage records) to the NHD reaches for erom validation
   qma <- USGS_data
   qma <- dplyr::select(qma, c('gageID','Q_MA', 'no_flow_fraction'))
   assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
@@ -115,23 +122,23 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
             'cache/gageNumbers.rds')
   
   assessmentDF <- tidyr::drop_na(assessmentDF) %>%
-    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #Messager definition for non-perennilaity is 1 day a year not flowing
-    dplyr::select('Q_MA', 'QDMA', 'type')
+    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #Messager definition for non-perenniality is 1 day a year not flowing
+    dplyr::select('Q_MA', 'QBMA', 'type')
   
   #join datasets
-  assessmentDF <- rbind(assessmentDF, ephemeralQDataset)
-  assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent", 'Ephemeral'))
+  assessmentDF <- rbind(assessmentDF, ephemeralQDataset, walnutGulch)
+  assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent"))
   
   #Model plot
-  eromVerification_QDMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QDMA, color=type)) +
+  eromVerification_QBMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QBMA, color=type)) +
     geom_abline(linetype='dashed', color='darkgrey', size=2)+
     geom_point(size=4)+
     xlab('Observed Mean Annual Flow')+
     ylab('USGS Discharge Model')+
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
-    annotate('text', label=paste0('r2: ', round(summary(lm(log(QDMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
-    annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QDMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
+    annotate('text', label=paste0('r2: ', round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
+    annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QBMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
     annotate('text', label=paste0(nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
@@ -160,7 +167,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
    BC
    "
   
-  comboPlot <- patchwork::wrap_plots(A=accuracyFig, B=eromVerification_QDMA, C=tokunagaPlot, design=design)
+  comboPlot <- patchwork::wrap_plots(A=accuracyFig, B=eromVerification_QBMA, C=tokunagaPlot, design=design)
   
   
   ggsave('cache/validationPlot.jpg', comboPlot, width=20, height=20)
@@ -527,9 +534,11 @@ runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
   plot <- ggplot(calibResults, aes(x=thresh, y=mae)) +
     geom_line(linetype='dashed', size=1.2, color='darkblue') +
     geom_point(size=8, color='darkblue') +
-    ylab('Number Flowing Days\nMean Absolute Error [dys]') +
+    ylab('Number Flowing Days MAE [dys]') +
     xlab('Runoff threshold (global calibration) [mm/dy]')+
-    scale_x_log10()+
+    scale_x_log10(limits=c(1e-4,5),
+                  breaks=c(1e-4, 1e-2, 1e-0),
+                  labels=c('0.0001', '0.001', '1'))+
     labs(tag='A')+
     theme(axis.text=element_text(size=20),
       axis.title=element_text(size=22,face="bold"),
@@ -541,7 +550,9 @@ runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
   
   plot2 <- ggplot(df, aes(theoreticalThresholds)) +
     geom_density(size=1.25, color='black', fill='lightgreen') +
-    scale_x_log10(limits=c(0.001, 5))+
+    scale_x_log10(limits=c(1e-4,5),
+                  breaks=c(1e-4, 1e-2, 1e-0),
+                  labels=c('0.0001', '0.001', '1'))+
     labs(tag='B')+
     xlab('Runoff threshold (estimated via theory per basin) [mm/dy]') +
     ylab('Density')+
@@ -644,18 +655,6 @@ areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
                                                 'United States Virgin Islands',
                                                 'Hawaii'))) #remove non CONUS states/territories
   states <- st_union(states)
-  
-  #set up regional boundaries
-  # regions <- sf::st_intersection(regions, results)
-  # regions$region <- ifelse(regions$huc2 %in% c('01', '02', '03','08'), 'East Coast',
-  #                                            ifelse(regions$huc2 %in% c('04', '05', '06', '07', '09'), 'Midwest',
-  #                                                   ifelse(regions$huc2 %in% c('11', '12','10'), 'Plains',
-  #                                                          ifelse(regions$huc2 %in% c('13', '14', '15', '16'), 'Southwest', "West Coast"))))
-  # 
-  # regions <- regions %>%
-  #   dplyr::group_by(region) %>%
-  #   dplyr::summarise(m=mean(basinAccuracy)) %>%
-  #   st_cast()
   
   #results shapefile
   results$percArea_eph <- round(results$percAreaEph_exported*100,0) #setup percent
@@ -1250,67 +1249,3 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
   
   return('see cache/hydrographyMaps.jpg')
 }
-
-
-
-
-
-#' #' create ephemeral land use paper figure (fig 3)
-#' #'
-#' #' @name landUseMapFunction
-#' #'
-#' #' @param shapefile_fin: final sf object with model results
-#' #'
-#' #' @import sf
-#' #' @import dplyr
-#' #' @import ggplot2
-#' #' @import cowplot
-#' #'
-#' #' @return land use results figure (also writes figure to file)
-#' landUseMapFunction <- function(shapefile_fin) {
-#'   theme_set(theme_classic())
-#'   
-#'   ##GET DATA
-#'   results <- shapefile_fin$shapefile
-#'   
-#'   # CONUS boundary
-#'   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
-#'   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
-#'                                                 'American Samoa',
-#'                                                 'Commonwealth of the Northern Mariana Islands',
-#'                                                 'Guam',
-#'                                                 'District of Columbia',
-#'                                                 'Puerto Rico',
-#'                                                 'United States Virgin Islands',
-#'                                                 'Hawaii'))) #remove non CONUS states/territories
-#'   states <- st_union(states)
-#'   
-#'   #results shapefile
-#'   results$ephemeralCultDevpNetworkLength_km <- results$ephemeralCultDevpNetworkLength_km
-#'   results$percLength_eph_cult_devp <- round(results$percLength_eph_cult_devp*100,0)
-#'   
-#'   #MAIN MAP-------------------------------------------------
-#'   results_map <- ggplot(results) +
-#'     geom_sf(aes(fill=percLength_eph_cult_devp), #actual map
-#'             color='black',
-#'             size=0.5) +
-#'     geom_sf(data=states,
-#'             color='black',
-#'             size=1.25,
-#'             alpha=0)+
-#'     scale_fill_gradientn(name='% ephemeral in cultivated/developed land',
-#'                          colors=c('#355070', '#B56576', '#EAAC8B'),
-#'                          guide = guide_colorbar(direction = "horizontal",
-#'                                                 title.position = "bottom"))+
-#'     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-#'     theme(legend.position = c(.20, 0.1),
-#'           legend.key.size = unit(2, 'cm'))+ #legend position settings
-#'     theme(text = element_text(family = "Futura-Medium"), #legend text settings
-#'           legend.title = element_text(face = "bold", size = 20),
-#'           legend.text = element_text(family = "Futura-Medium", size = 18))+
-#'     xlab('')+
-#'     ylab('')
-#'   
-#'   ggsave('cache/contributingArea.jpg', results_map, width=20, height=15)
-#'   return('see cache/contributingArea.jpg')
-#' }

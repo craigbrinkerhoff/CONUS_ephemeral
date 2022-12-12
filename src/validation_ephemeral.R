@@ -134,7 +134,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
   nhd <- dplyr::left_join(nhd, NHD_HR_EROM, by='NHDPlusID')
   nhd <- dplyr::left_join(nhd, NHD_HR_VAA, by='NHDPlusID')
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
-  nhd$Q_cms <- nhd$QEMA * 0.0283 #cfs to cms
+  nhd$Q_cms <- nhd$QBMA * 0.0283 #cfs to cms
   if(huc4id %in% indiana_hucs){
     thresh <- c(2,2,2,2,3,2,3,2) #see README file
     thresh <- thresh[which(indiana_hucs == huc4id)]
@@ -295,7 +295,7 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 
 
 
-#' Verifies our routing model can be anticipated by network length and the ephemeral map
+#' Verifies our routing model can be anticipated by network length and the ephemeral map. Ignores basins wirh foreign streams out of necessity
 #'
 #' @name tokunaga_eph
 #'
@@ -333,8 +333,7 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
     dplyr::left_join(results, by='StreamOrde') %>%
     dplyr::slice_max(StreamOrde) %>% #minimum value is the exported one from the max stream orde
     dplyr::mutate(export = ifelse((huc4 %in% c('0418', '0419', '0424', '0426', '0428')) |  #remove scenarios that won't work with this scaling: 1) great lakes, 2) > 10% foreign basins, 3) net losing basins
-                                    any(rivNetFin$perenniality == 'foreign') | 
-                                    r2 < 0.97, NA, percEphemeralStreamInfluence_mean),
+                                    any(rivNetFin$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean),
                  huc4 = huc4) %>%
     dplyr::select(c('huc4', 'percQEph_exported', 'export'))
 
@@ -343,7 +342,16 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
 
 
 
-
+#' Calculates frequency that headwater reaches are classified ephemeral
+#'
+#' @name ephemeralFirstOrder
+#'
+#' @param rivNetFin: routing model result for basin
+#' @param huc4: huc4 basin id
+#'
+#' @import dplyr
+#'
+#' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
 ephemeralFirstOrder <- function(rivNetFin, huc4) {
   eph <- sum(rivNetFin$perenniality == 'ephemeral' & rivNetFin$dQdX_cms == rivNetFin$Q_cms)
   total <- sum(rivNetFin$dQdX_cms == rivNetFin$Q_cms)

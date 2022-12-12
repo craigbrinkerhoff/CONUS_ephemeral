@@ -16,23 +16,26 @@
 #' @import dplyr
 #'
 #' @return ephemeral streams mean annual flow paired with model reach and model discharge
-setupEphemeralQValidation <- function(path_to_data, walnutGulch, other_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404){
-  #Wyoming gages-----------------------------------------------------------
+setupEphemeralQValidation <- function(path_to_data, walnutGulch, other_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408){
+  #USGS ephemeral gages-----------------------------------------------------------
   other_sites$wy_eph_gages <- substr(other_sites$name, 6,nchar(other_sites$name))
 
   wy_eph_Q <- data.frame()
   for(i in other_sites$wy_eph_gages){
-    gageQ <- readNWISstat(siteNumbers = i, #check if site mets our date requirements
-                          parameterCd = '00060') #discharge
+    gageQ <- readNWISdv(siteNumbers = i, #check if site mets our date requirements
+                        parameterCd = '00060') #discharge
     
     #get mean annual flow
     gageQ <- gageQ %>% 
-      dplyr::mutate(Q_cms = mean_va*0.0283) #cfs to cms
+      dplyr::mutate(Q_cms = X_00060_00003*0.0283) #cfs to cms
     
       Q_MA <- mean(gageQ$Q_cms, na.rm=T) #mean annual
-    
+      numFlow <- (sum(round(gageQ$Q_cms,2) > 0, na.rm=T)/nrow(gageQ))*365
+
     temp <- data.frame('gageID'=i, #take first row
-                       'meas_runoff_m3_s'=Q_MA)
+                       'meas_runoff_m3_s'=Q_MA,
+                       'num_flowing_dys'=numFlow,
+                       'period_of_record_yrs'=nrow(gageQ)/365)
     
     wy_eph_Q <- rbind(wy_eph_Q, temp)
   }
@@ -47,8 +50,9 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, other_sites, ri
   network2 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1009_HU4_GDB/NHDPLUS_H_1009_HU4_GDB.gdb', layer='NHDFlowline')
   network3 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1012_HU4_GDB/NHDPLUS_H_1012_HU4_GDB.gdb', layer='NHDFlowline')
   network4 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1404_HU4_GDB/NHDPLUS_H_1404_HU4_GDB.gdb', layer='NHDFlowline')
+  network5 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1408_HU4_GDB/NHDPLUS_H_1408_HU4_GDB.gdb', layer='NHDFlowline')
   
-  network <- rbind(network1, network2, network3, network4)
+  network <- rbind(network1, network2, network3, network4, network5)
   network<- sf::st_zm(network)
   
   #project to correct UTM zones------------------------
@@ -59,30 +63,23 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, other_sites, ri
   validationDF <- sf::st_transform(wy_eph_Q, epsg)
   network <- sf::st_transform(network, epsg)
   
-  rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404)
+  rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408)
   
   network <- dplyr::left_join(network, rivNetFin, 'NHDPlusID')
   network <- dplyr::filter(network, is.na(perenniality)==0)
   
   #snap to network----------------------------
   #grab everything within a kilometer of the field point
-  wy_eph_Q <- sf::st_join(wy_eph_Q, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
+  out <- sf::st_join(wy_eph_Q, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
   
   #keep the one with the best matching drainage area (must also be within 5% of drainage area agreement)
-  wy_eph_Q <- dplyr::group_by(wy_eph_Q, gageID) %>%
+  out <- dplyr::group_by(out, gageID) %>%
     dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
     dplyr::filter(error < 0.20) %>%
     dplyr::slice_min(error, with_ties=FALSE, n=1) %>% #ties are pretty much never going to happen, but still need something...
-    dplyr::select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm', 'gageID')) %>%
-    dplyr::mutate(basin = 'wyoming_eph_int')
+    dplyr::select(c('NHDPlusID', 'huc4', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'num_flowing_dys','TotDASqKm', 'gageID', 'period_of_record_yrs')) %>%
+    dplyr::mutate(type = ifelse(gageID %in% c('09216527', '09216545', '09216562', '09216565', '09216750', '09222300', '09222400', '09235300'), 'eph_int', 'eph'))
     
-  return(wy_eph_Q)
-  #walnut gulch flumes (already done in figure)---------------------------
-  walnutGulch$basin <- 'walnut_gulch'
-  
-  
-  out <- rbind(walnutGulch, wy_eph_Q)
-  
   return(out)
 }
 
@@ -128,7 +125,6 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   sf::st_crs(flume_sites) <- sf::st_crs('epsg:26912')
 
   #set up hydrography------------------------------
-  # walnut_gulch_hydrography <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/streamlines.shp')
   basin <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/boundary.shp')
   basin <- sf::st_transform(basin, 'epsg:26912')
   
@@ -145,13 +141,10 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   nearestIndex <- sf::st_nearest_feature(flume_sites, network)
   flume_sites$NHDPlusID <- network[nearestIndex,]$NHDPlusID
   flume_sites2 <- dplyr::left_join(as.data.frame(flume_sites), network, by='NHDPlusID') %>%
-    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 10% of one another
+    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 20% of one another
   
   #basin map----------------------------------
   map <- ggplot(network, aes(color=perenniality)) +
-    # geom_sf(data=walnut_gulch_hydrography, #conus boundary
-    #         color='darkred',
-    #         show.legend='line')+
     geom_sf()+
     geom_sf(data=flume_sites[flume_sites$NHDPlusID %in% flume_sites2$NHDPlusID,],
             color='black',
@@ -159,7 +152,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
     scale_color_manual(name='',
                        values=c('#f18f01', '#006e90'),
                        labels=c('Model ephemeral', 'Model non-ephemeral')) +
-    labs('A')+
+    labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20),
           legend.position = c(0.8, 0.1),
           legend.text=element_text(size=20),
@@ -168,13 +161,13 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
                                   face='bold'))+
     xlab('')+
     ylab('') +
-    ggtitle('Walnut Gulch Experimental Ephemeral Catchment, AZ')
+    ggtitle('Walnut Gulch Experimental Ephemeral Watershed, AZ')
   
   #Q validation-----------------------------
   scatterPlot <- ggplot(flume_sites2, aes(x=meas_runoff_m3_s, y=Q_cms)) +
     geom_abline(linetype='dashed', color='darkgrey', size=2) +
     geom_point(size=8) +
-    labs('B')+
+    labs(tag='B')+
     xlim(0,0.1)+
     ylim(0,0.1)+
     ylab('Model Streamflow [cms]')+

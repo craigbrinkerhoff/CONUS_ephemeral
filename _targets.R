@@ -18,7 +18,7 @@ source('src/validation_ephemeral.R')
 source('src/verification_flowingDays.R')
 source('src/figures_additional.R')
 source('src/figures_paper.R')
-source('src/validation_exp_basins.R')
+source('src/validation_routing.R')
 
 plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
@@ -29,16 +29,16 @@ tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot
 path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
 codes_huc02 <- c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
 lookUpTable <- readr::read_csv('data/HUC4_lookup.csv') #basin routing lookup table
-wyoming_sites <- readr::read_csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/others.csv')
+usgs_eph_sites <- readr::read_csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/usgs_gages_eph.csv')
 huc8s <- readr::read_table('data/HUC8s.txt', col_names=FALSE, col_types='c')
 
 #ehemeral mapping parameters
-threshold <- -0.01 #[m] buffer around 0m depth to capture the free surface
+threshold <- -0.01 #[m] buffer around 10cm depth to capture the free surface
 error <- 0 #[ignored] to add a bit of an error tolerance to the ephemeral mapping thresholding
 
 #ephemeral mapping validation parameters
 noFlowGageThresh <- 0.05 #[percent] no flow fraction for USGS gauge, used to determine which gauges are certainly not-ephemeral and can be included in the validation dataset (set very low to be sure)
-snappingThresh <- 7.5 #[m] see object compareSnappingThreshs for output that informs this 'expert assignment'
+snappingThresh <- 10 #[m] see object compareSnappingThreshs for output that informs this 'expert assignment'
 
 #flowing days parameters
   #runoffEffScalar [percent]: sensitivity parameter to use to perturb model sensitivity to runoff efficiency: % of runoff ratio to add or subtract
@@ -593,9 +593,10 @@ list(
   tar_target(validationDF, prepValDF(path_to_data)), #clean WOTUS validation set
   
   #GATHER AND PREP FIELD DATA ON NUMBER OF FLOWING DAYS PER YEAR IN EPHEMERAL CHANNELS
-  tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data)),
+  tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data, ephemeralQDataset)),
+  tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, usgs_eph_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408), deployment='main'),
   tar_target(flowingDaysValidation, flowingValidate(flowingFieldData, path_to_data, codes_huc02, combined_results, combined_numFlowingDays_mc)),
-  tar_target(flowingDaysCalibrate, flowingValidateSensitivityWrapper(flowingFieldData, runoffEffScalar_real, runoffMemory_real, c(0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.50, 0.75, 1, 2.5, 5), path_to_data, combined_runoffEff)),
+  tar_target(flowingDaysCalibrate, flowingValidateSensitivityWrapper(flowingFieldData, runoffEffScalar_real, runoffMemory_real, c(0.00001, 0.00025, 0.0005, 0.00075, 0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.50, 0.75, 1, 2.5, 5), path_to_data, combined_runoffEff)),
   
   #GATHER, PREP, AND VALIDATE OUR EPHEMERAL MAPPING VALIDATION SETP
   tar_target(ourFieldData, addOurFieldData(rivNetFin_0106, rivNetFin_0108, path_to_data, field_dataset)), #wrangle our field-assessed classified streams in northeast US
@@ -906,7 +907,7 @@ list(
    tar_target(snappingSensitivityFig, snappingSensitivityFigures(compareSnappingThreshs), deployment='main'), #figures for snapping thresh sensitivity analysis
    tar_target(scalingModelFig, buildScalingModelFig(scalingModel), deployment='main'), #figures for snapping thresh sensitivity analysis
    tar_target(flowingDaysCalibrateFig, runoffThreshCalibPlot(flowingDaysCalibrate, combined_runoffThresh)), #figure for empirical runoff threshold calibration
-   tar_target(validationPlotMain, validationPlot(combined_percEph_tokunga, USGS_data, nhdGages, ephemeralQDataset, val_shapefile_fin), deployment='main'),
+   tar_target(validationPlotMain, validationPlot(combined_percEph_tokunga, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin), deployment='main'),
    tar_target(validationMap, mappingValidationFigure(val_shapefile_fin), deployment='main'),
    tar_target(validationMap2, mappingValidationFigure2(val_shapefile_fin), deployment='main'),
    tar_target(drainageAreaMap, areaMapFunction(shapefile_fin, val_shapefile_fin), deployment='main'), #fig 3new
@@ -915,7 +916,6 @@ list(
                                                       rivNetFin_0703, rivNetFin_0304, rivNetFin_1605, rivNetFin_1507,
                                                       rivNetFin_0317, rivNetFin_0506, rivNetFin_0103, rivNetFin_1709), deployment='main'),
   tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'),
-  tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, wyoming_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404), deployment='main'),
 
   #GENERATE GUIDE TO DATA/MODEL INPUTS
   tar_render(data_guide, "docs/data_guide.Rmd", deployment='main') #data guide

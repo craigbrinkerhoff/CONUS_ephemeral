@@ -3,11 +3,11 @@
 ## Spring 2022
 
 
-#' Preps hydrography shapefiles into leightweight routing tables. Part of this is extracting 1) monthly water table depth and 2) average land cover type at each NHD flowline.
+#' Preps hydrography shapefiles into lightweight routing tables. Part of this is extracting 1) monthly water table depth and 2) average land cover type at each NHD flowline.
 #'
 #' @name extractData
 #'
-#' @note Be aware of the expilict repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
+#' @note Be aware of the explicit repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
 #' @note How the pixels are summarized for WTD extractions at each reach is specified in the summariseWTD() function within '~/src/utils.R``. Land cover is always the mean
 #'
 #' @param path_to_data: data repo path directory
@@ -95,7 +95,7 @@ extractData <- function(path_to_data, huc4){
 
   #Convert to more useful values
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
-  nhd$Q_cms <- nhd$QDMA * 0.0283 #cfs to cms. Use unadjusted Q because Qlat gets screwed up with the adjusted values. Plus, this still has a reasonable model performance
+  nhd$Q_cms <- nhd$QBMA * 0.0283 #no USGS adjustments to flow- they cause weird jumps in the mainstems sometimes that mess up my exported results
   nhd$Q_cms_adj <- nhd$QEMA*0.0283
   
   #handle indiana-effected basin stream orders
@@ -116,7 +116,7 @@ extractData <- function(path_to_data, huc4){
   #no divergent channels, i.e. all downstream routing flows into a single downstream reach.
   nhd <- dplyr::filter(nhd, StreamOrde > 0)
 
-  #calculate depths and widths via hydraulic geomtery and lake volume modeling
+  #calculate depths and widths via hydraulic geometry and lake volume modeling
   nhd$lakeVol_m3 <- 0.533 * (nhd$LakeAreaSqKm*1e6)^1.204 #Cael et al. 2016
 
   #Calculate and assign lake percents to each throughflow line so that we have fractional lake surface areas and volumes for each throughflow line
@@ -261,10 +261,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
 
   ######INTIAL PASS AT ASSIGNING PERENNIALITY: using median water table depth (function handles non-CONUS streams in its calculation)
   nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus, nhd_df$LakeAreaSqKm)
-  
-  #recast lakes/reservoirs as perennial. Model can't account for 'ephemeral' ponds and they aren't relevant in WOTUS context anyway
-  #nhd_df$perenniality <- ifelse(nhd_df$perenniality == 'ephemeral' & substr(nhd_df$FCode_riv,1,3) == 558 & is.na(nhd_df$width_m)== 1, 'non_ephemeral', nhd_df$perenniality)
-  
+
   #some streams adjacent to swamp/marsh are tagged as artificial paths (i.e. lakes) for some reason.
       #We can use the lack of assigned widths to lakes/reservoirs to remap these FCodes to streams, i.e. 460
   nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & is.na(nhd_df$width_m)== 0, '46000', nhd_df$FCode_riv)
@@ -420,7 +417,7 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
     width_distrib <- exp(rnorm(n, log(0.32), log(2.3))) #from george's paper
     runoff_min_distrib <- 1:n
     for(i in 1:n){
-      runoff_min_distrib[i] <- mean(ifelse(rivnet$perenniality == 'ephemeral' & rivnet$TotDASqKm  > 0, ((width_distrib[i]/a_distrib[i])^(1/b_distrib[i]) /( rivnet$TotDASqKm*1e6) ) * 86400000, NA), na.rm=T) #[mm/dy] only use non-0 km2 catchments for this....
+      runoff_min_distrib[i] <- median(ifelse(rivnet$perenniality == 'ephemeral' & rivnet$TotDASqKm  > 0, ((width_distrib[i]/a_distrib[i])^(1/b_distrib[i]) /( rivnet$TotDASqKm*1e6) ) * 86400000, NA), na.rm=T) #[mm/dy] only use non-0 km2 catchments for this....
     }
     return(runoff_min_distrib)
   }
@@ -428,8 +425,8 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
   #Normal calculation----------------
   else{
     #geomorphic scaling function to get ephemeral runoff generation threshold
-    runoffThresh <- mean(ifelse(rivnet$perenniality == 'ephemeral' & rivnet$TotDASqKm  > 0, ((W_min/a)^(1/b) /( rivnet$TotDASqKm*1e6) ) * 86400000, NA), na.rm=T) #[mm/dy] only use non-0 km2 catchments for this....
-    
+    runoffThresh <- median(ifelse(rivnet$perenniality == 'ephemeral' & rivnet$TotDASqKm  > 0, ((W_min/a)^(1/b) /( rivnet$TotDASqKm*1e6) ) * 86400000, NA), na.rm=T) #[mm/dy] only use non-0 km2 catchments for this....
+
     return(runoffThresh)
   }
 }
