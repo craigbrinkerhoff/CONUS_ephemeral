@@ -26,6 +26,7 @@
 #' @param thresh: water table depth threshold for 'perennial'
 #' @param err: error tolerance for thresholding
 #' @param conus: flag for foreign or not
+#' @param lakeAreaSqKm: fractional lake surface area per reach [km2]
 #'
 #' @return status: perennial, intermittent, or ephemeral
 perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm){

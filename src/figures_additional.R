@@ -46,7 +46,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   #crop to CONUS
   results <- sf::st_intersection(results, states)
   
-  ##ACCURACY MAP---------------------------------------------
+  ##ACCURACY MAP
   accuracyFig <- ggplot(results) +
     geom_sf(aes(fill=basinAccuracy*100), #actual map
             color='black',
@@ -80,7 +80,6 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
     geom_point(size=7, color='#335c67') +
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
-    geom_smooth(method='lm', se=F, size=1.5, color='black')+
     xlim(0,100)+
     ylim(0,100)+
     ylab('% Discharge ephemeral') +
@@ -104,10 +103,10 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     dplyr::mutate(type = 'Ephemeral/Intermittent')
   
   #rename ephemeral discharge columns to match this df
-  colnames(ephemeralQDataset) <- c('NHDPlusID', 'huc4', 'Q_MA', 'drainageArea_km2', 'QBMA', 'num_flowing_dys','ToTDASqKm', 'gageID')
-  ephemeralQDataset <- dplyr::select(as.data.frame(ephemeralQDataset), c('Q_MA', 'QBMA')) %>%
+  colnames(ephemeralQDataset) <- c('NHDPlusID', 'huc4', 'Q_MA', 'drainageArea_km2', 'QBMA', 'num_flowing_dys','ToTDASqKm', 'gageID', 'errorFlag')
+  ephemeralQDataset <- dplyr::select(ephemeralQDataset, c('Q_MA', 'QBMA')) %>%
     dplyr::mutate(type = 'Ephemeral/Intermittent')
-  
+
   #now make plots!
   theme_set(theme_classic())
   
@@ -126,8 +125,10 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     dplyr::select('Q_MA', 'QBMA', 'type')
   
   #join datasets
-  assessmentDF <- rbind(assessmentDF, ephemeralQDataset, walnutGulch)
+  assessmentDF <- rbind(assessmentDF, walnutGulch) #ephemeralQDataset
   assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent"))
+  
+  assessmentDF <- dplyr::filter(assessmentDF, !(is.na(QBMA)) & !(is.na(Q_MA)))
   
   #Model plot
   eromVerification_QBMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QBMA, color=type)) +
@@ -466,7 +467,7 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 
 
 
-#' Makes plots for snapping threshold senstivity analysis
+#' Makes plots for snapping threshold sensitivity analysis
 #'
 #' @name snappingSensitivityFigures
 #'
@@ -637,12 +638,11 @@ buildScalingModelFig <- function(scalingModel){
 #' @import cowplot
 #'
 #' @return land use results figure (also writes figure to file)
-areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
+areaMapFunction <- function(shapefile_fin) {
   theme_set(theme_classic())
   
   ##GET DATA
   results <- shapefile_fin$shapefile
-  regions <- val_shapefile_fin$shapefile
   
   # CONUS boundary
   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
@@ -668,10 +668,6 @@ areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
             color='black',
             size=1.25,
             alpha=0)+
-    # geom_sf(data=regions,
-    #         aes(color=region),
-    #         size=1.5,
-    #         alpha=0)+
     scale_fill_gradientn(name='% ephemeral drainage area',
                          colors=c('white', '#2c6e49', '#173B27'),
                          limits=c(0,100),
@@ -702,7 +698,23 @@ areaMapFunction <- function(shapefile_fin, val_shapefile_fin) {
 #' @name hydrographyFigure
 #'
 #' @param shapefile_fin: final model results shapefile
-#' @param many many river networks
+#' @param net_0108_results model results
+#' @param net_1023_results model results
+#' @param net_0313_results model results
+#' @param net_1503_results model results
+#' @param net_1306_results model results
+#' @param net_0804_results model results
+#' @param net_0501_results model results
+#' @param net_1703_results model results
+#' @param net_0703_results model results
+#' @param net_0304_results model results
+#' @param net_1605_results model results
+#' @param net_1507_results model results
+#' @param net_0317_results model results
+#' @param net_0506_results model results
+#' @param net_0103_results model results
+#' @param net_1709_results model results
+#' 
 #'
 #' @import sf
 #' @import dplyr

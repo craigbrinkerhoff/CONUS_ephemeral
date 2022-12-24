@@ -86,23 +86,67 @@ depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
 #' @param precip: flowing on/off binary timeseries as a vector [0/1]
 #' @param memory: number of days lag that runoff is still being generated from a rain event [days]
 #' @param thresh: runoff threshold as set in main analysis [m]
+#' #'
+#' #' @return updated flowing on/off binary timeseries (with lagged days now flagged as flowing too)
+#' addingRunoffMemory <- function(precip, memory, thresh){
+#'   precip <- precip[is.na(precip)==0]
+#'   if(length(precip)==0){return(NA)}
+#'   
+#'   orig <- precip
+#'   for(i in 1:length(precip)){
+#'     if(precip[i] == 1 & orig[i] == 1){
+#'       for(k in seq(1+i,memory+i-1,1)){
+#'         precip[k] <- 1
+#'       }
+#'     }
+#'   }
+#'   precip <- sum(precip >= thresh)
+#'   return(precip)
+#' }
+
+
+
+
+#' Adds 'memory days' to number of flowing days timeseries given a lag time.
+#' 
+#' @note This function specifically avoids double counting flowing days, by only adding memory flowing days if the day is not already tagged as flowing
+#'
+#' @name addingRunoffMemory
+#'
+#' @param precip: flowing on/off binary timeseries as a vector [0/1]
+#' @param memory: number of days lag that runoff is still being generated from a rain event [days]
+#' @param thresh: runoff threshold (expressed as precip) as set in main analysis [m]
 #'
 #' @return updated flowing on/off binary timeseries (with lagged days now flagged as flowing too)
 addingRunoffMemory <- function(precip, memory, thresh){
   precip <- precip[is.na(precip)==0]
   if(length(precip)==0){return(NA)}
   
+  #set up binary vectors
+  precip <- precip >= thresh
   orig <- precip
-  for(i in 1:length(precip)){
-    if(precip[i] == 1 & orig[i] == 1){
-      for(k in seq(1+i,memory+i-1,1)){
-        precip[k] <- 1
+
+  if(memory == 0){
+    out <- sum(precip)
+  }
+  else{
+    #propogate memory for days following runoff events
+    for(i in 1:length(precip)){
+      if(precip[i] == 1 & orig[i] == 1){
+        for(k in seq(1+i,memory+i,1)){
+          precip[k] <- 1
+        }
       }
     }
+
+    #sum up flowing days
+    out <- sum(precip)
   }
-  precip <- sum(precip >= thresh)
-  return(precip)
+
+  return(out)
 }
+
+
 
 
 
@@ -114,10 +158,10 @@ addingRunoffMemory <- function(precip, memory, thresh){
 #' @param n: number of reaches/terms to sum
 #'
 #' @return linear, uniform, error propagation [km3/yr]
-QlaterrorPropogation <- function(sigma, n) {
-  out <- sqrt(sigma^2*n)*365*86400*1e-9 #km3/yr equivalent: sqrt(n)*sigma*86400*365*1e-9
-  return(out)
-}
+# QlaterrorPropogation <- function(sigma, n) {
+#   out <- sqrt(sigma^2*n)*365*86400*1e-9 #km3/yr equivalent: sqrt(n)*sigma*86400*365*1e-9
+#   return(out)
+# }
 
 
 
@@ -169,7 +213,6 @@ fixGeometries <- function(rivnet){
 #'
 #' @param combined_levels_lvlx: combined targets for each processing level
 #'
-#'
 #' @return data frame of all combined targets at each processing level into a single dataset of basin flux results
 aggregateAllLevels <- function(combined_lvl0, combined_lvl1, combined_lvl2, combined_lvl3, combined_lvl4,
                                combined_lvl5, combined_lvl6, combined_lvl7, combined_lvl8, combined_lvl9,
@@ -189,3 +232,49 @@ aggregateAllLevels <- function(combined_lvl0, combined_lvl1, combined_lvl2, comb
 }
 
 
+
+
+
+#' Plots and saves mean annual hydrographs so we can manually verify these are 'more ephemeral than intermittent' (and vice versa)
+#'
+#' @name ephemeralityChecker
+#'
+#' @param other_sites: df with all the gage IDs
+#' 
+#' @import ggplot2
+#' @import dplyr
+#' @import dataRetrieval
+#'
+#' @return writes plots to file
+ephemeralityChecker <- function(other_sites) {
+  other_sites$wy_eph_gages <- substr(other_sites$name, 6,nchar(other_sites$name))
+  
+  wy_eph_Q <- data.frame()
+  for(i in other_sites$wy_eph_gages){
+    gageQ <- readNWISstat(siteNumbers = i, #check if site mets our date requirements
+                        parameterCd = '00060') #discharge
+    
+    #get mean annual flow
+    if(nrow(gageQ)==0){next} #some go these gages don't have their data online (in local USGS offices only.....)
+    
+    gageQ <- gageQ %>% 
+      dplyr::mutate(Q_cms = mean_va*0.0283)#cfs to cms with zero flow rounding protocol following:  https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794
+    
+    gageQ$index <- 1:nrow(gageQ)
+    
+    end <- gageQ[1,]$end_yr
+    begin <- gageQ[1,]$begin_yr
+    #maxPlot <- ifelse(max(gageQ$Q_cms) > 25, 25, max(gageQ$Q_cms))
+
+    plot <- ggplot(gageQ, aes(x=index, y=Q_cms)) +
+      geom_line() +
+    #  coord_cartesian(ylim=c(0,maxPlot)) +
+      ggtitle(paste0(begin, '-', end)) +
+      xlab('Date') +
+      ylab('Q [cms]')
+    
+    ggsave(paste0('cache/check_usgs_eph_hydrographs/', i, '.jpg'),plot, width=15, height=7)
+    
+  }
+  return(wy_eph_Q)
+}

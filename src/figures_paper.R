@@ -243,6 +243,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
 #' @name streamOrderPlot
 #'
 #' @param combined_results_by_order: df of model results per stream order
+#' @param combined_results: df of model results
 #'
 #' @import dplyr
 #' @import ggplot2
@@ -250,7 +251,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
-streamOrderPlot <- function(combined_results_by_order, combined_results, theoretical_curve){
+streamOrderPlot <- function(combined_results_by_order, combined_results){
   theme_set(theme_classic())
   
   #get regions
@@ -378,8 +379,8 @@ streamOrderPlot <- function(combined_results_by_order, combined_results, theoret
 #'
 #' @name flowingFigureFunction
 #'
-#' @param joinedData: df of flowing days field data joined to huc4 basin model results
 #' @param shapefile_fin: final sf object with flowing days results
+#' @param joinedData: df of flowing days field data joined to huc4 basin model results
 #'
 #' @import sf
 #' @import dplyr
@@ -408,23 +409,9 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   states <- sf::st_union(states)
   
   ##SETUP FIELD VERIFICATION STUFF
-  joinedData$n_flw_d <- round(joinedData$n_flw_d, 0)
-  joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys, 0)
-  joinedData$num_flowing_dys_sigma <- round(joinedData$num_flowing_dys_sigma, 0)
-  
-  #take basin average of field data
-  joinedData <- joinedData %>%
-    dplyr::group_by(huc4) %>%
-    dplyr::summarise(name=first(name),
-                     num_flowing_dys = mean(num_flowing_dys),
-                     num_flowing_dys_sigma = mean(num_flowing_dys_sigma),
-                     n_flw_d = mean(n_flw_d),
-                     num_sample_yrs = mean(num_sample_yrs),
-                     n_sites = sum(n_sites))# %>%
-   # dplyr::filter(huc4 != '1012')
-  
+  joinedData$num_flowing_dys <- joinedData$num_flowing_dys
   joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
-
+  
   ##MAIN MAP------------------------------------------
   flowingDaysFig <- ggplot(results) +
     geom_sf(aes(fill=num_flowing_dys), #observed
@@ -458,18 +445,38 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
     xlab('')+
     ylab('')
   
-  ##VERIFICATION FIGURE------------------
-  flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys, ymin=num_flowing_dys-num_flowing_dys_sigma, ymax=num_flowing_dys+num_flowing_dys_sigma, fill=region))+
-    geom_abline(size=2, linetype='dashed', color='darkgrey')+
-    geom_pointrange(size=3, fatten=5, pch=23, color='black')+
-   # geom_smooth(aes(fill=NULL), color='black', method='lm', se=F, size=2, show.legend = FALSE)+
+  ##VERIFICATION FIGURE------------------  
+  #ymin=num_flowing_dys-num_flowing_dys_sigma, ymax=num_flowing_dys+num_flowing_dys_sigma
+  flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys, fill=region))+
+    geom_abline(size=2, fatten=5, linetype='dashed', color='darkgrey')+
+    geom_point(size=10,  pch=23, color='black')+
     scale_fill_manual(name='',
                       values=c('#264653', '#2a9d8f'))+
     ylab('Predicted days/yr')+
     xlab('Measured days/yr')+
-    ylim(0,125)+
-    xlim(0,125)+
+ #   ylim(0,365)+
+  #  xlim(0,365)+
+    # scale_x_log10(limits=c(1,365))+
+    # scale_y_log10(limits=c(1,365))+
     labs(tag='B')+
+    theme(axis.text=element_text(size=24),
+          axis.title=element_text(size=26,face="bold"),
+          plot.title = element_text(size = 30, face = "bold"),
+          legend.position=c(0.85, 0.20),
+          legend.title =element_blank(),
+          legend.text = element_text(family = "Futura-Medium", size = 26),
+          legend.key = element_rect(fill = "grey"),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.spacing.x = unit(1.5, 'cm')) +
+    guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
+  
+  ##HISTOGRAM FIGURE------------------
+  flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
+    geom_histogram(size=2, fill='lightblue', color='black', bins=20)+
+    xlab('Measured days/yr')+
+    ylab('# basins')+
+    labs(tag='C')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
           plot.title = element_text(size = 30, face = "bold"),
@@ -493,9 +500,158 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
    BBCC
    "
   
-  comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, design=design)
+  comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysHist, design=design)
   
   
   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
   return('see cache/paper_figures/fig3.jpg')
 }
+
+
+
+
+
+
+#' 
+#' #' create ephemeral flow frequency paper figure (fig 3)
+#' #'
+#' #' @name flowingFigureFunction
+#' #'
+#' #' @param shapefile_fin: final sf object with flowing days results
+#' #' @param joinedData: df of flowing days field data joined to huc4 basin model results
+#' #' @param model
+#' #' @param combined_runoffEff
+#' #' @param combined_results
+#' #'
+#' #' @import sf
+#' #' @import dplyr
+#' #' @import ggplot2
+#' #' @import cowplot
+#' #' @import patchwork
+#' #'
+#' #' @return flowing days figure (also writes figure to file)
+#' flowingFigureFunction_new <- function(shapefile_fin, joinedData, model, combined_runoffEff, combined_results) {
+#'   theme_set(theme_classic())
+#'   
+#'   ##GET DATA
+#'   results <- shapefile_fin$shapefile
+#'   results <- dplyr::filter(results, is.na(num_flowing_dys)==0)
+#'   
+#'   # CONUS boundary
+#'   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+#'   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+#'                                                 'American Samoa',
+#'                                                 'Commonwealth of the Northern Mariana Islands',
+#'                                                 'Guam',
+#'                                                 'District of Columbia',
+#'                                                 'Puerto Rico',
+#'                                                 'United States Virgin Islands',
+#'                                                 'Hawaii'))) #remove non CONUS states/territories
+#'   states <- sf::st_union(states)
+#'   
+#'   ##SETUP FIELD VERIFICATION STUFF
+#'   combined_results <- dplyr::select(combined_results, c('huc4', 'median_eph_drainagearea_km2'))
+#' 
+#'   joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
+#'   #join together
+#'   joinedData <- dplyr::left_join(joinedData, combined_runoffEff, by='huc4')
+#'   
+#'   #fit model following runoff generation literature using runoff eff as proxy for antecedent soil moisure index
+#'   joinedData$log_n_flw_d<- log(joinedData$n_flw_d)
+#'   joinedData$log_precip_ma_mm_yr_runoff_eff <- log(joinedData$precip_ma_mm_yr + joinedData$runoff_eff + joinedData$drainage_area_km2)
+#'   model <- lm(log_n_flw_d ~ log_precip_ma_mm_yr_runoff_eff, data=joinedData)
+#'   joinedData$num_flowing_dys <- exp(predict(model, joinedData))
+#'   
+#'   ##MAIN MAP------------------------------------------
+#'   flowingDaysFig <- ggplot(results) +
+#'     geom_sf(aes(fill=num_flowing_dys), #observed
+#'             color='black',
+#'             size=0.5) + #map
+#'     scale_fill_gradientn(name='Average annual ephemeral flow days',
+#'                          colors = c("#FF4B1F", "#f7e9e8", "#044976"),
+#'                          guide = guide_colorbar(direction = "horizontal",title.position = "bottom"))+
+#'     ggnewscale::new_scale_fill()+ #'resets' scale so we can do two scale_fills in the same plot
+#'     geom_sf(data=states,
+#'             color='black',
+#'             size=1.0,
+#'             alpha=0)+ #conus domain
+#'     geom_sf(data=joinedData,
+#'             aes(fill=region),
+#'             size=10,
+#'             pch=23,
+#'             stroke=2)+ #verification data locations
+#'     scale_fill_manual(name='',
+#'                       values=c('#264653', '#2a9d8f'),
+#'                       guide='none')+
+#'     labs(tag='A')+
+#'     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+#'     theme(legend.position = c(.2, 0.1),
+#'           legend.key.size = unit(2, 'cm'))+ #legend position settings
+#'     theme(text = element_text(family = "Futura-Medium"), #legend text settings
+#'           legend.title = element_text(face = "bold", size = 20),
+#'           legend.text = element_text(family = "Futura-Medium", size = 18),
+#'           plot.tag = element_text(size=26,
+#'                                   face='bold'))+
+#'     xlab('')+
+#'     ylab('')
+#'   
+#'   ##VERIFICATION FIGURE------------------
+#'   flowingDaysVerifyFig <- ggplot(joinedData, aes(y=n_flw_d, x=precip_ma_mm_yr+(100*runoff_eff)+(drainage_area_km2))) +
+#'     geom_point(size=7)+
+#'     geom_smooth(method='lm', fullrange=TRUE, se=F) +
+#'     scale_x_log10()+
+#'     scale_y_log10(limits=c(1,500),
+#'                   labels=c(1,10,100,500),
+#'                   breaks=c(1,10,100,500))+
+#'     annotation_logticks() +
+#'     ylab('In situ annual\nephemeral flow days')+
+#'     xlab('Precip + Runoff coefficient\n+ Drainage area')+
+#'     labs(tag='B')+
+#'     theme(axis.text=element_text(size=24),
+#'           axis.title=element_text(size=26,face="bold"),
+#'           plot.title = element_text(size = 30, face = "bold"),
+#'           legend.position=c(0.20, 0.85),
+#'           legend.title =element_blank(),
+#'           legend.text = element_text(family = "Futura-Medium", size = 26),
+#'           legend.key = element_rect(fill = "grey"),
+#'           plot.tag = element_text(size=26,
+#'                                   face='bold'),
+#'           legend.spacing.x = unit(1.5, 'cm')) +
+#'     guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
+#'   
+#'   ##HISTOGRAM FIGURE------------------
+#'   flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
+#'     geom_histogram(size=2, fill='lightblue', color='black', bins=20)+
+#'     xlab('Average annual ephemeral flow days')+
+#'     ylab('# basins')+
+#'     labs(tag='C')+
+#'     xlim(0,365)+
+#'     theme(axis.text=element_text(size=24),
+#'           axis.title=element_text(size=26,face="bold"),
+#'           plot.title = element_text(size = 30, face = "bold"),
+#'           legend.position=c(0.20, 0.85),
+#'           legend.title =element_blank(),
+#'           legend.text = element_text(family = "Futura-Medium", size = 26),
+#'           legend.key = element_rect(fill = "grey"),
+#'           plot.tag = element_text(size=26,
+#'                                   face='bold'),
+#'           legend.spacing.x = unit(1.5, 'cm')) +
+#'     guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
+#'   
+#'   ##COMBO PLOT------------------------
+#'   design <- "
+#'    AAAA
+#'    AAAA
+#'    AAAA
+#'    AAAA
+#'    AAAA
+#'    BBCC
+#'    BBCC
+#'    "
+#'   
+#'   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysHist, design=design)
+#'   
+#'   
+#'   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
+#'   return('see cache/paper_figures/fig3.jpg')
+#' }

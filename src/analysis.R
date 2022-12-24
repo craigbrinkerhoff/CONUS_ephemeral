@@ -389,7 +389,6 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 
 
 
-
 #' Calculates a first-order runoff-generation threshold [mm/dy] using geomorphic scaling a characteristic minimum headwater stream width from Allen et al. 2018
 #' Will run Monte Carlo uncertainty simulation if munge_mc is on
 #' 
@@ -432,6 +431,68 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
 }
 
 
+#' 
+#' 
+#' 
+#' #' Calculates a first-order 'number flowing days' per HUC4 basin using long-term runoff ratio and daily precip for 1980-2010.
+#' #' Will run Monte Carlo analysis for uncertainty if the munge is turned on
+#' #'
+#' #' @name calcFlowingDays
+#' #'
+#' #' @param path_to_data: path to data repo
+#' #' @param huc4: huc basin level 4 code
+#' #' @param runoff_eff: calculated runoff ratio per HUC4 basin
+#' #' @param runoff_thresh: [mm] a priori runoff threshold for 'streamflowflow generation'
+#' #' @param runoffEffScalar: [percent] sensitivty parameter to use to perturb model sensitivty to runoff efficiency
+#' #' @param runoffMemory: sensitivity parameter to test 'runoff memory' in number of flowing days calculation: even if rain stops, there will be some overland flow and interflow that are delayed in their reaching the river
+#' #' @param munge_mc: binary indicating whether to run nromal model or MC uncertainty
+#' #'
+#' #' @import terra
+#' #' @import raster
+#' #'
+#' #' @return number of flowing days for a given HUC4 basin
+#' calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, runoffMemory, munge_mc){
+#'   #get basin to clip precip model
+#'   huc2 <- substr(huc4, 1, 2)
+#'   basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
+#'   basin <- basins[basins$huc4 == huc4,]
+#' 
+#'   #add year gridded precip
+#'   precip <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1980_2010.gri')) #daily precip for 1980-2010
+#'   precip <- raster::rotate(precip) #convert 0-360 lon to -180-180 lon
+#'   basin <- terra::project(basin, '+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ')
+#'   basin <- as(basin, 'Spatial')
+#'   precip <- raster::crop(precip, basin)
+#'   
+#'   #Monte Carlo calculation------------------------
+#'   if(munge_mc == 1){
+#'     set.seed(321)
+#'     n <- 1000
+#'     numFlowingDays_distrib <- 1:n
+#'     for(i in 1:n){
+#'       thresh <- runoff_thresh[i] / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
+#'       precip_t <- raster::calc(precip, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required)
+#'       
+#'       numFlowingDays <- (raster::cellStats(precip_t, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
+#'       numFlowingDays <- (numFlowingDays/(31*365))*365 #average number of dys per year across the record (31 years)
+#'       
+#'       numFlowingDays_distrib[i] <- numFlowingDays
+#'     }
+#'     return(sd(numFlowingDays_distrib, na.rm=T))
+#'   }
+#'   
+#'   #Normal calculation-----------------------------
+#'   else{
+#'     #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency (both calculated per basin previously)
+#'     thresh <- runoff_thresh / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
+#'     precip <- raster::calc(precip, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required)
+#'     
+#'     numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
+#'     numFlowingDays <- (numFlowingDays/(31*365))*365 #average number of dys per year across the record (31 years)
+#'     
+#'     return(numFlowingDays) 
+#'   }
+#' }
 
 
 
@@ -453,7 +514,11 @@ calcRunoffThresh <- function(rivnet, munge_mc) {
 #'
 #' @return number of flowing days for a given HUC4 basin
 calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, runoffMemory, munge_mc){
-  #get basin to clip wtd model
+if(is.na(runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff)){ #great lakes handling
+  return(NA)
+}
+
+  #get basin to clip precip model
   huc2 <- substr(huc4, 1, 2)
   basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
   basin <- basins[basins$huc4 == huc4,]
@@ -471,11 +536,11 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
     n <- 1000
     numFlowingDays_distrib <- 1:n
     for(i in 1:n){
-      thresh <- runoff_thresh[i] / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient (because proportion of P that becomes Q varies regionally)
+      thresh <- runoff_thresh[i] / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
       precip_t <- raster::calc(precip, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required)
       
       numFlowingDays <- (raster::cellStats(precip_t, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
-      numFlowingDays <- (numFlowingDays/(31*365))*365 #average number of dys per year across the record (31 years)
+      numFlowingDays <- numFlowingDays/10 #average number of dys per year across the record (31 years)
       
       numFlowingDays_distrib[i] <- numFlowingDays
     }
@@ -485,15 +550,50 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
   #Normal calculation-----------------------------
   else{
     #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency (both calculated per basin previously)
-    thresh <- runoff_thresh / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient (because proportion of P that becomes Q varies regionally)
+    thresh <- runoff_thresh / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
     precip <- raster::calc(precip, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required)
     
     numFlowingDays <- (raster::cellStats(precip, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
-    numFlowingDays <- (numFlowingDays/(31*365))*365 #average number of dys per year across the record (31 years)
+    numFlowingDays <- numFlowingDays/10 #average number of dys per year across the record (31 years)
     
     return(numFlowingDays) 
   }
 }
+
+
+
+numFlowingDaysModel <- function(validationData, combined_runoffEff){
+  validationData <- as.data.frame(validationData)
+  validationData <- dplyr::select(validationData, !'geometry')
+  
+  #join together
+  df <- dplyr::left_join(validationData, combined_runoffEff, by='huc4')
+  
+  #fit model following runoff generation literature using runoff eff as proxy for antecedent soil moisure index
+  df$log_n_flw_d <- log(df$n_flw_d)
+  df$log_precip_ma_mm_yr_runoff_eff <- log(df$precip_ma_mm_yr + df$runoff_eff + df$drainage_area_km2)
+  model <- lm(log_n_flw_d ~ log_precip_ma_mm_yr_runoff_eff, data=df)
+  
+  return(model)
+}
+
+# 
+# numFlowingDays_modeled <- function(model, runoffEff, results){
+#   #model inputs
+#   runoff_eff <- runoffEff[1,]$runoff_eff
+#   precip_ma_mm_yr <- runoffEff[1,]$precip_ma_mm_yr
+#   median_da_km2 <- results[1,]$median_eph_drainagearea_km2
+# 
+#   df <- data.frame('runoffEff'=runoff_eff,
+#                    'precip_ma_mm_yr'=precip_ma_mm_yr,
+#                    'median_da_km2'=median_da_km2)
+#   
+#   #apply model
+#   df$log_precip_ma_mm_yr_runoff_eff <- log(df$precip_ma_mm_yr + df$runoffEff + df$median_da_km2)
+#   df$num_flowing_dys <- exp(predict(model, df))
+#   
+#   return(df$num_flowing_dys)
+# }
 
 
 
@@ -604,12 +704,12 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 #'
 #' @param rivNetFin: model results hydrography
 #' @param huc4: huc basin level 4 code
-#' @param num_flowing_dys: model estimated number of flowing days (basin average)
+#' @param numFlowingDays: model estimated number of flowing days (basin average)
 #' 
 #' @import dplyr
 #'
 #' @return fraction of exported water and drainage area that is ephemeral
-getResultsExported <- function(nhd_df, huc4, num_flowing_dys){
+getResultsExported <- function(nhd_df, huc4, numFlowingDays){
   #water volume ephemeral fraction at outlets
   exportDF <- dplyr::group_by(nhd_df, TerminalPa) %>%
     dplyr::arrange(desc(Q_cms)) %>% 
@@ -620,12 +720,14 @@ getResultsExported <- function(nhd_df, huc4, num_flowing_dys){
   percAreaEph_exported <- sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach)/sum(exportDF$TotDASqKm)
   n_total <- nrow(nhd_df)
   n_eph <- sum(nhd_df$perenniality == 'ephemeral')
+  median_eph_DA_km <- median(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$TotDASqKm  > 0,]$TotDASqKm, na.rm=T)
   
   return(data.frame('percQEph_exported'=percQEph_exported,
                     'percAreaEph_exported'=percAreaEph_exported,
                     'QEph_exported_cms'= sum(exportDF$Q_cms*exportDF$percQEph_reach),
                     'AreaEph_exported_km2'= sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach),
-                    'num_flowing_dys'=num_flowing_dys,
+                    'median_eph_drainagearea_km2'=median_eph_DA_km,
+                    'num_flowing_dys'=numFlowingDays,
                     'n_eph'=n_eph,
                     'n_total'=n_total,
                     'huc4'=huc4))

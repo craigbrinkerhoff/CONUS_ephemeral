@@ -28,7 +28,7 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Paper (validation)**: https://doi.org/10.1029/2007JD009132
   - **Paper (algorithm):** https://doi.org/10.1175/JHM583.1
   - **Resolution/Scale:** 28km
-  - 1980-2010
+  - 1980-2010 (currently using 1980-1990)
 
 - CONUS hydrography and mean annual streamflow model
   - **Filename:** `src/CONUS_ephemeral_data/` directories
@@ -36,7 +36,7 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Resolution/Scale:** 1:24,000
   - **Years:** 1970-2000 (streamflow validated against 1970-2018)
 
-- USGS Streamgauge data to validate NHD streamflow model
+- USGS Streamgauge data to validate NHD streamflow model and $N_{flw}$ model
   - **Filename:** `cache/training` directory
   - **Data:** Accessed via `dataRetrieval` R package
   - **Resolution/Scale:** NA

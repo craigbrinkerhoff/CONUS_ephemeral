@@ -8,81 +8,56 @@
 #' 
 #' @note: these are the ephemeral streams we will have data for (Walnut Gulch and some temp USGS gages in WYoming/Colorado from the 70s)
 #'
-#' @param rivNetFin_1505: routing model result for basin
-#' @param path_to_data: charater string to data repo
+#' @param path_to_data: character string to data repo
+#' @param walnutGulch: walnut gulch data frame for runoff data\
+#' @param other_sites: usgs ephemeral gauge list
+#' @param rivNetFin_x: routing model result for basin x
 #'
 #' @import sf
 #' @import dataRetrieval
 #' @import dplyr
 #'
 #' @return ephemeral streams mean annual flow paired with model reach and model discharge
-setupEphemeralQValidation <- function(path_to_data, walnutGulch, other_sites, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408){
-  #USGS ephemeral gages-----------------------------------------------------------
-  other_sites$wy_eph_gages <- substr(other_sites$name, 6,nchar(other_sites$name))
-
-  wy_eph_Q <- data.frame()
-  for(i in other_sites$wy_eph_gages){
-    gageQ <- readNWISdv(siteNumbers = i, #check if site mets our date requirements
-                        parameterCd = '00060') #discharge
+setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDischarge, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305){
+  ephemeralUSGSDischarge <- #dplyr::left_join(ephemeralUSGSDischarge, other_sites, by=c('gageID'='wy_eph_gages')) %>%
+    sf::st_as_sf(ephemeralUSGSDischarge, coords=c('lon', 'lat'))
+  
+  sf::st_crs(ephemeralUSGSDischarge) <- sf::st_crs('epsg:4269')
+  
+  rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305)
+  
+  #join to networks iteratively to handle memory overloading...
+  out <- data.frame()
+  for (i in 1:nrow(ephemeralUSGSDischarge)){
+    huc4 <- ephemeralUSGSDischarge[i,]$huc4
+    huc2 <- substr(huc4, 1, 2)
     
-    #get mean annual flow
-    gageQ <- gageQ %>% 
-      dplyr::mutate(Q_cms = X_00060_00003*0.0283) #cfs to cms
+    network <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+    network<- sf::st_zm(network)
     
-      Q_MA <- mean(gageQ$Q_cms, na.rm=T) #mean annual
-      numFlow <- (sum(round(gageQ$Q_cms,2) > 0, na.rm=T)/nrow(gageQ))*365
-
-    temp <- data.frame('gageID'=i, #take first row
-                       'meas_runoff_m3_s'=Q_MA,
-                       'num_flowing_dys'=numFlow,
-                       'period_of_record_yrs'=nrow(gageQ)/365)
+    coords <- sf::st_coordinates(sf::st_centroid(network$Shape)) #get each line centroid
+    utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude
+    epsg <- as.numeric(paste0('326', as.character(utm_zone)))
     
-    wy_eph_Q <- rbind(wy_eph_Q, temp)
+    validationDF <- sf::st_transform(ephemeralUSGSDischarge, epsg)
+    network <- sf::st_transform(network, epsg)
+    
+    network <- dplyr::left_join(network, rivNetFin, 'NHDPlusID')
+    network <- dplyr::filter(network, is.na(perenniality)==0)
+    
+    temp <- sf::st_join(ephemeralUSGSDischarge, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
+    out <- rbind(out, temp)
   }
-  
-  wy_eph_Q <- dplyr::left_join(wy_eph_Q, other_sites, by=c('gageID'='wy_eph_gages')) %>%
-    sf::st_as_sf(coords=c('lon', 'lat'))
-  
-  sf::st_crs(wy_eph_Q) <- sf::st_crs('epsg:4269')
-  
-  #1008
-  network1 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1008_HU4_GDB/NHDPLUS_H_1008_HU4_GDB.gdb', layer='NHDFlowline')
-  network2 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1009_HU4_GDB/NHDPLUS_H_1009_HU4_GDB.gdb', layer='NHDFlowline')
-  network3 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1012_HU4_GDB/NHDPLUS_H_1012_HU4_GDB.gdb', layer='NHDFlowline')
-  network4 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1404_HU4_GDB/NHDPLUS_H_1404_HU4_GDB.gdb', layer='NHDFlowline')
-  network5 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1408_HU4_GDB/NHDPLUS_H_1408_HU4_GDB.gdb', layer='NHDFlowline')
-  
-  network <- rbind(network1, network2, network3, network4, network5)
-  network<- sf::st_zm(network)
-  
-  #project to correct UTM zones------------------------
-  coords <- sf::st_coordinates(sf::st_centroid(network$Shape)) #get each line centroid
-  utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude
-  epsg <- as.numeric(paste0('326', as.character(utm_zone)))
-  
-  validationDF <- sf::st_transform(wy_eph_Q, epsg)
-  network <- sf::st_transform(network, epsg)
-  
-  rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408)
-  
-  network <- dplyr::left_join(network, rivNetFin, 'NHDPlusID')
-  network <- dplyr::filter(network, is.na(perenniality)==0)
-  
-  #snap to network----------------------------
-  #grab everything within a kilometer of the field point
-  out <- sf::st_join(wy_eph_Q, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
   
   #keep the one with the best matching drainage area (must also be within 5% of drainage area agreement)
   out <- dplyr::group_by(out, gageID) %>%
     dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
     dplyr::filter(error < 0.20) %>%
     dplyr::slice_min(error, with_ties=FALSE, n=1) %>% #ties are pretty much never going to happen, but still need something...
-    dplyr::select(c('NHDPlusID', 'huc4', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'num_flowing_dys','TotDASqKm', 'gageID', 'period_of_record_yrs')) %>%
-    dplyr::mutate(type = ifelse(gageID %in% c('09216527', '09216545', '09216562', '09216565', '09216750', '09222300', '09222400', '09235300'), 'eph_int', 'eph'))
-    
-  return(out)
+    dplyr::select(c('NHDPlusID', 'huc4', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'num_flowing_dys','TotDASqKm', 'gageID', 'period_of_record_yrs'))
+ 
+   return(out)
 }
-
 
 
 

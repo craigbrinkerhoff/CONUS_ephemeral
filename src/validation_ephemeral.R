@@ -208,7 +208,8 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 #'
 #' @param rivNetFin_0106: 0106 river network, needed to pair field data in 0106 with model results
 #' @param rivNetFin_0108: 0108 river network, needed to pair field data in 0108 with model results
-#' @param our field-assessed river ephemerality classifications in New England (summer 2022)
+#' @param path_to_data: path to data directory
+#' @param field_dataset our field-assessed river ephemerality classifications in New England (summer 2022)
 #'
 #' @import dplyr
 #'
@@ -242,6 +243,8 @@ addOurFieldData <- function(rivNetFin_0106, rivNetFin_0108, path_to_data, field_
   field_dataset <- dplyr::select(field_dataset, c('method', 'NHDPlusID', 'dataset', 'snap_distance_m', 'network_utm_zone', 'JD_ID', 'resource_type', 'project_id', 'wotus_class', 'huc8', 'huc4', 'distinction', 'geometry', 'perenniality', 'StreamOrde'))
   return(field_dataset)
 }
+
+
 
 
 
@@ -339,6 +342,8 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
 
   return(out)
 }
+
+
 
 
 
