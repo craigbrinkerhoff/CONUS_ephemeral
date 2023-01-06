@@ -77,35 +77,6 @@ depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
 
 
 
-#' Adds 'memory days' to number of flowing days timeseries given a lag time.
-#' 
-#' @note This function specifically avoids double counting flowing days, by only adding memory flowing days if the day is not already tagged as flowing
-#'
-#' @name addingRunoffMemory
-#'
-#' @param precip: flowing on/off binary timeseries as a vector [0/1]
-#' @param memory: number of days lag that runoff is still being generated from a rain event [days]
-#' @param thresh: runoff threshold as set in main analysis [m]
-#' #'
-#' #' @return updated flowing on/off binary timeseries (with lagged days now flagged as flowing too)
-#' addingRunoffMemory <- function(precip, memory, thresh){
-#'   precip <- precip[is.na(precip)==0]
-#'   if(length(precip)==0){return(NA)}
-#'   
-#'   orig <- precip
-#'   for(i in 1:length(precip)){
-#'     if(precip[i] == 1 & orig[i] == 1){
-#'       for(k in seq(1+i,memory+i-1,1)){
-#'         precip[k] <- 1
-#'       }
-#'     }
-#'   }
-#'   precip <- sum(precip >= thresh)
-#'   return(precip)
-#' }
-
-
-
 
 #' Adds 'memory days' to number of flowing days timeseries given a lag time.
 #' 
@@ -204,6 +175,22 @@ fixGeometries <- function(rivnet){
 
 
 
+#' calculates mode of distribution
+#' 
+#' @name getMode
+#' 
+#' @param v: vector of values
+#' 
+#' @return mode of distribution of v
+getMode <- function(v){
+  v <- v[!is.na(v)]
+  uniqv <- unique(v)
+  out <- uniqv[which.max(tabulate(match(v, uniqv)))]
+  
+  return(out)
+}
+
+
 
 
 
@@ -264,11 +251,9 @@ ephemeralityChecker <- function(other_sites) {
     
     end <- gageQ[1,]$end_yr
     begin <- gageQ[1,]$begin_yr
-    #maxPlot <- ifelse(max(gageQ$Q_cms) > 25, 25, max(gageQ$Q_cms))
 
     plot <- ggplot(gageQ, aes(x=index, y=Q_cms)) +
       geom_line() +
-    #  coord_cartesian(ylim=c(0,maxPlot)) +
       ggtitle(paste0(begin, '-', end)) +
       xlab('Date') +
       ylab('Q [cms]')

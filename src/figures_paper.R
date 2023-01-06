@@ -10,7 +10,7 @@
 #'
 #' @param shapefile_fin: final sf object with model results
 #' @param net_0107_results: final river network results for basin 0107
-#' @param net_1804_results: final river network results for basin 1804
+#' @param net_0701_results: final river network results for basin 0701
 #' @param net_1407_results: final river network results for basin 1407
 #' @param net_1305_results: final river network results for basin 1305
 #'
@@ -24,7 +24,7 @@
 #' @import patchwork
 #'
 #' @return main model results figure (also writes figure to file)
-mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results, net_1407_results, net_1305_results) {
+mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results, net_1407_results, net_1305_results) {
   theme_set(theme_classic())
 
   ##GET DATA
@@ -48,9 +48,9 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
 
   #labels for select basins with subplots
   results$ids_west <- ifelse(results$huc4 == '1305', 'B',
-                         ifelse(results$huc4 == '1804', 'E',
-                                ifelse(results$huc4 == '1407', 'C',NA)))
+                                ifelse(results$huc4 == '1407', 'C',NA))
   results$ids_east <- ifelse(results$huc4 == '0107', 'D',NA)
+  results$ids_gl <- ifelse(results$huc4 == '0701', 'E',NA)
 
   #MAIN MAP------------------------------------------------------------------------------
   results_map <- ggplot(results) +
@@ -77,6 +77,14 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                         show.legend = FALSE,
                         ylim=c(30,40),
                         xlim=c(-72.5,-70))+
+    ggsflabel::geom_sf_label_repel(aes(label=ids_gl),
+                                   fontface = "bold",
+                                   size =12,
+                                   segment.size=3,
+                                   segment.color='#564C4D',
+                                   show.legend = FALSE,
+                                   ylim=c(48,50),
+                                   xlim=c(-88,-87))+
     scale_fill_gradientn(name='% Discharge ephemeral',
                          colors=c('white', '#3E1F47'),#164d71
                          guide = guide_colorbar(direction = "horizontal",
@@ -146,12 +154,12 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
     ylab('') +
     ggtitle(paste0('Lower Green River:\n', round(results[results$huc4 == '1407',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1407',]$percQ_eph,0), '%)'))
 
-  ##RIVER NETWORK MAP 1804---------------------------------------------------------------------------
-  net_1804 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_18/NHDPLUS_H_1804_HU4_GDB/NHDPLUS_H_1804_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1804 <- dplyr::left_join(net_1804, net_1804_results, 'NHDPlusID')
-  net_1804 <- dplyr::filter(net_1804, is.na(perenniality)==0)
+  ##RIVER NETWORK MAP 0701---------------------------------------------------------------------------
+  net_0701 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_07/NHDPLUS_H_0701_HU4_GDB/NHDPLUS_H_0701_HU4_GDB.gdb', layer='NHDFlowline')
+  net_0701 <- dplyr::left_join(net_0701, net_0701_results, 'NHDPlusID')
+  net_0701 <- dplyr::filter(net_0701, is.na(perenniality)==0)
 
-  hydrography_1804 <- ggplot(net_1804, aes(color=perenniality, size=Q_cms)) +
+  hydrography_0701 <- ggplot(net_0701, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='',
@@ -171,7 +179,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
                                face='bold'))+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('San Joaquin River:\n', round(results[results$huc4 == '1804',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1804',]$percQ_eph,0), '%)'))
+    ggtitle(paste0('Mississippi Headwaters:\n', round(results[results$huc4 == '0701',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0701',]$percQ_eph,0), '%)'))
   
 ##RIVER NETWORK MAP 1305-----------------------------------------------------------
   net_1305 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_13/NHDPLUS_H_1305_HU4_GDB/NHDPLUS_H_1305_HU4_GDB.gdb', layer='NHDFlowline')
@@ -226,7 +234,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_1804_results
     BCDE
     FFFF
     "
-    comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1407, D=hydrography_0107+theme(legend.position='none'), E=hydrography_1804, F=hydrography_legend, design=design)
+    comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1407, D=hydrography_0107+theme(legend.position='none'), E=hydrography_0701, F=hydrography_legend, design=design)
 
    ggsave('cache/paper_figures/fig1.jpg', comboPlot, width=20, height=20)
    return('see cache/paper_figures/fig1.jpg')
@@ -281,9 +289,9 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
               percArea_eph_order = mean(percAreaEph_reach_median*100),
               percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100) < 0,0,mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100)),
               percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)> 100,100,mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)),
-              percN_eph_order = mean(percNEph*100),
-              percN_eph_order_min = ifelse(mean(percNEph*100) - sd(percNEph*100) < 0,0,mean(percNEph*100) - sd(percNEph*100)),
-              percN_eph_order_max = ifelse(mean(percNEph*100) + sd(percNEph*100) < 0,0,mean(percNEph*100) + sd(percNEph*100)))
+              percLength_eph_order = mean(percLengthEph*100),
+              percLength_eph_order_min = ifelse(mean(percLengthEph*100) - sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) - sd(percLengthEph*100)),
+              percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) + sd(percLengthEph*100)))
 
   ####DISCHARGE PLOT--------------------
   plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order, group=region)) +
@@ -326,12 +334,12 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   
   ####N PLOT--------------------
-  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percN_eph_order, group=region)) +
-    geom_ribbon(aes(ymin=percN_eph_order_min, ymax=percN_eph_order_max), alpha=0.25) +
+  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percLength_eph_order, group=region)) +
+    geom_ribbon(aes(ymin=percLength_eph_order_min, ymax=percLength_eph_order_max), alpha=0.25) +
     geom_line(size=2)+
     geom_point(size=11)+
     xlab('') +
-    ylab('% ephemeral streams')+
+    ylab('% ephemeral streams by length')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -409,7 +417,15 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   states <- sf::st_union(states)
   
   ##SETUP FIELD VERIFICATION STUFF
-  joinedData$num_flowing_dys <- joinedData$num_flowing_dys
+  # joinedData <- dplyr::group_by(joinedData, huc4) %>%
+  #   dplyr::summarise(name=first(watershed),
+  #                    num_flowing_dys = mean(num_flowing_dys),
+  #                    n_flw_d = mean(n_flw_d),
+  #                    num_sample_yrs = mean(num_sample_yrs),
+  #                    n_sites = sum(n_sites))
+
+  joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys,0)
+  joinedData$n_flw_d <- round(joinedData$n_flw_d,0)
   joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
   
   ##MAIN MAP------------------------------------------
@@ -419,16 +435,16 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
             size=0.5) + #map
     scale_fill_gradientn(name='Average annual ephemeral flow days',
                          colors = c("#FF4B1F", "#f7e9e8", "#044976"),
-                         guide = guide_colorbar(direction = "horizontal",title.position = "bottom"))+
+                         guide = guide_colorbar(direction = "horizontal",title.position = "bottom"),
+                         limits= c(0,365))+
     ggnewscale::new_scale_fill()+ #'resets' scale so we can do two scale_fills in the same plot
     geom_sf(data=states,
             color='black',
             size=1.0,
             alpha=0)+ #conus domain
     geom_sf(data=joinedData,
-            aes(fill=region),
+            color='#650d1b',
             size=10,
-            pch=23,
             stroke=2)+ #verification data locations
     scale_fill_manual(name='',
                       values=c('#264653', '#2a9d8f'),
@@ -446,18 +462,16 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
     ylab('')
   
   ##VERIFICATION FIGURE------------------  
-  #ymin=num_flowing_dys-num_flowing_dys_sigma, ymax=num_flowing_dys+num_flowing_dys_sigma
-  flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys, fill=region))+
-    geom_abline(size=2, fatten=5, linetype='dashed', color='darkgrey')+
-    geom_point(size=10,  pch=23, color='black')+
-    scale_fill_manual(name='',
-                      values=c('#264653', '#2a9d8f'))+
-    ylab('Predicted days/yr')+
-    xlab('Measured days/yr')+
- #   ylim(0,365)+
-  #  xlim(0,365)+
-    # scale_x_log10(limits=c(1,365))+
-    # scale_y_log10(limits=c(1,365))+
+  flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys))+
+    geom_abline(size=2, linetype='dashed', color='darkgrey')+
+    geom_point(size=12, color='#650d1b', alpha=0.35)+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(n_flw_d~num_flowing_dys, data=joinedData))$r.squared,3)), x=50, y=350, size=9)+
+    annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(joinedData$n_flw_d, joinedData$num_flowing_dys),1) ~ frac(m^3,s)), x=50, y=300, size=9)+
+    annotate('text', label=paste0(nrow(joinedData), ' catchments'), x=300, y=50, size=9, color='black')+
+    ylab('Basin predicted days/yr')+
+    xlab('Catchment measured days/yr')+
+    ylim(0,365)+
+    xlim(0,365)+
     labs(tag='B')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
@@ -473,9 +487,10 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   
   ##HISTOGRAM FIGURE------------------
   flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
-    geom_histogram(size=2, fill='lightblue', color='black', bins=20)+
-    xlab('Measured days/yr')+
+    geom_histogram(size=2, fill='lightblue', color='black', binwidth=10)+
+    xlab('Predicted days/yr')+
     ylab('# basins')+
+    xlim(-10,365)+
     labs(tag='C')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
@@ -506,152 +521,3 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
   return('see cache/paper_figures/fig3.jpg')
 }
-
-
-
-
-
-
-#' 
-#' #' create ephemeral flow frequency paper figure (fig 3)
-#' #'
-#' #' @name flowingFigureFunction
-#' #'
-#' #' @param shapefile_fin: final sf object with flowing days results
-#' #' @param joinedData: df of flowing days field data joined to huc4 basin model results
-#' #' @param model
-#' #' @param combined_runoffEff
-#' #' @param combined_results
-#' #'
-#' #' @import sf
-#' #' @import dplyr
-#' #' @import ggplot2
-#' #' @import cowplot
-#' #' @import patchwork
-#' #'
-#' #' @return flowing days figure (also writes figure to file)
-#' flowingFigureFunction_new <- function(shapefile_fin, joinedData, model, combined_runoffEff, combined_results) {
-#'   theme_set(theme_classic())
-#'   
-#'   ##GET DATA
-#'   results <- shapefile_fin$shapefile
-#'   results <- dplyr::filter(results, is.na(num_flowing_dys)==0)
-#'   
-#'   # CONUS boundary
-#'   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
-#'   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
-#'                                                 'American Samoa',
-#'                                                 'Commonwealth of the Northern Mariana Islands',
-#'                                                 'Guam',
-#'                                                 'District of Columbia',
-#'                                                 'Puerto Rico',
-#'                                                 'United States Virgin Islands',
-#'                                                 'Hawaii'))) #remove non CONUS states/territories
-#'   states <- sf::st_union(states)
-#'   
-#'   ##SETUP FIELD VERIFICATION STUFF
-#'   combined_results <- dplyr::select(combined_results, c('huc4', 'median_eph_drainagearea_km2'))
-#' 
-#'   joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
-#'   #join together
-#'   joinedData <- dplyr::left_join(joinedData, combined_runoffEff, by='huc4')
-#'   
-#'   #fit model following runoff generation literature using runoff eff as proxy for antecedent soil moisure index
-#'   joinedData$log_n_flw_d<- log(joinedData$n_flw_d)
-#'   joinedData$log_precip_ma_mm_yr_runoff_eff <- log(joinedData$precip_ma_mm_yr + joinedData$runoff_eff + joinedData$drainage_area_km2)
-#'   model <- lm(log_n_flw_d ~ log_precip_ma_mm_yr_runoff_eff, data=joinedData)
-#'   joinedData$num_flowing_dys <- exp(predict(model, joinedData))
-#'   
-#'   ##MAIN MAP------------------------------------------
-#'   flowingDaysFig <- ggplot(results) +
-#'     geom_sf(aes(fill=num_flowing_dys), #observed
-#'             color='black',
-#'             size=0.5) + #map
-#'     scale_fill_gradientn(name='Average annual ephemeral flow days',
-#'                          colors = c("#FF4B1F", "#f7e9e8", "#044976"),
-#'                          guide = guide_colorbar(direction = "horizontal",title.position = "bottom"))+
-#'     ggnewscale::new_scale_fill()+ #'resets' scale so we can do two scale_fills in the same plot
-#'     geom_sf(data=states,
-#'             color='black',
-#'             size=1.0,
-#'             alpha=0)+ #conus domain
-#'     geom_sf(data=joinedData,
-#'             aes(fill=region),
-#'             size=10,
-#'             pch=23,
-#'             stroke=2)+ #verification data locations
-#'     scale_fill_manual(name='',
-#'                       values=c('#264653', '#2a9d8f'),
-#'                       guide='none')+
-#'     labs(tag='A')+
-#'     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-#'     theme(legend.position = c(.2, 0.1),
-#'           legend.key.size = unit(2, 'cm'))+ #legend position settings
-#'     theme(text = element_text(family = "Futura-Medium"), #legend text settings
-#'           legend.title = element_text(face = "bold", size = 20),
-#'           legend.text = element_text(family = "Futura-Medium", size = 18),
-#'           plot.tag = element_text(size=26,
-#'                                   face='bold'))+
-#'     xlab('')+
-#'     ylab('')
-#'   
-#'   ##VERIFICATION FIGURE------------------
-#'   flowingDaysVerifyFig <- ggplot(joinedData, aes(y=n_flw_d, x=precip_ma_mm_yr+(100*runoff_eff)+(drainage_area_km2))) +
-#'     geom_point(size=7)+
-#'     geom_smooth(method='lm', fullrange=TRUE, se=F) +
-#'     scale_x_log10()+
-#'     scale_y_log10(limits=c(1,500),
-#'                   labels=c(1,10,100,500),
-#'                   breaks=c(1,10,100,500))+
-#'     annotation_logticks() +
-#'     ylab('In situ annual\nephemeral flow days')+
-#'     xlab('Precip + Runoff coefficient\n+ Drainage area')+
-#'     labs(tag='B')+
-#'     theme(axis.text=element_text(size=24),
-#'           axis.title=element_text(size=26,face="bold"),
-#'           plot.title = element_text(size = 30, face = "bold"),
-#'           legend.position=c(0.20, 0.85),
-#'           legend.title =element_blank(),
-#'           legend.text = element_text(family = "Futura-Medium", size = 26),
-#'           legend.key = element_rect(fill = "grey"),
-#'           plot.tag = element_text(size=26,
-#'                                   face='bold'),
-#'           legend.spacing.x = unit(1.5, 'cm')) +
-#'     guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
-#'   
-#'   ##HISTOGRAM FIGURE------------------
-#'   flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
-#'     geom_histogram(size=2, fill='lightblue', color='black', bins=20)+
-#'     xlab('Average annual ephemeral flow days')+
-#'     ylab('# basins')+
-#'     labs(tag='C')+
-#'     xlim(0,365)+
-#'     theme(axis.text=element_text(size=24),
-#'           axis.title=element_text(size=26,face="bold"),
-#'           plot.title = element_text(size = 30, face = "bold"),
-#'           legend.position=c(0.20, 0.85),
-#'           legend.title =element_blank(),
-#'           legend.text = element_text(family = "Futura-Medium", size = 26),
-#'           legend.key = element_rect(fill = "grey"),
-#'           plot.tag = element_text(size=26,
-#'                                   face='bold'),
-#'           legend.spacing.x = unit(1.5, 'cm')) +
-#'     guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
-#'   
-#'   ##COMBO PLOT------------------------
-#'   design <- "
-#'    AAAA
-#'    AAAA
-#'    AAAA
-#'    AAAA
-#'    AAAA
-#'    BBCC
-#'    BBCC
-#'    "
-#'   
-#'   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysHist, design=design)
-#'   
-#'   
-#'   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
-#'   return('see cache/paper_figures/fig3.jpg')
-#' }

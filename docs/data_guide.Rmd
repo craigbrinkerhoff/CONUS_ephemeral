@@ -22,13 +22,13 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Years:** 2019
 
 - CONUS Long-Term Gauge-Based Daily Precip Model
-  - **Filename:** `dailyPrecip_1980_2010.gri`
-    - aggregated to yearly via `src/netcdf_prep.R`
+  - **Filenames:** `dailyPrecip_1980_1989.gri`, `dailyPrecip_1990_1999.gri`, `dailyPrecip_2000_2006.gri`
+    - file prep done locally via `src/netcdf_prep.R`
   - **Data:** https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source
   - **Paper (validation)**: https://doi.org/10.1029/2007JD009132
   - **Paper (algorithm):** https://doi.org/10.1175/JHM583.1
   - **Resolution/Scale:** 28km
-  - 1980-2010 (currently using 1980-1990)
+  - 1980-2006
 
 - CONUS hydrography and mean annual streamflow model
   - **Filename:** `src/CONUS_ephemeral_data/` directories

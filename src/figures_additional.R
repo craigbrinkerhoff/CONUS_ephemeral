@@ -249,7 +249,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
     scale_fill_gradientn(name='Number Observations                ',
                          colors =c("#dadaeb", "#807dba", "#3f007d"),
                          limits=c(48,903),
-                         breaks=c(48,300,600,903),
+                         breaks=c(48,300,600,973),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='C')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
@@ -449,10 +449,11 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
   boxplotsSens <- ggplot(forPlot, aes(x=key, y=value, fill=key)) +
     geom_boxplot(color='black', size=1.25) +
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
-    annotate('text', label=paste0('n = ', nrow(combined_results), ' basins'), x=as.factor('Model'), y=75, size=8)+
+    annotate('text', label=paste0('n = ', nrow(combined_results), ' basins'), x=as.factor('Model'), y=-5, size=8)+
     scale_fill_brewer(palette='BrBG') +
     ylab('Mean Annual ephemeral days flowing [dys]') +
     xlab('')+
+    ylim(0,365)+
     theme(axis.text=element_text(size=20),
       axis.title=element_text(size=22,face="bold"),
       legend.text = element_text(size=17),
@@ -526,57 +527,30 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
 #' @import ggplot2
 #' @import patchwork
 #'
-#' @return ggplot showing claibration (also writes fig to file)
-runoffThreshCalibPlot <- function(calibResults, theoreticalThresholds){
+#' @return ggplot showing calibration (also writes fig to file)
+runoffThreshCalibPlot <- function(calibResults){
   theme_set(theme_classic())
   
-  df <- data.frame('theoreticalThresholds'=theoreticalThresholds)
-
-  plot <- ggplot(calibResults, aes(x=thresh, y=mae)) +
-    geom_line(linetype='dashed', size=1.2, color='darkblue') +
-    geom_point(size=8, color='darkblue') +
-    ylab('Number Flowing Days MAE [dys]') +
-    xlab('Runoff threshold (global calibration) [mm/dy]')+
-    scale_x_log10(limits=c(1e-4,5),
-                  breaks=c(1e-4, 1e-2, 1e-0),
-                  labels=c('0.0001', '0.001', '1'))+
-    labs(tag='A')+
-    theme(axis.text=element_text(size=20),
-      axis.title=element_text(size=22,face="bold"),
-      legend.text = element_text(size=17),
-      plot.title = element_text(size = 30, face = "bold"),
-      legend.position='none',
-      plot.tag = element_text(size=26,
-                              face='bold'))
+  calibResults$r2 <- calibResults$r2 * 100
+  forPlot <- tidyr::gather(calibResults, key=key, value=value, c('r2', 'mae', 'rmse'))
   
-  plot2 <- ggplot(df, aes(theoreticalThresholds)) +
-    geom_density(size=1.25, color='black', fill='lightgreen') +
-    scale_x_log10(limits=c(1e-4,5),
-                  breaks=c(1e-4, 1e-2, 1e-0),
-                  labels=c('0.0001', '0.001', '1'))+
-    labs(tag='B')+
-    xlab('Runoff threshold (estimated via theory per basin) [mm/dy]') +
-    ylab('Density')+
+  
+  plot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
+    geom_line(linetype='dashed', size=1.2) +
+    geom_point(size=8) +
+    scale_color_brewer(name='', palette='Set1', labels=c(expression(MAE), expression(r^2%*%100), expression(RMSE)))+
+    ylab('Value') +
+    xlab('Runoff threshold (global calibration) [mm/dy]')+
+    scale_x_log10(limits=c(1e-4,100),
+                  breaks=c(1e-4, 1e-2, 1e-0,10,100),
+                  labels=c('0.0001', '0.001', '1','10','100'))+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=22,face="bold"),
           legend.text = element_text(size=17),
           plot.title = element_text(size = 30, face = "bold"),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))
+          legend.position='bottom')
   
-  
-  ##COMBO PLOT
-  design <- "
-    AAAA
-    AAAA
-    AAAA
-    AAAA
-    BBBB
-    "
-  comboPlot <- patchwork::wrap_plots(A=plot, B=plot2, design=design)
-  
-  ggsave('cache/runoffThresh_fitting.jpg', comboPlot, width=12, height=10)
+  ggsave('cache/runoffThresh_fitting.jpg', plot, width=12, height=8)
   
   return(plot)
 }
