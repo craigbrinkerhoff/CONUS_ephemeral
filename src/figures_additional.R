@@ -82,13 +82,13 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
     xlim(0,100)+
     ylim(0,100)+
-    ylab('% Discharge ephemeral') +
-    xlab('% Upstream network ephemeral') +
+    ylab('% Discharge ephemeral\n(via routing model)') +
+    xlab('% Upstream network ephemeral\n(via scaling theory)') +
     annotate('text', label=paste0(nrow(forPlot), ' basins'), x=75, y=15, size=7, color='black')+
     labs(tage='C')+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=24,face="bold"),
-          legend.text = element_text(size=17),
+          legend.text = element_text(size=20),
           legend.position='bottom',
           plot.title = element_text(size = 30, face = "bold"),
           plot.tag = element_text(size=26,
@@ -138,8 +138,9 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     ylab('USGS Discharge Model')+
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
-    annotate('text', label=paste0('r2: ', round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
-    annotate('text', label=paste0('MAE: ', round(Metrics::mae(assessmentDF$QBMA, assessmentDF$Q_MA),1), ' m3/s'), x=0.01, y=950, size=9)+
+  #  annotate('text', label=paste0('r2: ', round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
+    annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(assessmentDF$QBMA, assessmentDF$Q_MA),1) ~ frac(m^3, s)), x=0.01, y=1000, size=9)+
     annotate('text', label=paste0(nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
@@ -148,7 +149,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     labs(tag='B')+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=24,face="bold"),
-          legend.text = element_text(size=17),
+          legend.text = element_text(size=20),
           legend.position='bottom',
           plot.title = element_text(size = 30, face = "bold"),
           plot.tag = element_text(size=26,
@@ -248,7 +249,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
     scale_fill_gradientn(name='Number Observations                ',
                          colors =c("#dadaeb", "#807dba", "#3f007d"),
-                         limits=c(48,903),
+                         limits=c(48,973),
                          breaks=c(48,300,600,973),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='C')+
@@ -483,7 +484,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
 
   forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to accuracy Plot
   forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'ephMinOrder'))
-  tradeOffPlot <- ggplot(forPlot, aes(thresh, value, color=key)) +
+  tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
         geom_point(size=7) +
         geom_line(linetype='dashed', size=1) +
         scale_color_brewer(palette='Accent', name='', labels=c('# Scaled Orders', 'MAE of log(N)'))+
@@ -540,7 +541,7 @@ runoffThreshCalibPlot <- function(calibResults){
     geom_point(size=8) +
     scale_color_brewer(name='', palette='Set1', labels=c(expression(MAE), expression(r^2%*%100), expression(RMSE)))+
     ylab('Value') +
-    xlab('Runoff threshold (global calibration) [mm/dy]')+
+    xlab(expr(bold('Runoff threshold (global calibration) ['~frac(mm,dy)~']')))+
     scale_x_log10(limits=c(1e-4,100),
                   breaks=c(1e-4, 1e-2, 1e-0,10,100),
                   labels=c('0.0001', '0.001', '1','10','100'))+

@@ -283,15 +283,15 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   ####SUMMARY STATS-------------------
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
-    dplyr::summarise(percQ_eph_order = mean(percQEph_reach_median*100),
-              percQ_eph_order_min =  ifelse(mean(percQEph_reach_median*100) - sd(percQEph_reach_median*100) < 0,0,mean(percQEph_reach_median*100) - sd(percQEph_reach_median*100)),
-              percQ_eph_order_max =  ifelse(mean(percQEph_reach_median*100) + sd(percQEph_reach_median*100)> 100,100,mean(percQEph_reach_median*100) + sd(percQEph_reach_median*100)),
-              percArea_eph_order = mean(percAreaEph_reach_median*100),
-              percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100) < 0,0,mean(percAreaEph_reach_median*100) - sd(percAreaEph_reach_median*100)),
-              percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)> 100,100,mean(percAreaEph_reach_median*100) + sd(percAreaEph_reach_median*100)),
+    dplyr::summarise(percQ_eph_order = mean(percQEph_reach_mean*100),
+              percQ_eph_order_min =  ifelse(mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100) < 0,0,mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100)),
+              percQ_eph_order_max =  ifelse(mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)> 100,100,mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)),
+              percArea_eph_order = mean(percAreaEph_reach_mean*100),
+              percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100) < 0,0,mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100)),
+              percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)> 100,100,mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)),
               percLength_eph_order = mean(percLengthEph*100),
               percLength_eph_order_min = ifelse(mean(percLengthEph*100) - sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) - sd(percLengthEph*100)),
-              percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) + sd(percLengthEph*100)))
+              percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) > 100,100,mean(percLengthEph*100) + sd(percLengthEph*100)))
 
   ####DISCHARGE PLOT--------------------
   plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order, group=region)) +
@@ -299,7 +299,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     geom_line(size=2)+
     geom_point(size=11)+
     xlab('Stream Order') +
-    ylab('% ephemeral discharge\n(basin medians)')+
+    ylab('% ephemeral discharge')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -319,7 +319,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     geom_line(size=2)+
     geom_point(size=11)+
     xlab('') +
-    ylab('% ephemeral drainage area\n(basin medians)')+
+    ylab('% ephemeral drainage area')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -415,14 +415,6 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
                                                 'United States Virgin Islands',
                                                 'Hawaii'))) #remove non CONUS states/territories
   states <- sf::st_union(states)
-  
-  ##SETUP FIELD VERIFICATION STUFF
-  # joinedData <- dplyr::group_by(joinedData, huc4) %>%
-  #   dplyr::summarise(name=first(watershed),
-  #                    num_flowing_dys = mean(num_flowing_dys),
-  #                    n_flw_d = mean(n_flw_d),
-  #                    num_sample_yrs = mean(num_sample_yrs),
-  #                    n_sites = sum(n_sites))
 
   joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys,0)
   joinedData$n_flw_d <- round(joinedData$n_flw_d,0)
@@ -465,8 +457,8 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys))+
     geom_abline(size=2, linetype='dashed', color='darkgrey')+
     geom_point(size=12, color='#650d1b', alpha=0.35)+
-    annotate('text', label=expr(r^2: ~ !!round(summary(lm(n_flw_d~num_flowing_dys, data=joinedData))$r.squared,3)), x=50, y=350, size=9)+
-    annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(joinedData$n_flw_d, joinedData$num_flowing_dys),1) ~ frac(m^3,s)), x=50, y=300, size=9)+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(n_flw_d~num_flowing_dys, data=joinedData))$r.squared,2)), x=50, y=350, size=9)+
+    annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(joinedData$n_flw_d, joinedData$num_flowing_dys),0) ~ days), x=50, y=300, size=9)+
     annotate('text', label=paste0(nrow(joinedData), ' catchments'), x=300, y=50, size=9, color='black')+
     ylab('Basin predicted days/yr')+
     xlab('Catchment measured days/yr')+

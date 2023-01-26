@@ -358,7 +358,7 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
 #'
 #' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
 ephemeralFirstOrder <- function(rivNetFin, huc4) {
-  eph <- sum(rivNetFin$perenniality == 'ephemeral' & rivNetFin$dQdX_cms == rivNetFin$Q_cms)
+  eph <- sum(rivNetFin$perenniality == 'ephemeral' & rivNetFin$dQdX_cms == rivNetFin$Q_cms) #if these are equal, then they are the headwater subset of 1st order streams...
   total <- sum(rivNetFin$dQdX_cms == rivNetFin$Q_cms)
   
   out <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #percent headwater reaches that are ephemeral

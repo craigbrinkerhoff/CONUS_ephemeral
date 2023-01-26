@@ -634,18 +634,25 @@ getResultsExported <- function(rivNetFin, huc4, numFlowingDays){
 getResultsByOrder <- function(nhd_df, huc4){
 
   #percents by order
-  results_by_order_Q <- dplyr::group_by(nhd_df, StreamOrde) %>%
+  results_by_order_Q <- nhd_df %>%
+   # dplyr::mutate(StreamOrde = ifelse(StreamOrde == 1 & (dQdX_cms == Q_cms), 0, StreamOrde)) %>%
+    dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(percQEph_reach_mean = mean(percQEph_reach),
                      percQEph_reach_median = median(percQEph_reach),
                      percQEph_reach_sd = sd(percQEph_reach))
 
 
-  results_by_order_Area <- dplyr::group_by(nhd_df, StreamOrde) %>%
+  results_by_order_Area <- nhd_df %>%
+   # dplyr::mutate(StreamOrde = ifelse(StreamOrde == 1 & (dQdX_cms == Q_cms), 0, StreamOrde)) %>%
+    dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(percAreaEph_reach_mean = mean(percAreaEph_reach),
                      percAreaEph_reach_median = median(percAreaEph_reach),
                      percAreaEph_reach_sd = sd(percAreaEph_reach))
+
   
-  results_by_order_N <- dplyr::group_by(nhd_df, StreamOrde) %>%
+  results_by_order_N <- nhd_df %>%
+  #  dplyr::mutate(StreamOrde = ifelse(StreamOrde == 1 & (dQdX_cms == Q_cms), 0, StreamOrde)) %>%
+    dplyr::group_by(StreamOrde) %>%
     dplyr::mutate(ephLengthKM = ifelse(perenniality == 'ephemeral', LengthKM, 0)) %>%
     dplyr::summarise(percLengthEph = sum(ephLengthKM)/sum(LengthKM))
 

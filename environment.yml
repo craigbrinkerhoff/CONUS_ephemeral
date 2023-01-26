@@ -157,6 +157,7 @@ dependencies:
   - r-matrix=1.3_4=r41he454529_0
   - r-mgcv=1.8_36=r41he454529_0
   - r-munsell=0.5.0=r41hc72bb7e_1004
+  - r-ncdf4=1.17=r41h5e31ef6_5
   - r-nlme=3.1_152=r41h859d828_0
   - r-pillar=1.8.1=r41hc72bb7e_0
   - r-pkgconfig=2.0.3=r41hc72bb7e_1

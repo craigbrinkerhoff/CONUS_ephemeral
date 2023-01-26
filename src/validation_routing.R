@@ -145,8 +145,10 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
     labs(tag='B')+
     xlim(0,0.1)+
     ylim(0,0.1)+
-    ylab('Model Streamflow [cms]')+
-    xlab('Mean Annual Streamflow [cms]')+
+    ylab(expr(bold('Model Streamflow ['~frac(m^3,s)~']')))+
+    xlab(expr(bold('Mean Annual Streamflow ['~frac(m^3,s)~']')))+
+    #ylab('Model Streamflow [cms]')+
+    #xlab('Mean Annual Streamflow [cms]')+
     theme(axis.title = element_text(size=20, face='bold'),
           axis.text = element_text(size=18,face='bold'),
           legend.position='none',
@@ -163,7 +165,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   
   comboPlot <- patchwork::wrap_plots(A=map, B=scatterPlot, design=design)
   
-  ggsave('cache/walnutGulch.jpg', comboPlot, width=12, height=12)
+  ggsave('cache/walnutGulch.jpg', comboPlot, width=13, height=12)
   
   return(list('see cache/walnutGulch.jpg',
               'df'=flume_sites2 %>% select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm')),

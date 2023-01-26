@@ -29,7 +29,7 @@ tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot
 path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
 codes_huc02 <- c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18') #HUC2 regions to get gage data. Make sure these match the HUC4s that are being mapped below
 lookUpTable <- readr::read_csv('data/HUC4_lookup.csv') #basin routing lookup table
-usgs_eph_sites <- readr::read_csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/for_ephemeral_project/flowingDays_data/usgs_gages_eph.csv')
+usgs_eph_sites <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/usgs_gages_eph.csv'))
 
 #ehemeral mapping parameters
 threshold <- -0.01 #[m] buffer around 10cm depth to capture the free surface
