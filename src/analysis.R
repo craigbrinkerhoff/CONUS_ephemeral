@@ -279,7 +279,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
   order_vec <- as.vector(nhd_df$StreamOrde)
   Q_vec <- as.vector(nhd_df$Q_cms)
   Area_vec <- as.vector(nhd_df$TotDASqKm)
-  dQdX_vec <- as.vector(nhd_df$Q_cms)
+  dQdX_vec <- as.vector(nhd_df$Q_cms) #just intialized this way, it gets overridden down below
   dArea_vec <- as.vector(nhd_df$AreaSqKm)
   percQEph_vec <- rep(1, length(fromNode_vec))
   percAreaEph_vec <- rep(1, length(fromNode_vec))
@@ -643,7 +643,6 @@ getResultsByOrder <- function(nhd_df, huc4){
 
 
   results_by_order_Area <- nhd_df %>%
-   # dplyr::mutate(StreamOrde = ifelse(StreamOrde == 1 & (dQdX_cms == Q_cms), 0, StreamOrde)) %>%
     dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(percAreaEph_reach_mean = mean(percAreaEph_reach),
                      percAreaEph_reach_median = median(percAreaEph_reach),
@@ -651,10 +650,10 @@ getResultsByOrder <- function(nhd_df, huc4){
 
   
   results_by_order_N <- nhd_df %>%
-  #  dplyr::mutate(StreamOrde = ifelse(StreamOrde == 1 & (dQdX_cms == Q_cms), 0, StreamOrde)) %>%
     dplyr::group_by(StreamOrde) %>%
     dplyr::mutate(ephLengthKM = ifelse(perenniality == 'ephemeral', LengthKM, 0)) %>%
-    dplyr::summarise(percLengthEph = sum(ephLengthKM)/sum(LengthKM))
+    dplyr::summarise(LengthEph = sum(ephLengthKM),
+                     LengthTotal = sum(LengthKM))#/sum(LengthKM))
 
   out <- dplyr::left_join(results_by_order_Q, results_by_order_Area, by='StreamOrde')
   out <- dplyr::left_join(out, results_by_order_N, by='StreamOrde')

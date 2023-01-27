@@ -29,7 +29,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
 
   ##GET DATA
   results <- shapefile_fin$shapefile
-  results <- dplyr::filter(results, is.na(num_flowing_dys)==0)
+  results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
 
   # CONUS boundary
   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
@@ -283,23 +283,26 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   ####SUMMARY STATS-------------------
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
-    dplyr::summarise(percQ_eph_order = mean(percQEph_reach_mean*100),
-              percQ_eph_order_min =  ifelse(mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100) < 0,0,mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100)),
-              percQ_eph_order_max =  ifelse(mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)> 100,100,mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)),
-              percArea_eph_order = mean(percAreaEph_reach_mean*100),
-              percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100) < 0,0,mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100)),
-              percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)> 100,100,mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)),
-              percLength_eph_order = mean(percLengthEph*100),
-              percLength_eph_order_min = ifelse(mean(percLengthEph*100) - sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) - sd(percLengthEph*100)),
-              percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) > 100,100,mean(percLengthEph*100) + sd(percLengthEph*100)))
+  dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
+  #  dplyr::summarise(percQ_eph_order = mean(percQEph_reach_mean*100),
+   #           percQ_eph_order_min =  ifelse(mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100) < 0,0,mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100)),
+    #          percQ_eph_order_max =  ifelse(mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)> 100,100,mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)),
+     #         percArea_eph_order = mean(percAreaEph_reach_mean*100),
+      #        percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100) < 0,0,mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100)),
+      #        percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)> 100,100,mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)),
+      #        percLength_eph_order = mean(percLengthEph*100),
+      #        percLength_eph_order_min = ifelse(mean(percLengthEph*100) - sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) - sd(percLengthEph*100)),
+      #        percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) > 100,100,mean(percLengthEph*100) + sd(percLengthEph*100)))
 
   ####DISCHARGE PLOT--------------------
-  plotQ <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percQ_eph_order, group=region)) +
-    geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.25) +
-    geom_line(size=2)+
-    geom_point(size=11)+
+  plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_mean*100)) +
+    stat_summary(fun = median,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
+    geom_boxplot(color='black', size=1.2)+
+  #  geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.25) +
+  #  geom_line(size=2)+
+  #  geom_point(size=11)+
     xlab('Stream Order') +
-    ylab('% ephemeral discharge')+
+    ylab('Mean % ephemeral discharge')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -314,12 +317,14 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
           legend.text = element_text(size=24))
 
   ####AREA PLOT--------------------
-  plotArea <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percArea_eph_order, group=region)) +
-    geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.25) +
-    geom_line(size=2)+
-    geom_point(size=11)+
+  plotArea <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percAreaEph_reach_mean*100)) +
+    stat_summary(fun = median,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
+    geom_boxplot(color='black', size=1.2)+
+  #  geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.25) +
+  #  geom_line(size=2)+
+  #  geom_point(size=11)+
     xlab('') +
-    ylab('% ephemeral drainage area')+
+    ylab('Mean % ephemeral drainage area')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -334,10 +339,10 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   
   ####N PLOT--------------------
-  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percLength_eph_order, group=region)) +
-    geom_ribbon(aes(ymin=percLength_eph_order_min, ymax=percLength_eph_order_max), alpha=0.25) +
+  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percLength_eph_order*100, group=region)) +
+   # geom_ribbon(aes(ymin=percLength_eph_order_min, ymax=percLength_eph_order_max), alpha=0.25) +
     geom_line(size=2)+
-    geom_point(size=11)+
+    geom_point(size=13)+
     xlab('') +
     ylab('% ephemeral streams by length')+
     scale_fill_manual(name='',

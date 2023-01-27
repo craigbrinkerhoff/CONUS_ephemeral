@@ -133,7 +133,7 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   upstreamProperties <- Property_vec[upstream_reaches]
   upstream_percEphs <- percEph_vec[upstream_reaches]
 
-  #set ethier discharge or drainage area
+  #set either discharge or drainage area
   lateralProperty <- ifelse(property == 'discharge', curr_dQ, curr_dArea)
 
   upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)

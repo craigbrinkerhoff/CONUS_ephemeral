@@ -618,6 +618,7 @@ areaMapFunction <- function(shapefile_fin) {
   
   ##GET DATA
   results <- shapefile_fin$shapefile
+  results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
   
   # CONUS boundary
   states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
