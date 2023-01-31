@@ -452,7 +452,7 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
     annotate('text', label=paste0('n = ', nrow(combined_results), ' basins'), x=as.factor('Model'), y=-5, size=8)+
     scale_fill_brewer(palette='BrBG') +
-    ylab('Mean Annual ephemeral days flowing [dys]') +
+    ylab('Mean annual ephemeral days flowing [dys]') +
     xlab('')+
     ylim(0,365)+
     theme(axis.text=element_text(size=20),
@@ -485,7 +485,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
   forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to accuracy Plot
   forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'ephMinOrder'))
   tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
-        geom_point(size=7) +
+        geom_point(size=10) +
         geom_line(linetype='dashed', size=1) +
         scale_color_brewer(palette='Accent', name='', labels=c('# Scaled Orders', 'MAE of log(N)'))+
         xlab('Snapping Threshold [m]') +
@@ -580,7 +580,7 @@ buildScalingModelFig <- function(scalingModel){
   df <- rbind(df, df2)
   
   plot <- ggplot(df, aes(x=StreamOrde-1, y=n, color=label)) +
-    geom_point(size=8)+
+    geom_point(size=10)+
     scale_x_continuous(limits = c(0, 6), breaks = c(0,1,2,3,4,5,6)) +
     scale_y_log10() +
     scale_color_brewer(palette='Dark2', name='')+

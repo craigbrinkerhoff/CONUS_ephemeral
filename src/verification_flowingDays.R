@@ -108,7 +108,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   more_arizona <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/stromberg_etal_2017.csv'))
   geulph <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ontario.csv'))
 
-  #wrangling Mohave Yuma-------------------------------
+  #wrangling Mohave Yuma https://doi.org/10.1029/2018WR023714-------------------------------
   colnames(mohaveYuma) <- c('site', 'drainage_area_km2', 'elevation_m', 'period_of_record', 'num_flowing_events', 'ma_num_flowing_events', 'reference')
   mohaveYuma$watershed <- substr(mohaveYuma$site, 1, 1)
   mohaveYuma$watershed <- ifelse(mohaveYuma$watershed == 'M', 'mohave', 'yuma')
@@ -118,7 +118,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   mohaveYuma <- mohaveYuma %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
 
-  #wrangling walnut gulch--------------------------
+  #wrangling walnut gulch doi:10.1029/2006WR005733--------------------------
   walnutGulch <- tidyr::gather(walnutGulch, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 6","Flume 7","Flume 11","Flume 15","Flume 103","Flume 104", "Flume 112", "Flume 121", "Flume 125"))
   walnutGulch$date <- paste0(walnutGulch$Year, '-', walnutGulch$Month, '-', walnutGulch$Day)
   walnutGulch$date <- lubridate::as_date(walnutGulch$date)
@@ -129,12 +129,12 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               num_flowing_days = sum(runoff_mm > runoff_thresh),
               watershed=first(watershed),
               reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #source: see reference and MONITORING DISCHARGE AND SUSPENDED SEDIMENT, REYNOLDS CREEK EXPERIMENTAL WATERSHED, IDAHO, USA
+    dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #see source reference for these numbers
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='Stone et al. 2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
 
-  #wrangling Santa Rita------------------------
+  #wrangling Santa Rita doi:10.1029/2006WR005733------------------------
   santaRita <- tidyr::gather(santaRita, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 5","Flume 6","Flume 7","Flume 8"))
   santaRita$date <- paste0(santaRita$Year, '-', santaRita$Month, '-', santaRita$Day)
   santaRita$date <- lubridate::as_date(santaRita$date)
@@ -145,12 +145,12 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               num_flowing_days = sum(runoff_mm > runoff_thresh),
               watershed=first(watershed),
               reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #source: see reference and MONITORING DISCHARGE AND SUSPENDED SEDIMENT, REYNOLDS CREEK EXPERIMENTAL WATERSHED, IDAHO, USA
+    dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #see source reference for these numbers
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='Stone et al. 2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
   
-  #wrangling reynolds creek------------------
+  #wrangling reynolds creek https://doi.org/10.1029/2001WR000413------------------
   reynoldsCreek$date <- paste0(reynoldsCreek$year, '-', reynoldsCreek$month, '-', reynoldsCreek$day)
   reynoldsCreek$date <- lubridate::as_date(reynoldsCreek$date)
   reynoldsCreek$drainage_area_km2 <- ifelse(reynoldsCreek$site == 'summitWash', 83*0.01, #km2
@@ -172,13 +172,9 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                   reference='Slaughter et al. 2001') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
 
-  #wrangling Kentucky Robinson Forest-----------
+  #wrangling Kentucky Robinson Forest https://doi.org/10.1002/ecs2.2654-----------
   kentucky$period_of_record_yrs <- kentucky$period_of_record_dys / 365
-
-  #done separately for different datasets with different sampling frequencies
-  kentucky$num_flowing_events <- kentucky$perc_record_w_flow*365# (kentucky$perc_record_w_flow * (kentucky$period_of_record_dys*(60*24/15)))/kentucky$period_of_record_dys #because it's defined as a % of the record, we have to convert 15' data to daily averages
-  
-  #single year, so no averaging
+  kentucky$num_flowing_events <- kentucky$perc_record_w_flow*365
   kentucky$ma_num_flowing_days <- kentucky$num_flowing_events + 2 #field data in catchment only reports 1 or 2 flow events in the non-sampled months (see paper ad Fritz etal 2010)
 
   kentucky <- kentucky %>%
@@ -189,7 +185,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                            'site'='a',
                            'period_of_record_yrs'=1,
                            'drainage_area_km2'=3.3*0.01,
-                           'ma_num_flowing_days'=(365*0.44), #*0.37)
+                           'ma_num_flowing_days'=(365*0.44),
                            'reference'='Zimmer & McGlynn 2017')
 
   #add Montoyas watershed, urban system near Albuquerque, New Mexico manually (https://doi.org/10.1016/j.ejrh.2022.101089)-------------------------------------
@@ -200,17 +196,17 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                          'ma_num_flowing_days'=mean(c(2,0,1,0,0,5,2)), #See paper Table 1 for runoff events per year
                          'reference'='Schoener 2022')
 
-  #add additional Arizona data-----------------------------------------------------
-  more_arizona$ma_num_flowing_days <- 365*more_arizona$perc_record_flowing#(more_arizona$period_of_record_yrs*365*((24*60/10)*more_arizona$perc_record_flowing))/(more_arizona$period_of_record_yrs*365) #because its defined as a percent of the record, we have to convert 10' sampling frequency to daily average
+  #add additional Arizona data https://doi.org/10.1016/j.jaridenv.2016.12.004-----------------------------------------------------
+  more_arizona$ma_num_flowing_days <- 365*more_arizona$perc_record_flowing
   more_arizona <- more_arizona %>%
     dplyr::select(c('watershed', 'site', 'drainage_area_km2', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
 
-  #add Ontario data-------------------------------------
+  #add Ontario data https://doi.org/10.1002/hyp.10136-------------------------------------
     #already in number of flowing events per rain events (see paper), so no need to convert to 'daily resolution'.
     #Further, they only sampled July-Oct, so we double there number to capture springtime (Mar-June) flow which we assume as ~equivalent frequency. The other third of the year (winter) we assume no streamflow in Ontario.
   ontario <- data.frame('watershed'=geulph$watershed,
                         'site'=geulph$site,
-                        'period_of_record_yrs'=rep(1,nrow(geulph)), #130 days, but we account for the other two seasons in our setup
+                        'period_of_record_yrs'=rep(1,nrow(geulph)),
                         'drainage_area_km2'=geulph$drainage_area_km2,
                         'ma_num_flowing_days'=geulph$num_flowing_events * 3, #apply equivalent rate over the rest of the year
                         'reference'=geulph$reference)

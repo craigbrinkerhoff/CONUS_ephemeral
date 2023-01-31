@@ -296,30 +296,32 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 
   ####DISCHARGE PLOT--------------------
   plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_mean*100)) +
-    stat_summary(fun = median,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
-    geom_boxplot(color='black', size=1.2)+
+    geom_boxplot(color='black', size=1.2, alpha=0.25)+
+    stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
+    stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
   #  geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.25) +
   #  geom_line(size=2)+
   #  geom_point(size=11)+
-    xlab('Stream Order') +
+    xlab('') +
     ylab('Mean % ephemeral discharge')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
                        values=c('#688B55', '#2D93AD'))+
     ylim(0,100)+
-    labs(tag='C')+
+    labs(tag='A')+
     theme(axis.title = element_text(size=26, face='bold'),
           axis.text = element_text(size=24,face='bold'),
           plot.tag = element_text(size=26,
                                   face='bold'),
-          legend.position='bottom',
+          legend.position='none',
           legend.text = element_text(size=24))
 
   ####AREA PLOT--------------------
   plotArea <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percAreaEph_reach_mean*100)) +
-    stat_summary(fun = median,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
-    geom_boxplot(color='black', size=1.2)+
+    geom_boxplot(color='black', size=1.2, alpha=0.25)+
+    stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
+    stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
   #  geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.25) +
   #  geom_line(size=2)+
   #  geom_point(size=11)+
@@ -339,31 +341,30 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   
   ####N PLOT--------------------
-  plotN <- ggplot(forPlot, aes(color=region, fill=region, x=factor(StreamOrde), y=percLength_eph_order*100, group=region)) +
-   # geom_ribbon(aes(ymin=percLength_eph_order_min, ymax=percLength_eph_order_max), alpha=0.25) +
-    geom_line(size=2)+
-    geom_point(size=13)+
-    xlab('') +
+  plotN <- ggplot(forPlot, aes(color=region, x=factor(StreamOrde), y=percLength_eph_order*100, group=region)) +
+    geom_line(size=3)+
+    geom_point(size=18)+
+    xlab('Stream Order') +
     ylab('% ephemeral streams by length')+
-    scale_fill_manual(name='',
-                      values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
                        values=c('#688B55', '#2D93AD'))+
     ylim(0,100)+
-    labs(tag='A')+
+    labs(tag='C')+
     theme(axis.title = element_text(size=26, face='bold'),
           axis.text = element_text(size=24,face='bold'),
           plot.tag = element_text(size=26,
                                   face='bold'),
-          legend.position='none')
-  
+          legend.position='bottom',
+          legend.text = element_text(size=26))
+
+
   #setup plot layout 
   design <- "
     AB
     CC
   "
   
-  comboPlot <- patchwork::wrap_plots(A=plotN, B=plotArea, C=plotQ, design=design)
+  comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, C=plotN, design=design)
   
   
   ggsave('cache/paper_figures/fig2.jpg', comboPlot, width=18, height=18)
@@ -462,9 +463,9 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys))+
     geom_abline(size=2, linetype='dashed', color='darkgrey')+
     geom_point(size=12, color='#650d1b', alpha=0.35)+
-    annotate('text', label=expr(r^2: ~ !!round(summary(lm(n_flw_d~num_flowing_dys, data=joinedData))$r.squared,2)), x=50, y=350, size=9)+
-    annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(joinedData$n_flw_d, joinedData$num_flowing_dys),0) ~ days), x=50, y=300, size=9)+
-    annotate('text', label=paste0(nrow(joinedData), ' catchments'), x=300, y=50, size=9, color='black')+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(num_flowing_dys~n_flw_d, data=joinedData))$r.squared,2)), x=50, y=350, size=9)+
+    annotate('text', label=expr(SE: ~ !!round(summary(lm(num_flowing_dys~n_flw_d, data=joinedData))$sigma,0) ~ days), x=50, y=300, size=9)+
+    annotate('text', label=paste0('n = ', nrow(joinedData), ' catchments'), x=300, y=50, size=9, color='black')+
     ylab('Basin predicted days/yr')+
     xlab('Catchment measured days/yr')+
     ylim(0,365)+
@@ -484,7 +485,8 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   
   ##HISTOGRAM FIGURE------------------
   flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
-    geom_histogram(size=2, fill='lightblue', color='black', binwidth=10)+
+    geom_histogram(size=2, fill='lightblue', color='black', binwidth=10)+#,  aes(y = ..density..))+
+ #   stat_function(fun = function(x,mean,sd){10*nrow(results)*dlnorm(x,mean,sd)}, size=2, color='darkgreen', args = list(mean = log(mean(results$num_flowing_dys, na.rm=T)), sd = log(sd(results$num_flowing_dys, na.rm=T))))+
     xlab('Predicted days/yr')+
     ylab('# basins')+
     xlim(-10,365)+

@@ -18,13 +18,13 @@ aggregateHUC2|function|9cdb5eb4d1996967|||||||||||||||
 areaMapFunction|function|340490fd37a2afaa|||||||||||||||
 bivariateMapFunction|function|077ba97b5c146e85|||||||||||||||
 boxPlots|function|553c30d0172f2fda|||||||||||||||
-boxPlotsSensitivity|stem|ef8ccfe80d2ce27d|a8f7008f2907fe22|65db89b63ee3ec6b|1762257359||t19363.876901758s|c7555ba2edad0b3e|122196|rds|local|vector|||0.892|Removed 1 rows containing missing values geom_text.|
+boxPlotsSensitivity|stem|3be02d60ce8efbf5|a8f7008f2907fe22|6cb2d04a834538bc|1762257359||t19387.8872666465s|e58d55dc2d80025e|122195|rds|local|vector|||0.589|Removed 1 rows containing missing values geom_text.|
 boxPlots_classification|function|ef9e30f59056d469|||||||||||||||
 boxPlots_flowing|function|d17ff3bd61a5f8d0|||||||||||||||
-boxPlots_sensitivity|function|328de45201076bfc|||||||||||||||
+boxPlots_sensitivity|function|512167191ec78126|||||||||||||||
 boxplotsClassification|stem|9fe28043069e77c8|29334df5f366d1b3|129f91794457e466|470063933||t19338.0791094853s|88cf773bb88423c0|537976879|rds|local|vector|||7.211|package cowplot was built under R version 4.1.3. Removed 2 rows containing nonfinite values stat_boxplot.. Removed 2 rows containing nonfinite values stat_summary.|
 buildConfusionMatrix|function|6fd8ec102564cf87|||||||||||||||
-buildScalingModelFig|function|0aeb7415be8fc110|||||||||||||||
+buildScalingModelFig|function|6770ed2c7646a71c|||||||||||||||
 calcFlowingDays|function|c77a1a17a16509b0|||||||||||||||
 calcFlowingDays2|function|61f13998b636a4e8|||||||||||||||
 calcFlowingDays_forVal|function|3e7cceeba52135a3|||||||||||||||
@@ -513,8 +513,8 @@ extractedRivNet_1810|stem|f5189914b5d84480|a6f6d94895947a75|18206a9aef323079|743
 featureSpacePlot|function|485c684ae8d9ff02|||||||||||||||
 field_dataset|object|fd7866608382bcc3|||||||||||||||
 fig1|stem|7f55cb9cf411c38f|2f686d35320f5c95|3592b66d89d962ca|-1347776011||t19363.8785446665s|327de1c88c80ed8d|92|rds|local|vector|||133.249|st_point_on_surface may not give correct results for longitudelatitude data. st_point_on_surface may not give correct results for longitudelatitude data. st_point_on_surface may not give correct results for longitudelatitude data. Removed 203 rows containing missing values geom_label_repel.. Removed 204 rows containing missing values geom_label_repel.. Removed 204 rows containing missing values geom_label_repel.|
-fig2|stem|4242bc050e757409|ccabed8fa455fafc|21fdc79f761261ed|-983253655||t19384.9003858329s|327de1c88c80ed8d|92|rds|local|vector|||1.641||
-fig3|stem|70598ce49055b08e|6faa2e46b5beb48b|553a15d1fcc1d0bf|-1819616846||t19383.7581704239s|327de1c88c80ed8d|92|rds|local|vector|||53.099|is.na applied to nonlist or vector of type language. is.na applied to nonlist or vector of type language. Removed 1 rows containing missing values geom_bar.|
+fig2|stem|4242bc050e757409|ccabed8fa455fafc|30da3b0b10c5fd6d|-983253655||t19387.8640561079s|327de1c88c80ed8d|92|rds|local|vector|||1.776||
+fig3|stem|70598ce49055b08e|6faa2e46b5beb48b|992aac14bd670d85|-1819616846||t19387.9268853689s|327de1c88c80ed8d|92|rds|local|vector|||33.232|is.na applied to nonlist or vector of type language. is.na applied to nonlist or vector of type language. Removed 1 rows containing missing values geom_bar.|
 find_mode|function|a6ee7e6c91ddfd49|||||||||||||||
 fitJackKnifeRegression|function|e3e82ae0d0b6ec86|||||||||||||||
 fixGeometries|function|7624cb1fd0319fba|||||||||||||||
@@ -523,7 +523,7 @@ flowingDaysCalibrateFig|stem|3b7da5510f778f38|b7b8b75c9b3b205b|93ff3287b64a88b8|
 flowingDaysFigure|function|4ddaf0f744205adf|||||||||||||||
 flowingDaysValidation|stem|ced18e7d7743f263|210217e1fe7fdd58|e4b399fd69d1468d|1324909185||t19363.8191845357s|ee2ec9196da255db|2285|rds|local|vector|||339.88|attribute variables are assumed to be spatially constant throughout all geometries|
 flowingFieldData|stem|d60739df0a23ab91|57bfd669cc962486|4b798a419001f3e9|240115148||t19363.6692706337s|28b591e6329c7df0|1299|rds|local|vector|||10.527||
-flowingFigureFunction|function|b390102c4fae1fe1|||||||||||||||
+flowingFigureFunction|function|659f8fe67b7cc399|||||||||||||||
 flowingFigureFunction_new|function|5eac40c249ff73f9|||||||||||||||
 flowingMapFigureFunction|function|dd6746ee06041c30|||||||||||||||
 flowingQ|function|9743d29600c19783|||||||||||||||
@@ -2958,7 +2958,7 @@ scaleNetwork|function|ca60ed7eb9c5587a|||||||||||||||
 scalingByBasin|function|fb54b72caa8b1245|||||||||||||||
 scalingFunc|function|c96d33e03484c41c|||||||||||||||
 scalingModel|stem|9f799bbab9d15c8b|5e9e5cbda24d3fc7|d39cf70e635990d8|-1067582565||t19338.0763631864s|9abbe9395f590e08|215302|rds|local|vector|||5.765|package cowplot was built under R version 4.1.3|
-scalingModelFig|stem|4c5588f89e806d7c|c9ab1637554b0859|f3ff650164de371b|-553113754||t19338.0767166007s|fd6c32435840c678|297599|rds|local|vector|||0.409||
+scalingModelFig|stem|3fb1369ce2538613|c9ab1637554b0859|844db44d87eb8885|-553113754||t19387.8757862298s|0bac3154d8a9e402|297600|rds|local|vector|||0.464||
 scalingTestWrapper|function|bba07252c89491f7|||||||||||||||
 scaling_ephemeral_importance|function|cb21bc432343cd91|||||||||||||||
 scalingdQdX|function|7b17429e832ac310|||||||||||||||
@@ -3176,11 +3176,11 @@ snappedValidation_1807|stem|f57616c0a6e3fb6d|99a2b53568133c5b|228b2a76167633f4|-
 snappedValidation_1808|stem|e84101efc8abd5e3|2012687083c94107|d3b173c5fee1d314|544635301||t19337.7237399383s|eaaa27c8f55ffa44|1369|rds|local|vector|||11.666|package cowplot was built under R version 4.1.3|
 snappedValidation_1809|stem|ba02d916d4577fa0|3642b1e0f47c844c|23e98098c6e691f9|-648975524||t19337.7243579728s|d249eeebe3490506|11869|rds|local|vector|||40.061|package cowplot was built under R version 4.1.3|
 snappedValidation_1810|stem|9264ff157ad499e1|34d44d0619eef73e|d8e97e626b49066b|1652486541||t19337.7221557797s|14c3c2288ea81efb|4905|rds|local|vector|||24.865|package cowplot was built under R version 4.1.3|
-snappingSensitivityFig|stem|996e5bf3c65871c9|d51da5bcc206b39f|0b83b4494f85e4db|-87898887||t19383.9230895994s|af25c44244ee4d54|111193|rds|local|vector|||0.846|Duplicated aesthetics after name standardisation colour|
-snappingSensitivityFigures|function|436c94caf14e7400|||||||||||||||
+snappingSensitivityFig|stem|d39c12e730ff1ab3|d51da5bcc206b39f|e9ca818ea721c7b5|-87898887||t19387.8779511582s|b2fe0d0f9398a9fa|111191|rds|local|vector|||0.859|Duplicated aesthetics after name standardisation colour|
+snappingSensitivityFigures|function|b87dc5d28c0bfc2a|||||||||||||||
 snappingSensitivityWrapper|function|2216152b4e767bc6|||||||||||||||
 snappingThresh|object|dd2e6c639eff3211|||||||||||||||
-streamOrderPlot|function|44773850fb615510|||||||||||||||
+streamOrderPlot|function|ad08e77fcb8500b4|||||||||||||||
 summariseWTD|function|e3808d8f89b35767|||||||||||||||
 tally|function|42c8fb7607c5d91d|||||||||||||||
 target_factory|function|98ae9b2e177fdeaa|||||||||||||||
