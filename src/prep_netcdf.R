@@ -1,6 +1,6 @@
-## Code to re-orient precip data from 0 - 360 longitudes to -180 - 180. This was done locally on my PC and the code is included here for posterity's sake.
+## Code to concatenate daily precip data into a few netcdfs
 ## Craig Brinkerhoff
-## Summer 2022
+## Winter 2023
 
 library(raster)
 

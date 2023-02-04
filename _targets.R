@@ -1,12 +1,11 @@
 # _targets.R file
 ## Craig Brinkerhoff
-## Spring 2022
-## main script to launch pipeline for ephemeral streams project.
-## see README file
+## Winter 2023
 
 library(targets)
 library(tarchetypes)
 library(tibble)
+#library(clustermq)
 library(future)
 library(future.batchtools)
 source('src/model.R')
@@ -18,7 +17,6 @@ source('src/validation_ephemeral.R')
 source('src/verification_flowingDays.R')
 source('src/figures_additional.R')
 source('src/figures_paper.R')
-source('src/validation_routing.R')
 
 plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
@@ -70,19 +68,18 @@ mapped_lvl0 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', NA)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-   #    tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -96,19 +93,18 @@ mapped_lvl1 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl0)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
-    tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 2 downstream basins
@@ -121,19 +117,18 @@ mapped_lvl2 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl1)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 3 downstream basins
@@ -146,19 +141,18 @@ mapped_lvl3 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl2)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 4 downstream basins
@@ -171,19 +165,18 @@ mapped_lvl4 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl3)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 5 downstream basins
@@ -196,19 +189,18 @@ mapped_lvl5 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl4)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 6 downstream basins
@@ -221,19 +213,18 @@ mapped_lvl6 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl5)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 7 downstream basins
@@ -246,19 +237,18 @@ mapped_lvl7 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl6)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 8 downstream basins
@@ -271,19 +261,18 @@ mapped_lvl8 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl7)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -297,19 +286,18 @@ mapped_lvl9 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl8)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -323,19 +311,18 @@ mapped_lvl10 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl9)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -349,19 +336,18 @@ mapped_lvl11 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl10)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -375,19 +361,18 @@ mapped_lvl12 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl11)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -401,19 +386,18 @@ mapped_lvl13 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl12)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -427,19 +411,18 @@ mapped_lvl14 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl13)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -453,19 +436,18 @@ mapped_lvl15 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl14)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 16 downstream basins
@@ -478,19 +460,18 @@ mapped_lvl16 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl15)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 #level 17 downstream basins
@@ -503,19 +484,18 @@ mapped_lvl17 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl16)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 
@@ -529,19 +509,18 @@ mapped_lvl18 <- tar_map(
   names = "huc4",
   tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
       tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl17)), #calculate perenniality
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
   tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-  tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
-  tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution for basins downstream
+      tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
+      tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-  tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
-  #     tar_target(numFlowingDays_mc, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_mc, runoffEffScalar_real, runoffMemory_real, 1)), #calculate uncertainty in Nflw model using monte carlo
-  tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
-  tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
-  tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
-  tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
+    tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
+    tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
+    tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real, 0)), #calculate ballpark number of flowing days under high runoff scenario
+    tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under med-low runoff scenario
+    tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real, 0)) #calculate ballpark number of flowing days under med-high runoff scenario
 )
 
 

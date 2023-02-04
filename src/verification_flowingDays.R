@@ -1,6 +1,8 @@
 ## Craig Brinkerhoff
-## Summer 2022
-## Functions for building verification dataset and testing num flowing days sensitivity
+## Winter 2023
+## Functions to validate ephemeral flow frequency model
+
+
 
 
 #' Calculates mean annual num flowing days for USGS ephemeral gages. See /nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/for_ephemeral_project/flowingDays_data/README_usgs_eph_gages.md for gage QA/QC
@@ -72,7 +74,10 @@ wrangleUSGSephGages <- function(other_sites){
 
 
 
-#' wrangles existing (published) ephemeral field data to calculate 'number of flowing days' for their respective basins
+
+
+
+#' Wrangles existing (published) ephemeral field data to calculate 'number of flowing days' for their respective basins
 #'
 #' @name wrangleFlowingFieldData
 #' @note data comes from the following field studies (all saved in data repo except the Duke Forest data which is hardcoded here):
@@ -278,7 +283,6 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 #' @param path_to_data: path to data repo
 #' @param codes_huc02: all HUC2 basins
 #' @param combined_results: all HUC4 basin model results
-#' @param combined_numFlowingDays_mc: vector of number flowing days from monte carlo simulation (to calc sigma)
 #' @param combined_runoffEff: df of runoff efficiencies per basin
 #'
 #' @import sf
@@ -344,14 +348,6 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
                          'watershed'=flowingFieldData$watershed,
                          'num_flowing_dys'=num_flowing_dys)
       temp <- dplyr::left_join(flowingFieldData, temp, by='watershed')
-
-      #group by huc4 (USGS gauges are already pre-grouped by huc4 (in setupEphemeralQValidation function) so this code is redundant for them)
-      # temp <- dplyr::group_by(temp, huc4) %>%
-      #   dplyr::summarise(name=first(watershed),
-      #                    num_flowing_dys = mean(num_flowing_dys),
-      #                    n_flw_d = mean(n_flw_d),
-      #                    num_sample_yrs = mean(num_sample_yrs),
-      #                    n_sites = sum(n_sites))
 
       r2 <- summary(lm(num_flowing_dys ~ n_flw_d, data=temp))$r.squared
       mae <- Metrics::mae(temp$num_flowing_dys, temp$n_flw_d)

@@ -4,7 +4,7 @@ output: html_document
 date: "`r Sys.Date()`"
 author: 'Craig Brinkerhoff'
 ---
-## Guide to all datasets and models used to push our analysis over the entire CONUS domain.
+## Guide to all datasets and models used in this analysis
 Unless otherwise specified, these are in the `for_ephemeral_project` sub-directory.
 
 - Global Monthly Water Table Depth Model
@@ -46,7 +46,7 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Data (indirect):** https://waterwatch.usgs.gov/index.php?id=romap3&sid=w__download
   - **Paper (concept):** https://doi.org/10.1111/1752-1688.12431
   - **Resolution/Scale:** HUC4 basins
-  - **Years:** 1970-2021
+  - **Years:** varies, years are from 1904-2021
 
 - EPA/Corps of Engineers Voluntary WOTUS Jurisdictional Determinations Database (downloaded 06/20/2022)
   - **Filename**: `jds202206201319.csv`

@@ -15,6 +15,7 @@ run.sh
       - *slurm_future.tmpl*: While `clustermq` is faster than transient worker schemes, we found it behaves somewhat inconsistently for the highest-memory jobs within the pipeline. We've had luck using `futures.batchtools` instead.
 
 - We use a private R library (via `renv`) within a conda virtual environment because 1) some R packages are only available on github (and not anaconda) and 2) some other R packages do not play nice wih `gdal` on our HPC. Your experience on your HPC may vary. The virtual environment used for the analysis is reproducible using `environment.yml` and `renv.lock`. For more on `renv` see [here](https://rstudio.github.io/renv/).
+      - There is probably a better way to have done this but it is what we've got!
 
 - The data is stored in another repo (*~/CONUS_ephemeral_data*). While the user specifies the main path to this repo within `_targets.R`, **there are one or two hard-coded sub-directories out of necessity**. Check the functions in the R scripts to make sure you set up the folder structure correctly. Data sources are detailed at *docs/data_guide.Rmd*.
 

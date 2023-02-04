@@ -1,6 +1,6 @@
 ## FUNCTIONS FOR PAPER FIGURES
 ## Craig Brinkerhoff
-## Summer 2022
+## Winter 2023
 
 
 
@@ -295,7 +295,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
       #        percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) > 100,100,mean(percLengthEph*100) + sd(percLengthEph*100)))
 
   ####DISCHARGE PLOT--------------------
-  plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_mean*100)) +
+  plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_median*100)) +
     geom_boxplot(color='black', size=1.2, alpha=0.25)+
     stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
     stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
@@ -303,7 +303,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   #  geom_line(size=2)+
   #  geom_point(size=11)+
     xlab('') +
-    ylab('Mean % ephemeral discharge')+
+    ylab('Median % ephemeral discharge')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -318,7 +318,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
           legend.text = element_text(size=24))
 
   ####AREA PLOT--------------------
-  plotArea <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percAreaEph_reach_mean*100)) +
+  plotArea <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percAreaEph_reach_median*100)) +
     geom_boxplot(color='black', size=1.2, alpha=0.25)+
     stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
     stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
@@ -326,7 +326,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   #  geom_line(size=2)+
   #  geom_point(size=11)+
     xlab('') +
-    ylab('Mean % ephemeral drainage area')+
+    ylab('Median % ephemeral drainage area')+
     scale_fill_manual(name='',
                       values=c('#688B55', '#2D93AD'))+
     scale_color_manual(name='',
@@ -370,14 +370,6 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   ggsave('cache/paper_figures/fig2.jpg', comboPlot, width=18, height=18)
   return('see cache/paper_figures/fig2.jpg')
 }
-
-
-
-
-
-
-
-
 
 
 

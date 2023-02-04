@@ -1,10 +1,10 @@
 ## Craig Brinkerhoff
-## Spring 2022
+## Winter 2023
 ## Functions for getting mean annual flow and flow frequency at USGS streamgages along the NHD
 
 
 
-#' Returns set of USGS gages that are joined to the NHD a priori (that meet USGS QA/QC requirements)
+#' Returns set of USGS gages that are joined to the NHD-HR a priori (that meet USGS QA/QC requirements)
 #'
 #' @name getNHDGages
 #'
@@ -16,7 +16,7 @@
 #'
 #' @return df of USGS gages on the NHD with flows converted to metric
 getNHDGages <- function(path_to_data, codes_huc02){
-  #get USGS stations joined to NHD that meet their QA/QC requirements
+  #get USGS stations joined to NHD that meet USGS QA/QC requirements (i.e. IDs already matched to NHD-HR)
   codes <- c(NA)
   for(code_huc2 in codes_huc02){
     code <- list.dirs(paste0(path_to_data, '/HUC2_', code_huc2), full.names = FALSE, recursive = FALSE)
@@ -31,7 +31,7 @@ getNHDGages <- function(path_to_data, codes_huc02){
   for (i in codes){
     m <- substr(i, 1,2)
     dsnPath <- paste0(path_to_data, "/HUC2_", m, "/NHDPLUS_H_", i, "_HU4_GDB/NHDPLUS_H_", i, "_HU4_GDB.gdb")
-    NHD_HR_EROM_gage <- st_read(dsn = dsnPath, layer = "NHDPlusEROMQAMA") #Quality controlled gauges joined to NHD reaches a priori by USGS
+    NHD_HR_EROM_gage <- st_read(dsn = dsnPath, layer = "NHDPlusEROMQAMA") #Quality controlled gauges joined to NHD-HR reaches a priori by USGS
     NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA") #mean annual flow table
     NHD_HR_EROM <- dplyr::filter(NHD_HR_EROM, GageIDMA %in% NHD_HR_EROM_gage$GageID)
     temp <- NHD_HR_EROM %>%
@@ -49,12 +49,15 @@ getNHDGages <- function(path_to_data, codes_huc02){
 
 
 
-#' Gather streamflow data at gages and calculate no flow fractions and baseflow fractions
+
+
+
+#' Gather streamflow data at gauges and calculate 1) mean annual flow and 2) no flow fractions
 #'
 #' @name getGageData
 #'
 #' @param path_to_data: path to data working directory
-#' @param nhdGages: list of USGS streamgauges joined to the NHD with their Q info
+#' @param nhdGages: list of USGS streamgauges joined to NHD-HR
 #' @param codes_huc02: HUC2 basins to get gage data for
 #'
 #' @import dataRetrieval
@@ -66,31 +69,32 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
   for(m in codes_huc02){
     #NOTE::::: will be longer than the final sites b/c some of them don't have 20 yrs of data  within the bounds.
         #This function only finds gages that intersect our time domain, but not necessarily 20 yrs of data within the domain.
-        #Further, some gages have errors in data or are missing data and we throw them out.
+        #Further, some gages have errors in data or are missing data and we throw them out later
     if(!file.exists(paste0('cache/training/siteNos_', m, '.rds'))){ #only do HUC2 if it hasn't been done yet
       #get usgs gages by
       sites_full <- whatNWISdata(huc=m,
                                  parameterCd ='00060',
                                  service='dv',
-                                 startDate = '1970-10-01',
+                                 startDate = '1970-10-01', #water year
                                  endDate = '2018-09-30')
 
       write_rds(sites_full, paste0('cache/training/siteNos_', m, '.rds'))
       sites <- unique(sites_full$site_no)
-      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gages joined to NHD a priori
+      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gages joined to NHD-HR a priori
     }
     else{
       sites_full <- read_rds(paste0('cache/training/siteNos_', m, '.rds')) #will be longer than the final sites b/c some of them throw errors and are removed or don't have 20 yrs of data
       sites <- unique(sites_full$site_no)
       sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gages joined to NHD a priori
     }
-    if(length(sites)==0){next} #some zones don't have gages joined to NHD after QA/QC (HUC04 for example)
+    if(length(sites)==0){next} #some zones don't have gages joined to NHD-HR after QA/QC (HUC04 for example)
 
     ##########CALCUALTE MEAN ANNUAL FLOW
     results <- data.frame()
     k <- 1
     if(!file.exists(paste0('cache/training/trainingData_', m, '.rds'))){ #check if site has already been run
       for(i in sites){
+        #GRAB GAUGE DATA
         gageQ <- tryCatch(readNWISstat(siteNumbers = i, #check if site mets our date requirements
                                        parameterCd = '00060', #discharge
                                        startDate = '1970-10-01',
@@ -130,7 +134,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
    }
   }
 
-  #concatenate all into single target object
+  #concatenate all into single target object (janky but works)
   results_all <- data.frame()
   for(i in codes_huc02){
     temp_d <- tryCatch(read_rds(paste0('cache/training/trainingData_', i, '.rds')),error=function(k){'none'})

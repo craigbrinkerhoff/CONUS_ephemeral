@@ -1,6 +1,6 @@
 ## Craig Brinkerhoff
 ## functions to build shapefiles from results (both model and validation results)
-## Summer 2022
+## Winter 2023
 
 
 
@@ -29,7 +29,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 
   #round for mapping
   basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQEph_exported', 'percAreaEph_exported', 'QEph_exported_cms', 'AreaEph_exported_km2','geometry'))
-  basins_overall <- dplyr::filter(basins_overall, is.na(percQEph_exported)==0) #remove international basins we don't care about
+  basins_overall <- dplyr::filter(basins_overall, is.na(percQEph_exported)==0) #remove international basins that don't flow into US at all
   
   return(list('note'='see cache/results_fin.shp',
               'shapefile'=basins_overall))
@@ -55,14 +55,17 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 #'
 #' @return summary stats for validation + the sf object shapefile
 saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
-  #read in all HUC2 basins
-  basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU2.shp')) %>% dplyr::select(c('huc2', 'name'))
-  for(i in codes_huc02[-1]){ #join HUC04 and HUC09 because of too limited data
-    basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU2.shp')) %>% dplyr::select(c('huc2', 'name')) #basin polygons
+  #read in all HUC2 basins and make a single shapefile
+  basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU2.shp')) %>%
+      dplyr::select(c('huc2', 'name'))
+  for(i in codes_huc02[-1]){
+    basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU2.shp')) %>%
+        dplyr::select(c('huc2', 'name')) #basin polygons
     basins_overall <- rbind(basins_overall, basins)
   }
 
   #join validation results
+    #distinction is truth, perenniality is model
   out <- validationResults$validation_fin
   out$TP <- ifelse(out$distinction == 'ephemeral' & out$perenniality == 'ephemeral', 1, 0)
   out$FP <- ifelse(out$distinction == 'non_ephemeral' & out$perenniality == 'ephemeral', 1, 0)
@@ -84,10 +87,12 @@ saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
   basins_overall <- dplyr::left_join(basins_overall, out, by='huc2')
   basins_overall <- dplyr::select(basins_overall, c('huc2', 'name', 'basinAccuracy', 'basinSensitivity', 'basinSpecificity', 'basinTSS', 'n_total', 'n_eph', 'n_not_eph', 'geometry'))
 
-  return(list('note'='see cache/validation_fin.shp',
+  out <- list('note'='see cache/validation_fin.shp',
               'average_regional_acc'=mean(basins_overall$basinAccuracy, na.rm=T),
               'average_regional_sens'=mean(basins_overall$basinSensitivity, na.rm=T),
               'average_regional_spec'=mean(basins_overall$basinSpecificity, na.rm=T),
               'average_regional_TSS'=mean(basins_overall$basinTSS, na.rm=T),
-              'shapefile'=basins_overall))
+              'shapefile'=basins_overall)
+  
+  return(out)
 }

@@ -27,36 +27,39 @@
 #' @param err: error tolerance for thresholding
 #' @param conus: flag for foreign or not
 #' @param lakeAreaSqKm: fractional lake surface area per reach [km2]
+#' @param FCode_riv: river code from NHD-HR
 #'
 #' @return status: perennial, intermittent, or ephemeral
-perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm){
+perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm, FCode_riv){
   if(conus == 0){ #foreign stream handling
     return('foreign')
+  } else if(substr(FCode_riv,1,3) == 336){ #Fype for canal/ditch
+      return('canal_ditch')
+  } else if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm < 0.01){ #small ponds
+      return('small_pond')
   } else if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0) { #there are some NA WTDs for very short reaches that consist only of 'perennial boundary conditions' in the water table model, i.e. ocean or great lakes
-    return('non_ephemeral')
+      return('non_ephemeral')
   } else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){
       if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all wtd must not intersect river
         if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following Schmadel 2019
           return('non_ephemeral')
-        }
-        else{
+        } else{
           return('ephemeral') 
         }
       } else{
         return('non_ephemeral')
       }
-    }
-    else{
-      return('non_ephemeral')
-  }
+    } else{
+        return('non_ephemeral')
+      }
 }
 
 
 
 
-#' Update reach ephemerality/perenniality using routing
+#' Update reach ephemerality/perenniality using downstream routing
 #'
-#' @name routing_perenniality_update
+#' @name perenniality_func_update
 #'
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
@@ -86,18 +89,17 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
 
 
 
-#' Calculates lateral discharge / new water / runoff contribution for a reach
+#' Calculates lateral discharge / runoff contribution for a reach
 #'
-#' @name getdQdX
+#' @name getdQ
 #'
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
-#' @param curr_perr: current perenniality status
 #' @param curr_Q: reach discharge [m3/s]
 #' @param Q_vec: full network vector of discharges [m3/s]
 #'
 #' @return dQ per reach
-getdQdX <- function(fromNode, toNode_vec, curr_perr, curr_Q, Q_vec){
+getdQ <- function(fromNode, toNode_vec, curr_Q, Q_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
   upstreamQ <- sum(Q_vec[upstream_reaches], na.rm=T)
 
@@ -107,8 +109,32 @@ getdQdX <- function(fromNode, toNode_vec, curr_perr, curr_Q, Q_vec){
 
 
 
+
+#' Calculates accumulated drainage area for a reach
+#'
+#' @name getTotDA
+#'
+#' @param fromNode: upstream-end reach node
+#' @param toNode_vec: full network vector of downstream-end reach nodes
+#' @param curr_A: reach discharge [m3/s]
+#' @param A_vec: full network vector of discharges [m3/s]
+#'
+#' @return contributing drainage area per reach
+getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
+  upstream_reaches <- which(toNode_vec == fromNode)
+  upstreamA <- sum(A_vec[upstream_reaches], na.rm=T)
+
+  out <- upstreamA + curr_A
+
+  return(out)
+}
+
+
+
+
+
+
 #' Calculate % ephemeral contribution for some accumulated property in a reach in the network.
-#' Used to get % water volume or drainage area ephemeral (calculated for the 'property' param)
 #'
 #' @name getPercEph
 #'
@@ -139,7 +165,7 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)
 
   #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero (handles ost streamflow too)
-  Ephflag <- ifelse(curr_perr == 'non_ephemeral', 0, 1)
+  Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
   
   #if losing stream, set the weight to zero as it's not contributing anything to the stream
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)

@@ -1,5 +1,5 @@
 ## Craig Brinkerhoff
-## Summer 2022
+## Winter 2023
 ## Functions for additional results figures that aren't created in 'src/paperFigures.R'. These are mostly troubleshooting figures and/or supplemental info figures
 
 
@@ -22,7 +22,7 @@
 #' @import cowplot
 #' @import patchwork
 #'
-#' @return flowing days figure (also writes figure to file)
+#' @return combined Q validation df (also writes figure to file)
 validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin){
   theme_set(theme_classic())
   
@@ -78,13 +78,15 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
-    geom_point(size=7, color='#335c67') +
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
+    geom_point(size=7, color='#335c67') +
+    geom_smooth(method='lm', size=1.5, color='black', se=F)+
     xlim(0,100)+
     ylim(0,100)+
     ylab('% Discharge ephemeral\n(via routing model)') +
     xlab('% Upstream network ephemeral\n(via scaling theory)') +
-    annotate('text', label=paste0(nrow(forPlot), ' basins'), x=75, y=15, size=7, color='black')+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(percQEph_exported~export, data=forPlot))$r.squared,2)), x=10, y=75, size=9)+
+    annotate('text', label=paste0('n = ', nrow(forPlot), ' basins'), x=75, y=15, size=7, color='black')+
     labs(tage='C')+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=24,face="bold"),
@@ -115,18 +117,13 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   qma <- dplyr::select(qma, c('gageID','Q_MA', 'no_flow_fraction'))
   assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
   
-  #save number of gauges to file for later reference
-  write_rds(list('gages_w_sufficent_data'=nrow(qma),
-                 'gages_on_nhd'=nrow(assessmentDF)),
-            'cache/gageNumbers.rds')
-  
   assessmentDF <- tidyr::drop_na(assessmentDF) %>%
     dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #Messager definition for non-perenniality is 1 day a year not flowing
     dplyr::select('Q_MA', 'QBMA', 'type')
   
-  #join datasets
+  #join two datasets together
   assessmentDF <- rbind(assessmentDF, walnutGulch) #ephemeralQDataset
-  assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent"))
+  assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent")) #recast to be copacetic
   
   assessmentDF <- dplyr::filter(assessmentDF, !(is.na(QBMA)) & !(is.na(Q_MA)))
   
@@ -138,10 +135,9 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     ylab('USGS Discharge Model')+
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
-  #  annotate('text', label=paste0('r2: ', round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
     annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(assessmentDF$QBMA, assessmentDF$Q_MA),1) ~ frac(m^3, s)), x=0.01, y=1000, size=9)+
-    annotate('text', label=paste0(nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
+    annotate('text', label=paste0('n = ', nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
     scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
@@ -154,11 +150,6 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
           plot.title = element_text(size = 30, face = "bold"),
           plot.tag = element_text(size=26,
                                   face='bold'))
-  
-  
-  
-  
-  
   
   ##COMBO PLOT------------------------
   design <- "
@@ -173,7 +164,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   
   
   ggsave('cache/validationPlot.jpg', comboPlot, width=20, height=20)
-  return('see cache/validationPlot.jpg')
+  return(assessmentDF)
   
 }
 
@@ -482,15 +473,15 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law of stream numbers and snapping thresholds
   theme_set(theme_classic())
 
-  forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to accuracy Plot
-  forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'ephMinOrder'))
+  forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to plot accuracy
+  forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'rmse'))
   tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
         geom_point(size=10) +
         geom_line(linetype='dashed', size=1) +
-        scale_color_brewer(palette='Accent', name='', labels=c('# Scaled Orders', 'MAE of log(N)'))+
+        scale_color_brewer(palette='Accent', name='', labels=c('MAE of log(N)', 'RMSE of log(N)'))+
         xlab('Snapping Threshold [m]') +
         ylab('Value')+
-        ylim(0,2)+
+        ylim(0,1)+
         theme(axis.text=element_text(size=20),
           axis.title=element_text(size=22,face="bold"),
           legend.text = element_text(size=17),
@@ -543,8 +534,8 @@ runoffThreshCalibPlot <- function(calibResults){
     ylab('Value') +
     xlab(expr(bold('Runoff threshold (global calibration) ['~frac(mm,dy)~']')))+
     scale_x_log10(limits=c(1e-4,100),
-                  breaks=c(1e-4, 1e-2, 1e-0,10,100),
-                  labels=c('0.0001', '0.001', '1','10','100'))+
+                  breaks=c(1e-4, 1e-3, 1e-2, 1e-1, 1e-0,10,100),
+                  labels=c('0.0001', '0.001', '0.01', '0.1', '1','10','100'))+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=22,face="bold"),
           legend.text = element_text(size=17),

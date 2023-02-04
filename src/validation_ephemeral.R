@@ -1,12 +1,12 @@
 ## Craig Brinkerhoff
-## Functions to validate/verify the ephemeral river map against EPA WOTUS Jurisdictional Determinations (JDs), as well as streamgauges
-## Summer 2022
+## Functions to validate ephemeral classification, routing, and discharge
+## Winter 2023
 
 
 
 #' Prep and clean EPA WOTUS Jurisdictional Ditinction validation dataset
 #'
-#' Because our model exists only in a paradigm of ephemeral -> intermttent -> perennial, we only keep these categories (for both river and lakes. NOT wetlands)
+#' We keep only features directly connected to the drainage network and throw out disconnected features (see below)
 #' See the actual dataset for the descriptions of these codes
 #' KEEP:
 #'  A1: Traditionally navigable waters (i.e. perennial) (both rivers and lakes)
@@ -20,7 +20,7 @@
 #'  B3: Ephemeral features
 #'  RHAB codes for A1-4 and B3: Features classified under the older (and stricter) River and Harbors Act. Includes some ephemeral sites.
 #'
-#'REMOVE (basically non-surface water determinations: riparian/upland/cropland/groundwater/wastewater) determinations, as the NHD is stricly a drainage representing the flowing features and NOT adjacent/upland ones
+#' REMOVE
 #'  All upland/dryland/isolated features with codes like UPLAND, DRYLAND, ISOLATE
 #'  A4: wetlands that abut A1-A3 and/or are seasonally innundated by A1-A3
 #'  B1: wetlands/lakes/ponds that aren't connected to network, i.e. 'non adjacent'
@@ -76,7 +76,7 @@ prepValDF <- function(path_to_data){
 #' @param validationDF: EPA/Corps WOTUS Jurisdictional distinction dataset (pre-cleaned and prepped)
 #' @param USGS_data: USGS gauge IDs and 'no flow fractions'
 #' @param nhdGages: loopup table linking USGS gages to nhd reach ids
-#' @param rivNetFin: model result river network (as data.frame)
+#' @param nhd_df: model result river network (as data.frame)
 #' @param huc4id: HUC4 id for current network
 #' @param noFlowGageThresh: Threshold for % of year the gage runs dry that is allowable for rivers that are 'certainly non-ephemeral'
 #'
@@ -84,7 +84,7 @@ prepValDF <- function(path_to_data){
 #' @import dplyr
 #'
 #' @return df with WOTUS validation points associated with NHD reaches (and their respective dicstance [m] from the reach)
-snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4id, noFlowGageThresh) {
+snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGages, nhd_df, huc4id, noFlowGageThresh) {
   indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #indiana-effected basins
 
   #do by basin to speed up processing
@@ -168,13 +168,13 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
   #join model results with validation data
   out <- as.data.frame(out)
-  rivNetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'StreamOrde'))
-  out <- dplyr::left_join(out, rivNetFin, by='NHDPlusID')
+  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'perenniality', 'StreamOrde'))
+  out <- dplyr::left_join(out, nhd_df, by='NHDPlusID')
 
   #join usgs gauges to flesh out training set
   USGS_data <- dplyr::left_join(USGS_data, nhdGages, by=c('gageID'='GageIDMA'))
-  USGS_data <- dplyr::filter(USGS_data, no_flow_fraction < noFlowGageThresh & NHDPlusID %in% rivNetFin$NHDPlusID) #if average year the river is flowing > 90% of the time, it's almost certainly non-ephemeral
-  USGS_data <- dplyr::left_join(USGS_data, rivNetFin, by='NHDPlusID')
+  USGS_data <- dplyr::filter(USGS_data, no_flow_fraction < noFlowGageThresh & NHDPlusID %in% nhd_df$NHDPlusID) #if average year the river is flowing > 90% of the time, it's almost certainly non-ephemeral
+  USGS_data <- dplyr::left_join(USGS_data, nhd_df, by='NHDPlusID')
   if(nrow(USGS_data) > 0){
     USGS_data$distinction <- 'non_ephemeral'
     USGS_out <- data.frame('NHDPlusID'=USGS_data$NHDPlusID,
@@ -252,9 +252,9 @@ addOurFieldData <- function(rivNetFin_0106, rivNetFin_0108, path_to_data, field_
 #'
 #' @name validateModel
 #'
-#' @param combined_validation: combo df of all verification tables for each HUC4
+#' @param combined_validation: combo df of all validation tables for each HUC4
 #' @param ourFieldData: prepped df of our field-mapped stream classifications in the Northeast US
-#' @param snappingThresh: snapping threshold for 'on the NHD'
+#' @param snappingThresh: snapping threshold
 #'
 #' @import dplyr
 #' @import tidyr
@@ -287,12 +287,222 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
   #EPA ephemeral-classed JDs on the NHD
   onNHD_tot <- nrow(verifyDFfin[verifyDFfin$distinction == 'ephemeral',])
 
-  return(list('validation_fin'=verifyDFfin,
+  out <- list('validation_fin'=verifyDFfin,
               'eph_features_on_nhd_tot'=onNHD_tot,
               'eph_features_off_nhd_tot'=totNHD_tot - onNHD_tot,
-              'all_validation_features'=nrow(verifyDFfin)))
+              'all_validation_features'=nrow(verifyDFfin))
+
+  return(out)
 }
 
+
+
+
+
+
+#' Calculates frequency that headwater reaches are classified ephemeral
+#'
+#' @name ephemeralFirstOrder
+#'
+#' @param nhd_df: routing model result for basin
+#' @param huc4: huc4 basin id
+#'
+#' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
+ephemeralFirstOrder <- function(nhd_df, huc4) {
+  #river source calculation
+  eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM) #if these are equal, then they are the headwater subset of 1st order streams...
+  total <- sum(nhd_df[nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM)
+  res <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #percent headwater reaches that are ephemeral
+  
+  #first order ('headwater') calculation
+  eph2 <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$StreamOrde == 1,]$LengthKM) #if these are equal, then they are the headwater subset of 1st order streams...
+  total2 <- sum(nhd_df[nhd_df$StreamOrde == 1,]$LengthKM)
+  res2 <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph2/total2) #percent headwater reaches that are ephemeral
+
+  out <- data.frame('huc4'=huc4,
+                    'percEph_firstOrder'=res2,
+                    'lenKM_eph_firstOrder'=eph2,
+                    'lenKM_firstOrder'=total2,
+                    'percEph_source'=res,
+                    'lenKM_eph_source'=eph,
+                    'lenKM_source'=total)
+
+  return(out)
+}
+
+
+
+
+#' Sets up df of ephemeral streams with in situ mean annual streamflow and our model's discharge estimates
+#'
+#' @name setupEphemeralQValidation
+#' 
+#' @note: these are the ephemeral streams we will have data for (Walnut Gulch and some temp USGS gages in WYoming/Colorado from the 70s)
+#'
+#' @param path_to_data: character string to data repo
+#' @param walnutGulch: walnut gulch data frame for runoff data\
+#' @param ephemeralUSGSDischarge: usgs ephemeral gauge list
+#' @param rivNetFin_x: routing model result for basin x
+#'
+#' @import sf
+#' @import dataRetrieval
+#' @import dplyr
+#'
+#' @return ephemeral streams mean annual flow paired with model reach and model discharge
+setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDischarge, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305){
+  ephemeralUSGSDischarge <- sf::st_as_sf(ephemeralUSGSDischarge, coords=c('lon', 'lat'))
+  
+  sf::st_crs(ephemeralUSGSDischarge) <- sf::st_crs('epsg:4269')
+  
+  rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305)
+  
+  #join to networks iteratively to handle memory overloading...
+  out <- data.frame()
+  for (i in 1:nrow(ephemeralUSGSDischarge)){
+    huc4 <- ephemeralUSGSDischarge[i,]$huc4
+    huc2 <- substr(huc4, 1, 2)
+    
+    network <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+    network<- sf::st_zm(network)
+    
+    coords <- sf::st_coordinates(sf::st_centroid(network$Shape)) #get each line centroid
+    utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude
+    epsg <- as.numeric(paste0('326', as.character(utm_zone)))
+    
+    validationDF <- sf::st_transform(ephemeralUSGSDischarge, epsg)
+    network <- sf::st_transform(network, epsg)
+    
+    network <- dplyr::left_join(network, rivNetFin, 'NHDPlusID')
+    network <- dplyr::filter(network, is.na(perenniality)==0)
+    
+    temp <- sf::st_join(ephemeralUSGSDischarge, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
+    out <- rbind(out, temp)
+  }
+  
+  #keep the one with the best matching drainage area (must also be within 5% of drainage area agreement)
+  out <- dplyr::group_by(out, gageID) %>%
+    dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
+    dplyr::filter(error < 0.20) %>%
+    dplyr::slice_min(error, with_ties=FALSE, n=1) %>% #ties are pretty much never going to happen, but still need something...
+    dplyr::select(c('NHDPlusID', 'huc4', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'num_flowing_dys','TotDASqKm', 'gageID', 'period_of_record_yrs'))
+ 
+   return(out)
+}
+
+
+
+
+#' Verifies our model in the Walnut Gulch Experimental watershed
+#'
+#' @name walnutGulchQualitative
+#'
+#' @param rivNetFin_1505: routing model result for basin
+#' @param path_to_data: charater string to data repo
+#'
+#' @import sf
+#' @import ggplot2
+#' @import patchwork
+#' @import dplyr
+#'
+#' @return map of Wlanut gulch hydrography and discharge model (written to file)
+walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
+  theme_set(theme_classic())
+  
+  #wrangling walnut gulch--------------------------
+  walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv'))
+  walnutGulch <- tidyr::gather(walnutGulch, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 6","Flume 7","Flume 11","Flume 15","Flume 103","Flume 104", "Flume 112", "Flume 121", "Flume 125"))
+  walnutGulch$date <- paste0(walnutGulch$Year, '-', walnutGulch$Month, '-', walnutGulch$Day)
+  walnutGulch$date <- lubridate::as_date(walnutGulch$date)
+  walnutGulch <- walnutGulch %>%
+    dplyr::mutate(year = lubridate::year(date)) %>%
+    dplyr::group_by(site) %>% #get no flow stats per sub watershed
+    dplyr::summarise(runoff_m_s = mean(runoff_mm, na.rm=T)*0.001/86400) %>% #m/s
+    dplyr::mutate(site = substr(site, 7, nchar(site)))
+
+  #setup flume locations----------------------------
+  flume_sites <- read.csv('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/walnut_gulch_flumes.csv')
+  flume_sites <- dplyr::filter(flume_sites, !is.na(drainageArea_km2)) %>%
+    dplyr::mutate(flume = as.character(flume)) %>%
+    dplyr::left_join(walnutGulch, by=c('flume'='site')) %>%
+    sf::st_as_sf(coords=c('easting', 'northing')) %>%
+    dplyr::mutate(meas_runoff_m3_s = runoff_m_s*drainageArea_km2*1e6) #m3/s
+  
+  sf::st_crs(flume_sites) <- sf::st_crs('epsg:26912')
+
+  #set up hydrography------------------------------
+  basin <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/exp_catchments/walnut_gulch/boundary.shp')
+  basin <- sf::st_transform(basin, 'epsg:26912')
+  
+  #map ephemeral classification----------------------
+  network <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_15/NHDPLUS_H_1505_HU4_GDB/NHDPLUS_H_1505_HU4_GDB.gdb', layer='NHDFlowline')
+  network<- sf::st_zm(network)
+  network <- sf::st_transform(network, 'epsg:26912')
+  network <- sf::st_intersection(network, basin)
+  
+  network <- dplyr::left_join(network, rivNetFin_1505, 'NHDPlusID')
+  network <- dplyr::filter(network, is.na(perenniality)==0)
+  
+  #snap flume data to network----------------------------
+  nearestIndex <- sf::st_nearest_feature(flume_sites, network)
+  flume_sites$NHDPlusID <- network[nearestIndex,]$NHDPlusID
+  flume_sites2 <- dplyr::left_join(as.data.frame(flume_sites), network, by='NHDPlusID') %>%
+    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 20% of one another
+  
+  #basin map----------------------------------
+  map <- ggplot(network, aes(color=perenniality)) +
+    geom_sf()+
+    geom_sf(data=flume_sites[flume_sites$NHDPlusID %in% flume_sites2$NHDPlusID,],
+            color='black',
+            size=6)+
+    scale_color_manual(name='',
+                       values=c('#f18f01', '#006e90'),
+                       labels=c('Model ephemeral', 'Model non-ephemeral')) +
+    labs(tag='A')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20),
+          legend.position = c(0.8, 0.1),
+          legend.text=element_text(size=20),
+          plot.title = element_text(face = "italic", size = 26),
+          plot.tag = element_text(size=26,
+                                  face='bold'))+
+    xlab('')+
+    ylab('') +
+    ggtitle('Walnut Gulch Experimental Ephemeral Watershed, AZ')
+  
+  #Q validation-----------------------------
+  scatterPlot <- ggplot(flume_sites2, aes(x=meas_runoff_m3_s, y=Q_cms)) +
+    geom_abline(linetype='dashed', color='darkgrey', size=2) +
+    geom_point(size=8) +
+    labs(tag='B')+
+    xlim(0,0.1)+
+    ylim(0,0.1)+
+    ylab(expr(bold('Model Streamflow ['~frac(m^3,s)~']')))+
+    xlab(expr(bold('Mean Annual Streamflow ['~frac(m^3,s)~']')))+
+    #ylab('Model Streamflow [cms]')+
+    #xlab('Mean Annual Streamflow [cms]')+
+    theme(axis.title = element_text(size=20, face='bold'),
+          axis.text = element_text(size=18,face='bold'),
+          legend.position='none',
+          plot.tag = element_text(size=26,
+                                  face='bold'))
+  
+  
+  design <- "
+    AA
+    AA
+    AA
+    BB
+  "
+  
+  comboPlot <- patchwork::wrap_plots(A=map, B=scatterPlot, design=design)
+  
+  ggsave('cache/walnutGulch.jpg', comboPlot, width=13, height=12)
+  
+  out <- list('see cache/walnutGulch.jpg',
+              'df'=flume_sites2 %>% select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm')),
+              'percQEph_exported'=network[which.max(network$Q_cms),]$percQEph_reach)
+
+  return(out)
+}
 
 
 
@@ -302,21 +512,20 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 #'
 #' @name tokunaga_eph
 #'
-#' @param rivNetFin: routing model result for basin
+#' @param nhd_df: routing model result for basin
 #' @param results: model results for huc4 basin
 #' @param huc4: huc4 basin id
 #'
 #' @import dplyr
 #'
 #' @return df containing routing vs network length analysis
-tokunaga_eph <- function(rivNetFin, results, huc4){
+tokunaga_eph <- function(nhd_df, results, huc4){
   #prep results for joining to df
-  results <- data.frame('StreamOrde'=max(rivNetFin$StreamOrde),
+  results <- data.frame('StreamOrde'=max(nhd_df$StreamOrde),
                         'percQEph_exported' = results[1,]$percQEph_exported)
 
   #calc df for tokunaga
-  out <- rivNetFin %>%
-   # dplyr::filter(!is.na(width_m))%>%
+  out <- nhd_df %>%
     dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')),
                      length = sum(LengthKM))%>%
@@ -336,35 +545,9 @@ tokunaga_eph <- function(rivNetFin, results, huc4){
     dplyr::left_join(results, by='StreamOrde') %>%
     dplyr::slice_max(StreamOrde) %>% #minimum value is the exported one from the max stream orde
     dplyr::mutate(export = ifelse((huc4 %in% c('0418', '0419', '0424', '0426', '0428')) |  #remove scenarios that won't work with this scaling: 1) great lakes, 2) > 10% foreign basins, 3) net losing basins
-                                    any(rivNetFin$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean),
+                                    any(nhd_df$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean),
                  huc4 = huc4) %>%
     dplyr::select(c('huc4', 'percQEph_exported', 'export'))
 
   return(out)
-}
-
-
-
-
-
-#' Calculates frequency that headwater reaches are classified ephemeral
-#'
-#' @name ephemeralFirstOrder
-#'
-#' @param rivNetFin: routing model result for basin
-#' @param huc4: huc4 basin id
-#'
-#' @import dplyr
-#'
-#' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
-ephemeralFirstOrder <- function(rivNetFin, huc4) {
-  eph <- sum(rivNetFin$perenniality == 'ephemeral' & rivNetFin$dQdX_cms == rivNetFin$Q_cms) #if these are equal, then they are the headwater subset of 1st order streams...
-  total <- sum(rivNetFin$dQdX_cms == rivNetFin$Q_cms)
-  
-  out <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #percent headwater reaches that are ephemeral
-  
-  return(data.frame('huc4'=huc4,
-                    'percEph_firstOrder'=out,
-                    'num_eph_headwater'=eph,
-                    'num_headwater'=total))
 }

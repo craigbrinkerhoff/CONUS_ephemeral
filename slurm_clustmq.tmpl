@@ -1,6 +1,6 @@
 #!/bin/sh
 #SBATCH --job-name={{ job_name }}
-#SBATCH --partition=cpu
+#SBATCH --partition=gpu-preempt
 #SBATCH --output={{ log_file | /dev/null }} # you can add .%a for array index
 #SBATCH --error={{ log_file | /dev/null }}
 #SBATCH --mem-per-cpu={{ memory | 64000 }}
@@ -9,7 +9,5 @@
 
 module load netcdf-c
 
-ulimit -v $(( 1024 * {{ memory | 64000 }} ))
+ulimit -v $(( 1024 * {{ memory | 20000 }} ))
 CMQ_AUTH={{ auth }} R --no-save --no-restore -e 'clustermq:::worker("{{ master }}")'
-
-## note that memory needs to be 64gb to run some of these WTD extractions... Some of these need a tonnnnnn of memory because of some super high-res vector geometry
