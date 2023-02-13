@@ -51,6 +51,15 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
                                 ifelse(results$huc4 == '1407', 'C',NA))
   results$ids_east <- ifelse(results$huc4 == '0107', 'D',NA)
   results$ids_gl <- ifelse(results$huc4 == '0701', 'E',NA)
+  
+  #INSET MAP-----------------------------------------------
+  cdf_inset <- ggplot(results, aes(percQ_eph))+
+    stat_ecdf(size=2, color='black') +
+    xlab('% ephemeral discharge')+
+    ylab('Exceedance Probability')+
+    theme(axis.title = element_text(size=20),
+          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
+    theme(legend.position = 'none') #legend position settings
 
   #MAIN MAP------------------------------------------------------------------------------
   results_map <- ggplot(results) +
@@ -86,7 +95,8 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
                                    ylim=c(48,50),
                                    xlim=c(-88,-87))+
     scale_fill_gradientn(name='% Discharge ephemeral',
-                         colors=c('white', '#3E1F47'),#164d71
+                         colors=c('white', '#3E1F47'), # 281F32
+                         limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",
                                                 title.position = "bottom"))+
     labs(tag='A')+
@@ -100,6 +110,8 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
     theme(legend.position = c(.15, 0.1))+ #legend position settings
     xlab('')+
     ylab('')
+
+  results_map <- results_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ##RIVER NETWORK MAP 0107-------------------------------------------------------------------------------------
   net_0107 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_01/NHDPLUS_H_0107_HU4_GDB/NHDPLUS_H_0107_HU4_GDB.gdb', layer='NHDFlowline')
@@ -209,19 +221,17 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
     ggtitle(paste0('Rio Grande Endorheic:\n', round(results[results$huc4 == '1305',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1305',]$percQ_eph,0), '%)'))
   
     ##EXTRACT SHARED LEGEND-----------------
-    hydrography_legend <- cowplot::get_legend(
-                                    hydrography_0107 +
-                                      labs(tag = '')+
-                                      theme(legend.position = "bottom",
-                                            legend.text = element_text(size=24),
-                                            legend.title = element_text(size=26,
-                                                                    face='bold'),
-                                            legend.box="vertical",
-                                            legend.margin=margin(),
-                                            legend.spacing.x = unit(2, 'cm')) +
-                                      guides(color = guide_legend(override.aes = list(size=10))))
+    hydrography_legend <- cowplot::get_legend(hydrography_0107 +
+                                                  labs(tag = '')+
+                                                  theme(legend.position = "bottom",
+                                                        legend.text = element_text(size=24),
+                                                        legend.title = element_text(size=26, face='bold'),
+                                                        legend.box="vertical",
+                                                        legend.margin=margin(),
+                                                        legend.spacing.x = unit(2, 'cm')) +
+                                                  guides(color = guide_legend(override.aes = list(size=10)))) #fill legend size settings
 
-    ##COMBO PLOT------------------------------
+    ##BUILD PLOT----------------------------
     design <- "
     AAAA
     AAAA
@@ -284,30 +294,18 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   ####SUMMARY STATS-------------------
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
   dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
-  #  dplyr::summarise(percQ_eph_order = mean(percQEph_reach_mean*100),
-   #           percQ_eph_order_min =  ifelse(mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100) < 0,0,mean(percQEph_reach_mean*100) - sd(percQEph_reach_mean*100)),
-    #          percQ_eph_order_max =  ifelse(mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)> 100,100,mean(percQEph_reach_mean*100) + sd(percQEph_reach_mean*100)),
-     #         percArea_eph_order = mean(percAreaEph_reach_mean*100),
-      #        percArea_eph_order_min =  ifelse(mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100) < 0,0,mean(percAreaEph_reach_mean*100) - sd(percAreaEph_reach_mean*100)),
-      #        percArea_eph_order_max =  ifelse(mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)> 100,100,mean(percAreaEph_reach_mean*100) + sd(percAreaEph_reach_mean*100)),
-      #        percLength_eph_order = mean(percLengthEph*100),
-      #        percLength_eph_order_min = ifelse(mean(percLengthEph*100) - sd(percLengthEph*100) < 0,0,mean(percLengthEph*100) - sd(percLengthEph*100)),
-      #        percLength_eph_order_max = ifelse(mean(percLengthEph*100) + sd(percLengthEph*100) > 100,100,mean(percLengthEph*100) + sd(percLengthEph*100)))
 
   ####DISCHARGE PLOT--------------------
   plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_median*100)) +
     geom_boxplot(color='black', size=1.2, alpha=0.25)+
     stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
     stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
-  #  geom_ribbon(aes(ymin=percQ_eph_order_min, ymax=percQ_eph_order_max), alpha=0.25) +
-  #  geom_line(size=2)+
-  #  geom_point(size=11)+
     xlab('') +
     ylab('Median % ephemeral discharge')+
     scale_fill_manual(name='',
-                      values=c('#688B55', '#2D93AD'))+
+                      values=c('#2b3a67', '#b56b45'))+
     scale_color_manual(name='',
-                       values=c('#688B55', '#2D93AD'))+
+                       values=c('#2b3a67', '#b56b45'))+
     ylim(0,100)+
     labs(tag='A')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -322,15 +320,12 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     geom_boxplot(color='black', size=1.2, alpha=0.25)+
     stat_summary(fun = mean,geom = 'line',aes(group = region, colour = region),position = position_dodge(width = 0.9), size=2)+
     stat_summary(fun = mean,geom = 'point',aes(group = region, colour = region),size=12, position = position_dodge(width = 0.9))+
-  #  geom_ribbon(aes(ymin=percArea_eph_order_min, ymax=percArea_eph_order_max), alpha=0.25) +
-  #  geom_line(size=2)+
-  #  geom_point(size=11)+
     xlab('') +
     ylab('Median % ephemeral drainage area')+
     scale_fill_manual(name='',
-                      values=c('#688B55', '#2D93AD'))+
+                      values=c('#2b3a67', '#b56b45'))+
     scale_color_manual(name='',
-                       values=c('#688B55', '#2D93AD'))+
+                       values=c('#2b3a67', '#b56b45'))+
     ylim(0,100)+
     labs(tag='B')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -347,7 +342,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     xlab('Stream Order') +
     ylab('% ephemeral streams by length')+
     scale_color_manual(name='',
-                       values=c('#688B55', '#2D93AD'))+
+                       values=c('#2b3a67', '#b56b45'))+ #'#688B55', '#2D93AD'
     ylim(0,100)+
     labs(tag='C')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -358,16 +353,16 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
           legend.text = element_text(size=26))
 
 
-  #setup plot layout 
+  ##BUILD PLOT----------------------------
   design <- "
     AB
     CC
   "
-  
+
   comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, C=plotN, design=design)
   
   
-  ggsave('cache/paper_figures/fig2.jpg', comboPlot, width=18, height=18)
+  ggsave('cache/paper_figures/fig2.jpg', comboPlot, width=20, height=20)
   return('see cache/paper_figures/fig2.jpg')
 }
 
@@ -417,31 +412,37 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys,0)
   joinedData$n_flw_d <- round(joinedData$n_flw_d,0)
   joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
+
+  #INSET MAP-----------------------------------------------
+  cdf_inset <- ggplot(results, aes(num_flowing_dys))+
+    stat_ecdf(size=2, color='black') +
+    xlab('Annual ephemeral flow\ndays')+
+    ylab('Exceedance Probability')+
+    xlim(0,365)+
+    theme(axis.title = element_text(size=20),
+          axis.text = element_text(family="Futura-Medium", size=18),
+          legend.position = 'none')
   
   ##MAIN MAP------------------------------------------
   flowingDaysFig <- ggplot(results) +
     geom_sf(aes(fill=num_flowing_dys), #observed
             color='black',
             size=0.5) + #map
-    scale_fill_gradientn(name='Average annual ephemeral flow days',
-                         colors = c("#FF4B1F", "#f7e9e8", "#044976"),
+    scale_fill_gradientn(name='Annual ephemeral flow days',
+                         colors = c("#9e2a2b", "white", "#2b2d42"), #c("#FF4B1F", "#f7e9e8", "#044976")
                          guide = guide_colorbar(direction = "horizontal",title.position = "bottom"),
                          limits= c(0,365))+
-    ggnewscale::new_scale_fill()+ #'resets' scale so we can do two scale_fills in the same plot
-    geom_sf(data=states,
+    geom_sf(data=states,  #conus domain
             color='black',
             size=1.0,
-            alpha=0)+ #conus domain
-    geom_sf(data=joinedData,
-            color='#650d1b',
+            alpha=0)+
+    geom_sf(data=joinedData,  #verification data locations
+            color='#564C4D',
             size=10,
-            stroke=2)+ #verification data locations
-    scale_fill_manual(name='',
-                      values=c('#264653', '#2a9d8f'),
-                      guide='none')+
+            stroke=2)+
     labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.2, 0.1),
+    theme(legend.position = c(.15, 0.10),
           legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 20),
@@ -454,48 +455,47 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   ##VERIFICATION FIGURE------------------  
   flowingDaysVerifyFig <- ggplot(joinedData, aes(x=n_flw_d, y=num_flowing_dys))+
     geom_abline(size=2, linetype='dashed', color='darkgrey')+
-    geom_point(size=12, color='#650d1b', alpha=0.35)+
+    geom_point(size=12, color='#564C4D', alpha=0.35)+
+    geom_smooth(method='lm', size=2, color='black', se=F)+
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(num_flowing_dys~n_flw_d, data=joinedData))$r.squared,2)), x=50, y=350, size=9)+
     annotate('text', label=expr(SE: ~ !!round(summary(lm(num_flowing_dys~n_flw_d, data=joinedData))$sigma,0) ~ days), x=50, y=300, size=9)+
-    annotate('text', label=paste0('n = ', nrow(joinedData), ' catchments'), x=300, y=50, size=9, color='black')+
-    ylab('Basin predicted days/yr')+
-    xlab('Catchment measured days/yr')+
+    annotate('text', label=paste0('n = ', nrow(joinedData), ' catchments'), x=250, y=50, size=9, color='black')+
+    xlab('In situ days/yr')+
+    ylab('Modeled days/yr')+
     ylim(0,365)+
     xlim(0,365)+
+    theme(axis.title = element_text(size=20),
+      axis.text = element_text(family="Futura-Medium", size=18),
+      legend.position = 'none')+
     labs(tag='B')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
           plot.title = element_text(size = 30, face = "bold"),
           legend.position=c(0.85, 0.20),
-          legend.title =element_blank(),
           legend.text = element_text(family = "Futura-Medium", size = 26),
           legend.key = element_rect(fill = "grey"),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.spacing.x = unit(1.5, 'cm')) +
-    guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
+                                  face='bold'))
   
   ##HISTOGRAM FIGURE------------------
-  flowingDaysHist <- ggplot(results, aes(x=num_flowing_dys))+
-    geom_histogram(size=2, fill='lightblue', color='black', binwidth=10)+#,  aes(y = ..density..))+
- #   stat_function(fun = function(x,mean,sd){10*nrow(results)*dlnorm(x,mean,sd)}, size=2, color='darkgreen', args = list(mean = log(mean(results$num_flowing_dys, na.rm=T)), sd = log(sd(results$num_flowing_dys, na.rm=T))))+
-    xlab('Predicted days/yr')+
-    ylab('# basins')+
-    xlim(-10,365)+
+  forPlot <- tidyr::gather(joinedData, key=key, value=value, c('num_flowing_dys', 'n_flw_d'))
+  flowingDaysCDF <- ggplot(forPlot, aes(value, linetype=key))+
+    stat_ecdf(size=2, color='#564C4D') +
+    scale_linetype_manual(name='', labels=c('In situ', 'Modeled'), values=c('dotted', 'solid'))+
+    xlab('Annual ephemeral flow days')+
+    ylab('Exceedance Probability')+
+    xlim(0,365)+
     labs(tag='C')+
     theme(axis.text=element_text(size=24),
           axis.title=element_text(size=26,face="bold"),
           plot.title = element_text(size = 30, face = "bold"),
-          legend.position=c(0.20, 0.85),
-          legend.title =element_blank(),
+          legend.position=c(0.75, 0.20),
           legend.text = element_text(family = "Futura-Medium", size = 26),
-          legend.key = element_rect(fill = "grey"),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.spacing.x = unit(1.5, 'cm')) +
-    guides(fill = guide_legend(override.aes = list(size = 3),  keyheight = 4))
+                                  face='bold')) +
+    guides(linetype=guide_legend(keywidth = 3, keyheight = 1)) #linetype size legend settings
   
-  ##COMBO PLOT------------------------
+  ##BUILD PLOT------------------------
   design <- "
    AAAA
    AAAA
@@ -506,9 +506,94 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
    BBCC
    "
   
-  comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysHist, design=design)
-  
-  
+  flowingDaysFig <- flowingDaysFig + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)  
+  comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysCDF, design=design)
+
   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
   return('see cache/paper_figures/fig3.jpg')
+}
+
+
+
+
+
+
+
+
+#' create ephemeral drainage area paper figure
+#'
+#' @name areaMapFunction
+#'
+#' @param shapefile_fin: final sf object with model results
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#'
+#' @return land use results figure (also writes figure to file)
+lengthMapFunction <- function(shapefile_fin) {
+  theme_set(theme_classic())
+  
+  ##GET DATA
+  results <- shapefile_fin$shapefile
+  results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
+  
+  # CONUS boundary
+  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  states <- st_union(states)
+  
+  #results shapefile
+  results$percLength_eph <- round(results$perc_length_eph*100,0) #setup percent
+
+  #INSET MAP-----------------------------------------------
+  cdf_inset <- ggplot(results, aes(percLength_eph))+
+    stat_ecdf(size=2, color='black') +
+    xlab('% ephemeral network\nextent')+
+    ylab('Exceedance Probability')+
+    theme(axis.title = element_text(size=20),
+          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
+    theme(legend.position = 'none') #legend position settings
+
+  #LENGTH MAP-------------------------------------------------
+  length_map <- ggplot(results) +
+    geom_sf(aes(fill=percLength_eph), #actual map
+            color='black',
+            size=0.5) +
+    geom_sf(data=states,
+            color='black',
+            size=1.25,
+            alpha=0)+
+    scale_fill_gradientn(name='% ephemeral network extent',
+                         colors=c('white', '#400406'),
+                         limits=c(0,100),
+                         guide = guide_colorbar(direction = "horizontal",
+                                                title.position = "bottom"))+
+    scale_color_brewer(name='',
+                       palette='Dark2',
+                       guide='none')+
+    theme(axis.title = element_text(size=26, face='bold'),axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = c(0.15, 0.1),
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 18),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                                  face='bold'))+
+    xlab('')+
+    ylab('')
+  
+  #add inset
+  length_map <- length_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
+
+  ggsave('cache/paper_figures/fig4.jpg', length_map, width=20, height=13)
+  return('see cache/paper_figures/fig4.jpg')
 }

@@ -472,13 +472,14 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   scatterPlot <- ggplot(flume_sites2, aes(x=meas_runoff_m3_s, y=Q_cms)) +
     geom_abline(linetype='dashed', color='darkgrey', size=2) +
     geom_point(size=8) +
+    geom_smooth(method='lm', size=1.5, color='black', se=F)+
     labs(tag='B')+
     xlim(0,0.1)+
     ylim(0,0.1)+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(Q_cms~meas_runoff_m3_s, data=flume_sites2))$r.squared,2)), x=10, y=75, size=9)+
+    annotate('text', label=paste0('n = ', nrow(flume_sites2), ' basins'), x=75, y=15, size=7, color='black')+
     ylab(expr(bold('Model Streamflow ['~frac(m^3,s)~']')))+
     xlab(expr(bold('Mean Annual Streamflow ['~frac(m^3,s)~']')))+
-    #ylab('Model Streamflow [cms]')+
-    #xlab('Mean Annual Streamflow [cms]')+
     theme(axis.title = element_text(size=20, face='bold'),
           axis.text = element_text(size=18,face='bold'),
           legend.position='none',

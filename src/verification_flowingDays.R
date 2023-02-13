@@ -136,7 +136,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               reference=first(reference)) %>%
     dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #see source reference for these numbers
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
-                  reference='Stone et al. 2008') %>%
+                  reference='@stoneLongtermRunoffDatabase2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
 
   #wrangling Santa Rita doi:10.1029/2006WR005733------------------------
@@ -152,7 +152,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               reference=first(reference)) %>%
     dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #see source reference for these numbers
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
-                  reference='Stone et al. 2008') %>%
+                  reference='@stoneLongtermRunoffDatabase2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
   
   #wrangling reynolds creek https://doi.org/10.1029/2001WR000413------------------
@@ -174,7 +174,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               drainage_area_km2 = mean(drainage_area_km2),
               watershed=first(watershed)) %>%
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
-                  reference='Slaughter et al. 2001') %>%
+                  reference='@slaughterThirtyfiveYearsResearch2001') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
 
   #wrangling Kentucky Robinson Forest https://doi.org/10.1002/ecs2.2654-----------
@@ -185,13 +185,13 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   kentucky <- kentucky %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days', 'reference'))
 
-  # #add Duke Forest manually (https://doi.org/10.1002/hyp.11301)---------------------------------------
+  #add Duke Forest manually (https://doi.org/10.1002/hyp.11301)---------------------------------------
   dukeForest <- data.frame('watershed'='dukeForest',
                            'site'='a',
                            'period_of_record_yrs'=1,
                            'drainage_area_km2'=3.3*0.01,
                            'ma_num_flowing_days'=(365*0.44),
-                           'reference'='Zimmer & McGlynn 2017')
+                           'reference'='@zimmerBidirectionalStreamGroundwater2017')
 
   #add Montoyas watershed, urban system near Albuquerque, New Mexico manually (https://doi.org/10.1016/j.ejrh.2022.101089)-------------------------------------
   montoyas <- data.frame('watershed'='montoyas',
@@ -199,7 +199,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                          'period_of_record_yrs'=7, #2008-2014
                          'drainage_area_km2'=142,
                          'ma_num_flowing_days'=mean(c(2,0,1,0,0,5,2)), #See paper Table 1 for runoff events per year
-                         'reference'='Schoener 2022')
+                         'reference'='@schoenerImpactUrbanizationStormwater2022')
 
   #add additional Arizona data https://doi.org/10.1016/j.jaridenv.2016.12.004-----------------------------------------------------
   more_arizona$ma_num_flowing_days <- 365*more_arizona$perc_record_flowing

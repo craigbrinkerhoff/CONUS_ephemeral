@@ -28,7 +28,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   basins_overall <- dplyr::left_join(basins_overall, combined_results, by='huc4')
 
   #round for mapping
-  basins_overall <- select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQEph_exported', 'percAreaEph_exported', 'QEph_exported_cms', 'AreaEph_exported_km2','geometry'))
+  basins_overall <- dplyr::select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'percQEph_exported', 'percAreaEph_exported', 'perc_length_eph', 'QEph_exported_cms', 'AreaEph_exported_km2', 'geometry'))
   basins_overall <- dplyr::filter(basins_overall, is.na(percQEph_exported)==0) #remove international basins that don't flow into US at all
   
   return(list('note'='see cache/results_fin.shp',

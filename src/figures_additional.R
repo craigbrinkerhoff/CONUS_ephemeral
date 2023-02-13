@@ -67,8 +67,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.box.background = element_rect(colour = "black"))+
+                                  face='bold'))+
     xlab('')+
     ylab('')
   
@@ -86,7 +85,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     ylab('% Discharge ephemeral\n(via routing model)') +
     xlab('% Upstream network ephemeral\n(via scaling theory)') +
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(percQEph_exported~export, data=forPlot))$r.squared,2)), x=10, y=75, size=9)+
-    annotate('text', label=paste0('n = ', nrow(forPlot), ' basins'), x=75, y=15, size=7, color='black')+
+    annotate('text', label=paste0('n = ', nrow(forPlot), ' basins'), x=75, y=15, size=9, color='black')+
     labs(tage='C')+
     theme(axis.text=element_text(size=20),
           axis.title=element_text(size=24,face="bold"),
@@ -137,7 +136,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
     scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(log(QBMA)~log(Q_MA), data=assessmentDF))$r.squared,2)), x=0.01, y=175, size=9)+
     annotate('text', label=expr(MAE: ~ !!round(Metrics::mae(assessmentDF$QBMA, assessmentDF$Q_MA),1) ~ frac(m^3, s)), x=0.01, y=1000, size=9)+
-    annotate('text', label=paste0('n = ', nrow(assessmentDF), ' streams'), x=100, y=0.001, size=7, color='black')+
+    annotate('text', label=paste0('n = ', nrow(assessmentDF), ' streams'), x=100, y=0.001, size=9, color='black')+
     scale_y_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100,1000, 10000),
                   labels=c('0.0001', '0.001', '0.01', '0.1', '1', '10', '100', '1000', '10000'))+
     scale_x_log10(breaks=c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000),
@@ -229,8 +228,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.box.background = element_rect(colour = "black"))+
+                                  face='bold'))+
     xlab('')+
     ylab('')
   
@@ -251,8 +249,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.box.background = element_rect(colour = "black"))+
+                                  face='bold'))+
     xlab('')+
     ylab('')
   
@@ -328,8 +325,7 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.box.background = element_rect(colour = "black"))+
+                                  face='bold'))+
     xlab('')+
     ylab('')
   
@@ -349,8 +345,7 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
-                                  face='bold'),
-          legend.box.background = element_rect(colour = "black"))+
+                                  face='bold'))+
     xlab('')+
     ylab('')
   
@@ -388,7 +383,7 @@ boxPlots_classification <- function(val_shapefile_fin){
   boxplots <- ggplot(forPlot, aes(x=key, y=value, fill=key)) +
     geom_boxplot(color='black', size=1.25) +
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
-    annotate('text', label=paste0('n = ', nrow(df), ' basins'), x=as.factor('basinSpecificity'), y=0.20, size=8)+
+    annotate('text', label=paste0('n = ', nrow(df), ' basins'), x=as.factor('basinSpecificity'), y=0.20, size=7)+
     scale_fill_brewer(palette='Set2') +
     scale_y_continuous(limits=c(0,1), breaks=c(0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))+
     scale_x_discrete('', labels=c('Accuracy', 'Sensitivity', 'Specificity', 'TSS'))+
@@ -399,7 +394,7 @@ boxPlots_classification <- function(val_shapefile_fin){
       legend.position='none',
       axis.text.x = element_text( angle=60,hjust = 1, size=20, color="black"))
 
-  ggsave('cache/boxPlots_classification.jpg', boxplots, width=9, height=8)
+  ggsave('cache/boxPlots_classification.jpg', boxplots, width=8, height=8)
 
   return(boxplots)
 }
@@ -486,7 +481,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
           axis.title=element_text(size=22,face="bold"),
           legend.text = element_text(size=17),
           legend.position='bottom')
-  ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=9, height=8)
+  ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=8, height=8)
 
   #check sensitivity of classification accuracy to snapping threshold
   accuracyPlot <- ggplot(out, aes(x=factor(thresh), y=basinAccuracy.basinAccuracy*100, fill=factor(thresh))) +
@@ -499,7 +494,7 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
     theme(axis.text=element_text(size=20),
       axis.title=element_text(size=22,face="bold"),
       legend.position = 'none')
-  ggsave('cache/acc_sens_to_snapping.jpg', accuracyPlot, width=9, height=8)
+  ggsave('cache/acc_sens_to_snapping.jpg', accuracyPlot, width=8, height=8)
 
   return(list('tradeOffPlot'=tradeOffPlot,
               'accuracyPlot'=accuracyPlot))
@@ -626,6 +621,15 @@ areaMapFunction <- function(shapefile_fin) {
   #results shapefile
   results$percArea_eph <- round(results$percAreaEph_exported*100,0) #setup percent
   
+  #INSET MAP-----------------------------------------------
+  cdf_inset <- ggplot(results, aes(percArea_eph))+
+    stat_ecdf(size=2, color='black') +
+    xlab('% ephemeral drainage area')+
+    ylab('Exceedance Probability')+
+    theme(axis.title = element_text(size=20),
+          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
+    theme(legend.position = 'none') #legend position settings
+
   #MAIN MAP-------------------------------------------------
   results_map <- ggplot(results) +
     geom_sf(aes(fill=percArea_eph), #actual map
@@ -636,7 +640,7 @@ areaMapFunction <- function(shapefile_fin) {
             size=1.25,
             alpha=0)+
     scale_fill_gradientn(name='% ephemeral drainage area',
-                         colors=c('white', '#2c6e49', '#173B27'),
+                         colors=c('white', '#2c6e49'),
                          limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",
                                                 title.position = "bottom"))+
@@ -644,7 +648,7 @@ areaMapFunction <- function(shapefile_fin) {
                        palette='Dark2',
                        guide='none')+
     theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
-    theme(legend.position = c(.20, 0.1),
+    theme(legend.position = c(.15, 0.1),
           legend.key.size = unit(2, 'cm'))+ #legend position settings
     theme(text = element_text(family = "Futura-Medium"), #legend text settings
           legend.title = element_text(face = "bold", size = 20),
@@ -652,6 +656,8 @@ areaMapFunction <- function(shapefile_fin) {
     xlab('')+
     ylab('')
   
+  results_map <- results_map + inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
+
   ggsave('cache/drainageAreaMap.jpg', results_map, width=20, height=15)
   return('see cache/drainageAreaMap.jpg')
 }
@@ -660,53 +666,49 @@ areaMapFunction <- function(shapefile_fin) {
 
 
 
-#' create ephemeral discharge vs river size plot
+
+
+#' create ephemeral hydrography map per huc4 basin
 #'
-#' @name hydrographyFigure
+#' @name hydrographyFigureSmall
 #'
 #' @param shapefile_fin: final model results shapefile
-#' @param net_0108_results model results
-#' @param net_1023_results model results
-#' @param net_0313_results model results
-#' @param net_1503_results model results
-#' @param net_1306_results model results
-#' @param net_0804_results model results
-#' @param net_0501_results model results
-#' @param net_1703_results model results
-#' @param net_0703_results model results
-#' @param net_0304_results model results
-#' @param net_1605_results model results
-#' @param net_1507_results model results
-#' @param net_0317_results model results
-#' @param net_0506_results model results
-#' @param net_0103_results model results
-#' @param net_1709_results model results
-#' 
+#' @param net_results: hydrography df detailing each reach's perenniality
+#' @param huc4: huc4 basin id 
 #'
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
 #' @import cowplot
 #'
-#' @return writes to file
-hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results, net_0313_results, net_1503_results,
-                              net_1306_results, net_0804_results, net_0501_results, net_1703_results,
-                              net_0703_results, net_0304_results, net_1605_results, net_1507_results,
-                              net_0317_results, net_0506_results, net_0103_results, net_1709_results){
+#' @return ggplot object of hydrography map
+hydrographyFigureSmall <- function(shapefile_fin, net_results, huc4){
   theme_set(theme_classic())
   
   ##GET DATA--------------------------------
+  huc2 <- substr(huc4, 1, 2)
   results <- shapefile_fin$shapefile
+  name <- results[results$huc4 == huc4,]$name
+  exported_abs <- results[results$huc4 == huc4,]$QEph_exported_cms
+  exported_perc <- results[results$huc4 == huc4,]$percQEph_exported
+
+  net <- sf::st_read(dsn = paste0('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_',huc2,'/NHDPLUS_H_',huc4,'_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  if('MULTICURVE' %in% sf::st_geometry_type(net)){
+    net <- sf::st_cast(net, 'MULTILINESTRING') #plotting functions can't handle the few streamlines saved as multicurve....
+  }
+
+  net <- dplyr::left_join(net, net_results, 'NHDPlusID')
+  net <- dplyr::filter(net, is.na(perenniality)==0)
   
-  ##RIVER NETWORK MAP 0108-------------------------------------------------------------------------------------
-  net_0108 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_01/NHDPLUS_H_0108_HU4_GDB/NHDPLUS_H_0108_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0108 <- dplyr::left_join(net_0108, net_0108_results, 'NHDPlusID')
-  net_0108 <- dplyr::filter(net_0108, is.na(perenniality)==0)
+  #recast foreign streams as non-ephemeral for visualization's sake
+  net$perenniality <- ifelse(net$perenniality == 'foreign', 'non_ephemeral', net$perenniality)
   
-  #recast as non-ephemeral for visualization's sake
-  net_0108$perenniality <- ifelse(net_0108$perenniality == 'foreign', 'non_ephemeral', net_0108$perenniality)
-  
-  hydrography_0108 <- ggplot(net_0108, aes(color=perenniality, size=Q_cms)) +
+  #make plot name that is line-aware (so cool!!)
+  plotName <- paste0(name,': ', round(exported_abs*86400*365*1e-9,0), ' km3/yr (', round(exported_perc*100,0), '%)')
+  plotName <- stringr::str_wrap(plotName, 20) #wrap to twenty characters, seems to fit nicely
+
+  #make hydrography map (keeping legend for later)
+  hydrography <- ggplot(net, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='Stream Type',
@@ -716,485 +718,62 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
                       breaks=c(0.1, 1, 10, 100),
                       range=c(0.4,2),
                       guide = "none")+
-    labs(tag='A')+
     theme(plot.title = element_text(face = "italic", size = 26),
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
+         plot.tag = element_text(size=26,
+                                face='bold'))+
     ggspatial::annotation_scale(location = "bl",
                                 height = unit(0.5, "cm"),
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Connecticut River:\n', round(results[results$huc4 == '0108',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0108',]$percQEph_exported*100,0), '%)'))
+    ggtitle(plotName)
   
-  ##RIVER NETWORK MAP 1023-------------------------------------------------------------------------------------
-  net_1023 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_10/NHDPLUS_H_1023_HU4_GDB/NHDPLUS_H_1023_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1023 <- dplyr::left_join(net_1023, net_1023_results, 'NHDPlusID')
-  net_1023 <- dplyr::filter(net_1023, is.na(perenniality)==0)
+  return(hydrography)
+}
+
+
+
+
+
+
+#' combines 16 hydrography ggplots into single patchwork plot
+#'
+#' @name comboHydroSmalls
+#'
+#' @param hydroMap_1: ggplot obejct mapping network 1
+#' @param hydroMap_2: ggplot obejct mapping network 2
+#' @param hydroMap_3: ggplot obejct mapping network 3
+#' @param hydroMap_4: ggplot obejct mapping network 4
+#' @param hydroMap_5: ggplot obejct mapping network 5
+#' @param hydroMap_6: ggplot obejct mapping network 6
+#' @param hydroMap_7: ggplot obejct mapping network 7
+#' @param hydroMap_8: ggplot obejct mapping network 8
+#' @param hydroMap_9: ggplot obejct mapping network 9
+#' @param hydroMap_10: ggplot obejct mapping network 10
+#' @param hydroMap_11: ggplot obejct mapping network 11
+#' @param hydroMap_12: ggplot obejct mapping network 12
+#' @param hydroMap_13: ggplot obejct mapping network 13
+#' @param hydroMap_14: ggplot obejct mapping network 14
+#' @param hydroMap_15: ggplot obejct mapping network 15
+#' @param hydroMap_16: ggplot obejct mapping network 16
+#' @param imageID: id for writing image to file
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#'
+#' @return writes patchwork plot to file
+comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
+                             hydroMap_5, hydroMap_6, hydroMap_7, hydroMap_8,
+                             hydroMap_9, hydroMap_10, hydroMap_11, hydroMap_12,
+                             hydroMap_13, hydroMap_14, hydroMap_15, hydroMap_16, imageID){
   
-  #recast as non-ephemeral for visualization's sake
-  net_1023$perenniality <- ifelse(net_1023$perenniality == 'foreign', 'non_ephemeral', net_1023$perenniality)
-  
-  hydrography_1023 <- ggplot(net_1023, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='B')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Missouri/Little Sioux\nRiver: ', round(results[results$huc4 == '1023',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1023',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0313-------------------------------------------------------------------------------------
-  net_0313 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_03/NHDPLUS_H_0313_HU4_GDB/NHDPLUS_H_0313_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0313 <- dplyr::left_join(net_0313, net_0313_results, 'NHDPlusID')
-  net_0313 <- dplyr::filter(net_0313, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0313$perenniality <- ifelse(net_0313$perenniality == 'foreign', 'non_ephemeral', net_0313$perenniality)
-  
-  hydrography_0313 <- ggplot(net_0313, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='C')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Apalachicola River:\n', round(results[results$huc4 == '0313',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0313',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 1503-------------------------------------------------------------------------------------
-  net_1503 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_15/NHDPLUS_H_1503_HU4_GDB/NHDPLUS_H_1503_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1503 <- dplyr::left_join(net_1503, net_1503_results, 'NHDPlusID')
-  net_1503 <- dplyr::filter(net_1503, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1503$perenniality <- ifelse(net_1503$perenniality == 'foreign', 'non_ephemeral', net_1503$perenniality)
-  
-  hydrography_1503 <- ggplot(net_1503, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='D')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Lower Colorado River:\n', round(results[results$huc4 == '1503',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1503',]$percQEph_exported*100,0), '%)'))
-  
-  ##RIVER NETWORK MAP 1306-------------------------------------------------------------------------------------
-  net_1306 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_13/NHDPLUS_H_1306_HU4_GDB/NHDPLUS_H_1306_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1306 <- dplyr::left_join(net_1306, net_1306_results, 'NHDPlusID')
-  net_1306 <- dplyr::filter(net_1306, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1306$perenniality <- ifelse(net_1306$perenniality == 'foreign', 'non_ephemeral', net_1306$perenniality)
-  
-  hydrography_1306 <- ggplot(net_1306, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='E')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Upper Pecos River:\n', round(results[results$huc4 == '1306',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1306',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0804-------------------------------------------------------------------------------------
-  net_0804 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_08/NHDPLUS_H_0804_HU4_GDB/NHDPLUS_H_0804_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0804 <- dplyr::left_join(net_0804, net_0804_results, 'NHDPlusID')
-  net_0804 <- dplyr::filter(net_0804, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0804$perenniality <- ifelse(net_0804$perenniality == 'foreign', 'non_ephemeral', net_0804$perenniality)
-  
-  hydrography_0804 <- ggplot(net_0804, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='F')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Lower Red/Quachita\nRiver: ', round(results[results$huc4 == '0804',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0804',]$percQEph_exported*100,0), '%)'))
-  
-  ##RIVER NETWORK MAP 0501-------------------------------------------------------------------------------------
-  net_0501 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_05/NHDPLUS_H_0501_HU4_GDB/NHDPLUS_H_0501_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0501 <- dplyr::left_join(net_0501, net_0501_results, 'NHDPlusID')
-  net_0501 <- dplyr::filter(net_0501, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0501$perenniality <- ifelse(net_0501$perenniality == 'foreign', 'non_ephemeral', net_0501$perenniality)
-  
-  hydrography_0501 <- ggplot(net_0501, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='G')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Allegheny River:\n', round(results[results$huc4 == '0501',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0501',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 1703-------------------------------------------------------------------------------------
-  net_1703 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_17/NHDPLUS_H_1703_HU4_GDB/NHDPLUS_H_1703_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1703 <- dplyr::left_join(net_1703, net_1703_results, 'NHDPlusID')
-  net_1703 <- dplyr::filter(net_1703, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1703$perenniality <- ifelse(net_1703$perenniality == 'foreign', 'non_ephemeral', net_1703$perenniality)
-  
-  hydrography_1703 <- ggplot(net_1703, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='H')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Yakima River:\n', round(results[results$huc4 == '1703',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1703',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0703-------------------------------------------------------------------------------------
-  net_0703 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_07/NHDPLUS_H_0703_HU4_GDB/NHDPLUS_H_0703_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0703 <- dplyr::left_join(net_0703, net_0703_results, 'NHDPlusID')
-  net_0703 <- dplyr::filter(net_0703, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0703$perenniality <- ifelse(net_0703$perenniality == 'foreign', 'non_ephemeral', net_0703$perenniality)
-  
-  hydrography_0703 <- ggplot(net_0703, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='I')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('St. Croix River:\n', round(results[results$huc4 == '0703',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0703',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0304-------------------------------------------------------------------------------------
-  net_0304 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_03/NHDPLUS_H_0304_HU4_GDB/NHDPLUS_H_0304_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0304 <- dplyr::left_join(net_0304, net_0304_results, 'NHDPlusID')
-  net_0304 <- dplyr::filter(net_0304, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0304$perenniality <- ifelse(net_0304$perenniality == 'foreign', 'non_ephemeral', net_0304$perenniality)
-  
-  hydrography_0304 <- ggplot(net_0304, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='J')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Pee Dee River:\n', round(results[results$huc4 == '0304',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0304',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 1605-------------------------------------------------------------------------------------
-  net_1605 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_16/NHDPLUS_H_1605_HU4_GDB/NHDPLUS_H_1605_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1605 <- dplyr::left_join(net_1605, net_1605_results, 'NHDPlusID')
-  net_1605 <- dplyr::filter(net_1605, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1605$perenniality <- ifelse(net_1605$perenniality == 'foreign', 'non_ephemeral', net_1605$perenniality)
-  
-  hydrography_1605 <- ggplot(net_1605, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='K')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Central Lahontan River:\n', round(results[results$huc4 == '1605',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1605',]$percQEph_exported*100,0), '%)'))
-  
-  
-  
-  ##RIVER NETWORK MAP 1507-------------------------------------------------------------------------------------
-  net_1507 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_15/NHDPLUS_H_1507_HU4_GDB/NHDPLUS_H_1507_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1507 <- dplyr::left_join(net_1507, net_1507_results, 'NHDPlusID')
-  net_1507 <- dplyr::filter(net_1507, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1507$perenniality <- ifelse(net_1507$perenniality == 'foreign', 'non_ephemeral', net_1507$perenniality)
-  
-  hydrography_1507 <- ggplot(net_1507, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='L')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Lower Gila River:\n', round(results[results$huc4 == '1507',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1507',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0317-------------------------------------------------------------------------------------
-  net_0317 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_03/NHDPLUS_H_0317_HU4_GDB/NHDPLUS_H_0317_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0317 <- dplyr::left_join(net_0317, net_0317_results, 'NHDPlusID')
-  net_0317 <- dplyr::filter(net_0317, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0317$perenniality <- ifelse(net_0317$perenniality == 'foreign', 'non_ephemeral', net_0317$perenniality)
-  
-  hydrography_0317 <- ggplot(net_0317, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='M')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Pascagoula River:\n', round(results[results$huc4 == '0317',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0317',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0506-------------------------------------------------------------------------------------
-  net_0506 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_05/NHDPLUS_H_0506_HU4_GDB/NHDPLUS_H_0506_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0506 <- dplyr::left_join(net_0506, net_0506_results, 'NHDPlusID')
-  net_0506 <- dplyr::filter(net_0506, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0506$perenniality <- ifelse(net_0506$perenniality == 'foreign', 'non_ephemeral', net_0506$perenniality)
-  
-  hydrography_0506 <- ggplot(net_0506, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='N')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Scioto River:\n', round(results[results$huc4 == '0506',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0506',]$percQEph_exported*100,0), '%)'))
-  
-  
-  ##RIVER NETWORK MAP 0103-------------------------------------------------------------------------------------
-  net_0103 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_01/NHDPLUS_H_0103_HU4_GDB/NHDPLUS_H_0103_HU4_GDB.gdb', layer='NHDFlowline')
-  net_0103 <- dplyr::left_join(net_0103, net_0103_results, 'NHDPlusID')
-  net_0103 <- dplyr::filter(net_0103, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_0103$perenniality <- ifelse(net_0103$perenniality == 'foreign', 'non_ephemeral', net_0103$perenniality)
-  
-  hydrography_0103 <- ggplot(net_0103, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='O')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Kennebec River:\n', round(results[results$huc4 == '0103',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '0103',]$percQEph_exported*100,0), '%)'))
-  
-  
-  
-  ##RIVER NETWORK MAP 1709-------------------------------------------------------------------------------------
-  net_1709 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_17/NHDPLUS_H_1709_HU4_GDB/NHDPLUS_H_1709_HU4_GDB.gdb', layer='NHDFlowline')
-  net_1709 <- dplyr::left_join(net_1709, net_1709_results, 'NHDPlusID')
-  net_1709 <- dplyr::filter(net_1709, is.na(perenniality)==0)
-  
-  #recast as non-ephemeral for visualization's sake
-  net_1709$perenniality <- ifelse(net_1709$perenniality == 'foreign', 'non_ephemeral', net_1709$perenniality)
-  
-  hydrography_1709 <- ggplot(net_1709, aes(color=perenniality, size=Q_cms)) +
-    geom_sf()+
-    coord_sf(datum = NA)+
-    scale_color_manual(name='Stream Type',
-                       values=c('#f18f01','#006e90'),
-                       labels=c('Ephemeral','Not Ephemeral')) +
-    scale_size_binned(name='Discharge [cms]',
-                      breaks=c(0.1, 1, 10, 100),
-                      range=c(0.4,2),
-                      guide = "none")+
-    labs(tag='P')+
-    theme(plot.title = element_text(face = "italic", size = 26),
-          legend.position='none',
-          plot.tag = element_text(size=26,
-                                  face='bold'))+
-    ggspatial::annotation_scale(location = "bl",
-                                height = unit(0.5, "cm"),
-                                text_cex = 1)+
-    xlab('')+
-    ylab('') +
-    ggtitle(paste0('Willamette River:\n', round(results[results$huc4 == '1709',]$QEph_exported_cms*86400*365*1e-9,0), ' km3/yr (', round(results[results$huc4 == '1709',]$percQEph_exported*100,0), '%)'))
-  
-  
+  theme_set(theme_classic())
+
   ##EXTRACT SHARED LEGEND-----------------
   hydrography_legend <- cowplot::get_legend(
-    hydrography_0108 +
+    hydroMap_1 +
       labs(tag = '')+
       theme(legend.position = "bottom",
             legend.text = element_text(size=24),
@@ -1218,13 +797,86 @@ hydrographyFigure <- function(shapefile_fin, net_0108_results, net_1023_results,
     MNOP
     QQQQ
     "
-  comboPlot <- patchwork::wrap_plots(A=hydrography_0108+theme(legend.position='none'), B=hydrography_1023, C=hydrography_0313, D=hydrography_1503,
-                                     E=hydrography_1306, F=hydrography_0804, G=hydrography_0501, H=hydrography_1703,
-                                     I=hydrography_0703, J=hydrography_0304, K=hydrography_1605, L=hydrography_1507,
-                                     M=hydrography_0317, N=hydrography_0506, O=hydrography_0103, P=hydrography_1709,
+  comboPlot <- patchwork::wrap_plots(A=hydroMap_1 + theme(legend.position='none'), B=hydroMap_2 + theme(legend.position='none'), C=hydroMap_3 + theme(legend.position='none'), D=hydroMap_4 + theme(legend.position='none'),
+                                     E=hydroMap_5 + theme(legend.position='none'), F=hydroMap_6 + theme(legend.position='none'), G=hydroMap_7 + theme(legend.position='none'), H=hydroMap_8 + theme(legend.position='none'),
+                                     I=hydroMap_9 + theme(legend.position='none'), J=hydroMap_10 + theme(legend.position='none'), K=hydroMap_11 + theme(legend.position='none'), L=hydroMap_12 + theme(legend.position='none'),
+                                     M=hydroMap_13 + theme(legend.position='none'), N=hydroMap_14 + theme(legend.position='none'), O=hydroMap_15 + theme(legend.position='none'), P=hydroMap_16 + theme(legend.position='none'),
                                      Q=hydrography_legend, design=design)
   
-  ggsave('cache/hydrographyMaps.jpg', comboPlot, width=20, height=25)
+  ggsave(paste0('cache/hydrographyMaps_', imageID, '.jpg'), comboPlot, width=20, height=25)
   
-  return('see cache/hydrographyMaps.jpg')
+  return(paste0('cache/hydrographyMaps_', imageID, '.jpg'))
+}
+
+
+
+
+
+
+#' combines 13 hydrography ggplots into single patchwork plot
+#'
+#' @name comboHydroSmalls
+#'
+#' @param hydroMap_1: ggplot obejct mapping network 1
+#' @param hydroMap_2: ggplot obejct mapping network 2
+#' @param hydroMap_3: ggplot obejct mapping network 3
+#' @param hydroMap_4: ggplot obejct mapping network 4
+#' @param hydroMap_5: ggplot obejct mapping network 5
+#' @param hydroMap_6: ggplot obejct mapping network 6
+#' @param hydroMap_7: ggplot obejct mapping network 7
+#' @param hydroMap_8: ggplot obejct mapping network 8
+#' @param hydroMap_9: ggplot obejct mapping network 9
+#' @param hydroMap_10: ggplot obejct mapping network 10
+#' @param hydroMap_11: ggplot obejct mapping network 11
+#' @param hydroMap_12: ggplot obejct mapping network 12
+#' @param hydroMap_13: ggplot obejct mapping network 13
+#' @param imageID: id for writing image to file
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#'
+#' @return writes patchwork plot to file
+comboHydroSmalls_13 <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
+                             hydroMap_5, hydroMap_6, hydroMap_7, hydroMap_8,
+                             hydroMap_9, hydroMap_10, hydroMap_11, hydroMap_12,
+                             hydroMap_13, imageID){
+  
+  theme_set(theme_classic())
+
+  ##EXTRACT SHARED LEGEND-----------------
+  hydrography_legend <- cowplot::get_legend(
+    hydroMap_1 +
+      labs(tag = '')+
+      theme(legend.position = "bottom",
+            legend.text = element_text(size=24),
+            legend.title = element_text(size=26,
+                                        face='bold'),
+            legend.box="vertical",
+            legend.margin=margin(),
+            legend.spacing.x = unit(2, 'cm')) +
+      guides(color = guide_legend(override.aes = list(size=10))))
+  
+  
+  ##COMBO PLOT------------------------------
+  design <- "
+    ABCD
+    ABCD
+    EFGH
+    EFGH
+    IJKL
+    IJKL
+    MNOP
+    MNOP
+    QQQQ
+    "
+  comboPlot <- patchwork::wrap_plots(A=hydroMap_1 + theme(legend.position='none'), B=hydroMap_2 + theme(legend.position='none'), C=hydroMap_3 + theme(legend.position='none'), D=hydroMap_4 + theme(legend.position='none'),
+                                     E=hydroMap_5 + theme(legend.position='none'), F=hydroMap_6 + theme(legend.position='none'), G=hydroMap_7 + theme(legend.position='none'), H=hydroMap_8 + theme(legend.position='none'),
+                                     I=hydroMap_9 + theme(legend.position='none'), J=hydroMap_10 + theme(legend.position='none'), K=hydroMap_11 + theme(legend.position='none'), L=hydroMap_12 + theme(legend.position='none'),
+                                     M=hydroMap_13 + theme(legend.position='none'),Q=hydrography_legend, design=design)
+  
+  ggsave(paste0('cache/hydrographyMaps_', imageID, '.jpg'), comboPlot, width=20, height=25)
+  
+  return(paste0('cache/hydrographyMaps_', imageID, '.jpg'))
 }

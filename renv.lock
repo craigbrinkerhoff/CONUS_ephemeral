@@ -121,10 +121,10 @@
     },
     "batchtools": {
       "Package": "batchtools",
-      "Version": "0.9.15",
+      "Version": "0.9.16",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "1f8105b6e7c01c37b58559fbf91425e3",
+      "Hash": "600b6e43b22f8ff7c7d0bb5878ebb65a",
       "Requirements": [
         "R6",
         "backports",
@@ -440,10 +440,10 @@
     },
     "future": {
       "Package": "future",
-      "Version": "1.25.0",
+      "Version": "1.31.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "877024e372cf61e41f5d13eafd8d4bac",
+      "Hash": "f3f0fbe5ce9b77c002f8c5170790538a",
       "Requirements": [
         "digest",
         "globals",
@@ -453,13 +453,14 @@
     },
     "future.batchtools": {
       "Package": "future.batchtools",
-      "Version": "0.10.0",
+      "Version": "0.11.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "ed6d40f78a5761934d6d3ba77d7ddac2",
+      "Hash": "ebfd7dcaeca039e3e165bf4aefe5f7f7",
       "Requirements": [
         "batchtools",
-        "future"
+        "future",
+        "parallelly"
       ]
     },
     "generics": {
@@ -550,10 +551,10 @@
     },
     "globals": {
       "Package": "globals",
-      "Version": "0.14.0",
+      "Version": "0.16.2",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "eca8023ed5ca6372479ebb9b3207f5ae",
+      "Hash": "baa9585ab4ce47a9f4618e671778cc6f",
       "Requirements": [
         "codetools"
       ]
@@ -793,10 +794,10 @@
     },
     "parallelly": {
       "Package": "parallelly",
-      "Version": "1.31.1",
+      "Version": "1.34.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "115faaa1a50897c3e2339d1cb7d3d493",
+      "Hash": "2a795ec0ddbfe465ca0d6471039631bf",
       "Requirements": []
     },
     "patchwork": {

@@ -604,6 +604,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays){
   n_total <- nrow(nhd_df)
   n_eph <- sum(nhd_df$perenniality == 'ephemeral')
   median_eph_DA_km <- median(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$TotDASqKm  > 0,]$TotDASqKm, na.rm=T)
+  perc_length_eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T)/sum(nhd_df$LengthKM, na.rm=T)
   
   out <- data.frame('percQEph_exported'=percQEph_exported,
                     'percAreaEph_exported'=percAreaEph_exported,
@@ -612,6 +613,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays){
                     'num_flowing_dys'=numFlowingDays,
                     'n_eph'=n_eph,
                     'n_total'=n_total,
+                    'perc_length_eph'=perc_length_eph,
                     'huc4'=huc4)
 
   return(out)
@@ -648,22 +650,6 @@ getResultsByOrder <- function(nhd_df, huc4){
                      percAreaEph_reach_median = median(percAreaEph_reach),
                      percAreaEph_reach_sd = sd(percAreaEph_reach))
 
-  
-  results_by_order_N <- nhd_df %>%
-    dplyr::group_by(StreamOrde) %>%
-    dplyr::mutate(ephLengthKM = ifelse(perenniality == 'ephemeral', LengthKM, 0)) %>%
-    dplyr::summarise(LengthEph = sum(ephLengthKM),
-                     LengthTotal = sum(LengthKM))
-
-  out <- dplyr::left_join(results_by_order_Q, results_by_order_Area, by='StreamOrde')
-  out <- dplyr::left_join(out, results_by_order_N, by='StreamOrde')
-  
-  return(out)
-}
-
-
-
-
 #  results_by_order_Q <- nhd_df %>%
 #    dplyr::group_by(StreamOrde, TerminalPa) %>% #get all exporting reaches PER STREAM ORDER
 #    dplyr::arrange(desc(Q_cms)) %>% 
@@ -680,6 +666,24 @@ getResultsByOrder <- function(nhd_df, huc4){
 #    dplyr::ungroup() %>%
 #    dplyr::group_by(StreamOrde) %>%
 #    dplyr::summarise(percAreaEph_exported_SO = sum(percAreaEph_reach*TotDASqKm)/sum(TotDASqKm))
+
+
+  
+  results_by_order_N <- nhd_df %>%
+    dplyr::group_by(StreamOrde) %>%
+    dplyr::mutate(ephLengthKM = ifelse(perenniality == 'ephemeral', LengthKM, 0)) %>%
+    dplyr::summarise(LengthEph = sum(ephLengthKM),
+                     LengthTotal = sum(LengthKM))
+
+  out <- dplyr::left_join(results_by_order_Q, results_by_order_Area, by='StreamOrde')
+  out <- dplyr::left_join(out, results_by_order_N, by='StreamOrde')
+  
+  return(out)
+}
+
+
+
+
 
 
 

@@ -18,7 +18,7 @@ source('src/verification_flowingDays.R')
 source('src/figures_additional.R')
 source('src/figures_paper.R')
 
-plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
+#plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
 tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr', 'biscale', 'patchwork', 'ggsflabel', 'ggspatial', 'ggrepel')) #set up packages to load in. Note that tidyr is specified manually throughout to avoid conflicts with dplyr
 
@@ -74,6 +74,7 @@ mapped_lvl0 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -99,6 +100,7 @@ mapped_lvl1 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -123,6 +125,7 @@ mapped_lvl2 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -147,6 +150,7 @@ mapped_lvl3 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -171,6 +175,7 @@ mapped_lvl4 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -195,6 +200,7 @@ mapped_lvl5 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -219,6 +225,7 @@ mapped_lvl6 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -243,6 +250,7 @@ mapped_lvl7 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -267,6 +275,7 @@ mapped_lvl8 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -292,6 +301,7 @@ mapped_lvl9 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -317,6 +327,7 @@ mapped_lvl10 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -342,6 +353,7 @@ mapped_lvl11 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -367,6 +379,7 @@ mapped_lvl12 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -392,6 +405,7 @@ mapped_lvl13 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -417,6 +431,7 @@ mapped_lvl14 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -442,6 +457,7 @@ mapped_lvl15 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -466,6 +482,7 @@ mapped_lvl16 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -490,6 +507,7 @@ mapped_lvl17 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -515,6 +533,7 @@ mapped_lvl18 <- tar_map(
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order streams that are ephemeral
       tar_target(percEph_tokunga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral classification reaches
+  tar_target(hydroMap, hydrographyFigureSmall(shapefile_fin, rivNetFin, huc4)),
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
     tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real, 0)), #calculate number of flowing days
     tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real, 0)), #calculate ballpark number of flowing days under low runoff scenario
@@ -536,7 +555,7 @@ list(
   #GATHER AND PREP EPA WOTUS JD VALIDATION SET
   tar_target(validationDF, prepValDF(path_to_data)), #clean WOTUS validation set
   
-  #GATHER AND PREP FIELD DATA ON NUMBER OF FLOWING DAYS PER YEAR IN EPHEMERAL CHANNELS
+  #GATHER, PREP, AND CALIBRATE FIELD DATA ON NUMBER OF FLOWING DAYS PER YEAR IN EPHEMERAL CHANNELS
   tar_target(ephemeralQDataset_all, wrangleUSGSephGages(usgs_eph_sites)),
   tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, ephemeralQDataset_all, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305), deployment='main'),
   tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data, ephemeralQDataset_all)), #uses all USGS ephemeral gages
@@ -837,22 +856,71 @@ list(
   tar_target(fig1, mainFigureFunction(shapefile_fin, rivNetFin_0107, rivNetFin_0701, rivNetFin_1407, rivNetFin_1305), deployment='main'), #fig 1
   tar_target(fig2, streamOrderPlot(combined_results_by_order, combined_results), deployment='main'), #fig 2
   tar_target(fig3, flowingFigureFunction(shapefile_fin, flowingDaysValidation), deployment='main'), #fig 3
-   
+  tar_target(fig4, lengthMapFunction(shapefile_fin), deployment='main'), #fig 3
+
   #BUILD SUPPLEMENTRY FIGURES
    tar_target(boxplotsClassification, boxPlots_classification(val_shapefile_fin)),
    tar_target(boxPlotsSensitivity, boxPlots_sensitivity(combined_numFlowingDays, combined_numFlowingDays_low, combined_numFlowingDays_high, combined_numFlowingDays_med_low, combined_numFlowingDays_med_high), deployment='main'), #ephemeral flow frequency sensitivity figure
-   tar_target(snappingSensitivityFig, snappingSensitivityFigures(compareSnappingThreshs), deployment='main'), #figures for snapping thresh sensitivity analysis
-   tar_target(scalingModelFig, buildScalingModelFig(scalingModel), deployment='main'), #figures for snapping thresh sensitivity analysis
+   tar_target(snappingSensitivityFig, snappingSensitivityFigures(compareSnappingThreshs), deployment='main'), #figures for snapping thresh analysis
+   tar_target(scalingModelFig, buildScalingModelFig(scalingModel), deployment='main'), #figure for Horton scaling model
    tar_target(flowingDaysCalibrateFig, runoffThreshCalibPlot(flowingDaysCalibrate)), #figure for empirical runoff threshold calibration
-   tar_target(validationPlotMain, validationPlot(combined_percEph_tokunga, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin), deployment='main'), #uses only USGS ephemeral gages on the NHD
-   tar_target(validationMap, mappingValidationFigure(val_shapefile_fin), deployment='main'),
-   tar_target(validationMap2, mappingValidationFigure2(val_shapefile_fin), deployment='main'),
-   tar_target(drainageAreaMap, areaMapFunction(shapefile_fin), deployment='main'), #fig 3new
-   tar_target(comboHydrographyMaps, hydrographyFigure(shapefile_fin, rivNetFin_0108, rivNetFin_1023, rivNetFin_0313, rivNetFin_1503,
-                                                      rivNetFin_1306, rivNetFin_0804, rivNetFin_0501, rivNetFin_1703,
-                                                      rivNetFin_0703, rivNetFin_0304, rivNetFin_1605, rivNetFin_1507,
-                                                      rivNetFin_0317, rivNetFin_0506, rivNetFin_0103, rivNetFin_1709), deployment='main'),
-  tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'),
+   tar_target(validationPlotMain, validationPlot(combined_percEph_tokunga, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin), deployment='main'), #primary analysis validation figure
+   tar_target(validationMap, mappingValidationFigure(val_shapefile_fin), deployment='main'), #figure of second set of validation maps
+   tar_target(validationMap2, mappingValidationFigure2(val_shapefile_fin), deployment='main'), #figure of third set of validation maps
+   tar_target(drainageAreaMap, areaMapFunction(shapefile_fin), deployment='main'), #figure for % ephemeral drainage area map
+   tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'), #figure walnut gulch additional confirmation
+   tar_target(comboHydrographyMaps_1, comboHydroSmalls(hydroMap_0101, hydroMap_0102, hydroMap_0103, hydroMap_0104,
+                                                       hydroMap_0105, hydroMap_0106, hydroMap_0107, hydroMap_0108,
+                                                       hydroMap_0109, hydroMap_0110, hydroMap_0202, hydroMap_0203,
+                                                       hydroMap_0204, hydroMap_0205, hydroMap_0206, hydroMap_0207,1)),
+   tar_target(comboHydrographyMaps_2, comboHydroSmalls(hydroMap_0208, hydroMap_0301, hydroMap_0302, hydroMap_0303,
+                                                       hydroMap_0304, hydroMap_0305, hydroMap_0306, hydroMap_0307,
+                                                       hydroMap_0308, hydroMap_0309, hydroMap_0310, hydroMap_0311,
+                                                       hydroMap_0312, hydroMap_0313, hydroMap_0314, hydroMap_0315,2)),
+   tar_target(comboHydrographyMaps_3, comboHydroSmalls(hydroMap_0316, hydroMap_0317, hydroMap_0318, hydroMap_0401,
+                                                       hydroMap_0402, hydroMap_0403, hydroMap_0404, hydroMap_0405,
+                                                       hydroMap_0406, hydroMap_0407, hydroMap_0408, hydroMap_0409,
+                                                       hydroMap_0410, hydroMap_0411, hydroMap_0412, hydroMap_0413,3)),
+   tar_target(comboHydrographyMaps_4, comboHydroSmalls(hydroMap_0414, hydroMap_0420, hydroMap_0427, hydroMap_0429,
+                                                       hydroMap_0430, hydroMap_0501, hydroMap_0502, hydroMap_0503,
+                                                       hydroMap_0504, hydroMap_0505, hydroMap_0506, hydroMap_0507,
+                                                       hydroMap_0508, hydroMap_0509, hydroMap_0510, hydroMap_0511,4)),
+   tar_target(comboHydrographyMaps_5, comboHydroSmalls(hydroMap_0512, hydroMap_0513, hydroMap_0514, hydroMap_0601,
+                                                       hydroMap_0602, hydroMap_0603, hydroMap_0604, hydroMap_0701,
+                                                       hydroMap_0702, hydroMap_0703, hydroMap_0704, hydroMap_0705,
+                                                       hydroMap_0706, hydroMap_0707, hydroMap_0708, hydroMap_0709, 5)),
+   tar_target(comboHydrographyMaps_6, comboHydroSmalls(hydroMap_0710, hydroMap_0711, hydroMap_0712, hydroMap_0713,
+                                                       hydroMap_0714, hydroMap_0801, hydroMap_0802, hydroMap_0803,
+                                                       hydroMap_0804, hydroMap_0805, hydroMap_0806, hydroMap_0807,
+                                                       hydroMap_0808, hydroMap_0809, hydroMap_0901, hydroMap_0902, 6)),
+   tar_target(comboHydrographyMaps_7, comboHydroSmalls(hydroMap_0903, hydroMap_0904, hydroMap_1002, hydroMap_1003,
+                                                       hydroMap_1004, hydroMap_1005, hydroMap_1006, hydroMap_1007,
+                                                       hydroMap_1008, hydroMap_1009, hydroMap_1010, hydroMap_1011,
+                                                       hydroMap_1012, hydroMap_1013, hydroMap_1014, hydroMap_1015, 7)),
+   tar_target(comboHydrographyMaps_8, comboHydroSmalls(hydroMap_1016, hydroMap_1017, hydroMap_1018, hydroMap_1019,
+                                                       hydroMap_1020, hydroMap_1021, hydroMap_1022, hydroMap_1023,
+                                                       hydroMap_1024, hydroMap_1025, hydroMap_1026, hydroMap_1027,
+                                                       hydroMap_1028, hydroMap_1029, hydroMap_1030, hydroMap_1101, 8)),
+   tar_target(comboHydrographyMaps_9, comboHydroSmalls(hydroMap_1102, hydroMap_1103, hydroMap_1104, hydroMap_1105,
+                                                       hydroMap_1106, hydroMap_1107, hydroMap_1108, hydroMap_1109,
+                                                       hydroMap_1110, hydroMap_1111, hydroMap_1112, hydroMap_1113,
+                                                       hydroMap_1114, hydroMap_1201, hydroMap_1202, hydroMap_1203, 9)),
+   tar_target(comboHydrographyMaps_10, comboHydroSmalls(hydroMap_1204, hydroMap_1205, hydroMap_1206, hydroMap_1207,
+                                                       hydroMap_1208, hydroMap_1209, hydroMap_1210, hydroMap_1211,
+                                                       hydroMap_1301, hydroMap_1302, hydroMap_1303, hydroMap_1304,
+                                                       hydroMap_1305, hydroMap_1306, hydroMap_1307, hydroMap_1308, 10)),
+   tar_target(comboHydrographyMaps_11, comboHydroSmalls(hydroMap_1309, hydroMap_1401, hydroMap_1402, hydroMap_1403,
+                                                        hydroMap_1404, hydroMap_1405, hydroMap_1406, hydroMap_1407,
+                                                       hydroMap_1408, hydroMap_1501, hydroMap_1502, hydroMap_1503,
+                                                       hydroMap_1504, hydroMap_1505, hydroMap_1506, hydroMap_1507, 11)),
+   tar_target(comboHydrographyMaps_12, comboHydroSmalls(hydroMap_1508, hydroMap_1601, hydroMap_1602, hydroMap_1603,
+                                                        hydroMap_1604, hydroMap_1605, hydroMap_1606, hydroMap_1701,
+                                                       hydroMap_1702, hydroMap_1703, hydroMap_1704, hydroMap_1705,
+                                                       hydroMap_1706, hydroMap_1707, hydroMap_1708, hydroMap_1709,12)),
+   tar_target(comboHydrographyMaps_13, comboHydroSmalls_13(hydroMap_1710, hydroMap_1711, hydroMap_1712, hydroMap_1801,
+                                                        hydroMap_1802, hydroMap_1803, hydroMap_1804, hydroMap_1805,
+                                                       hydroMap_1806, hydroMap_1807, hydroMap_1808, hydroMap_1809, hydroMap_1810,13)),
+
 
   #GENERATE GUIDE TO DATA/MODEL INPUTS
   tar_render(data_guide, "docs/data_guide.Rmd", deployment='main') #data guide
