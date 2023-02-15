@@ -2,3 +2,4 @@
 _targets/objects
 .future/
 cache/*.csv
+docs/manuscript

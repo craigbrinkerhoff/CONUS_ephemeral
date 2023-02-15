@@ -5,13 +5,13 @@
 
 
 
-#' Specifies how the water table depth pixels along each river reach are summarized.
+#' Summarizes water table depth along each river reach
 #'
 #' @name summariseWTD
 #'
 #' @param wtd: vector of water table depths along a stream reach
 #'
-#' @return out: summarized water table depth
+#' @return out: summarized water table depth along reach
 summariseWTD <- function(wtd){
   median <- median(wtd, na.rm=T)
   mean <- mean(wtd, na.rm=T)
@@ -27,7 +27,7 @@ summariseWTD <- function(wtd){
 
 
 
-#' width for rivers
+#' width for rivers or lakes/reservoirs
 #'
 #' @name width_func
 #'
@@ -63,7 +63,7 @@ width_func <- function(waterbody, Q, a, b){
 #' @param c: depth~Q AHG model intercept
 #' @param f: depth~Q AHG model coefficient
 #'
-#' @return channel depth via hydraulic geometry [m]
+#' @return river depth via hydraulic geometry [m]
 depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
   if (waterbody == 'River') {
     output <- exp(c)*Q^(f) #river depth [m]
@@ -101,7 +101,7 @@ addingRunoffMemory <- function(precip, memory, thresh){
     out <- sum(precip)
   }
   else{
-    #propogate memory for days following runoff events
+    #propagate memory for days following runoff events
     for(i in 1:length(precip)){
       if(precip[i] == 1 & orig[i] == 1){
         for(k in seq(1+i,memory+i,1)){
@@ -117,22 +117,6 @@ addingRunoffMemory <- function(precip, memory, thresh){
   return(out)
 }
 
-
-
-
-
-#' Propagates linear combination of uniform Q errors given a sample size and sigma term. Returns in km3/yr
-#'
-#' @name QlaterrorPropogation
-#'
-#' @param sigma: uniform uncertainty term (1 sigma)
-#' @param n: number of reaches/terms to sum
-#'
-#' @return linear, uniform, error propagation [km3/yr]
-# QlaterrorPropogation <- function(sigma, n) {
-#   out <- sqrt(sigma^2*n)*365*86400*1e-9 #km3/yr equivalent: sqrt(n)*sigma*86400*365*1e-9
-#   return(out)
-# }
 
 
 
@@ -175,48 +159,6 @@ fixGeometries <- function(rivnet){
 
 
 
-#' calculates mode of distribution
-#' 
-#' @name getMode
-#' 
-#' @param v: vector of values
-#' 
-#' @return mode of distribution of v
-getMode <- function(v){
-  v <- v[!is.na(v)]
-  uniqv <- unique(v)
-  out <- uniqv[which.max(tabulate(match(v, uniqv)))]
-  
-  return(out)
-}
-
-
-
-
-
-#' Aggregates combined targets at each processing level into a single dataset of basin results
-#'
-#' @name aggregateAllLevels
-#'
-#' @param combined_levels_lvlx: combined targets for each processing level
-#'
-#' @return data frame of all combined targets at each processing level into a single dataset of basin flux results
-aggregateAllLevels <- function(combined_lvl0, combined_lvl1, combined_lvl2, combined_lvl3, combined_lvl4,
-                               combined_lvl5, combined_lvl6, combined_lvl7, combined_lvl8, combined_lvl9,
-                               combined_lvl10, combined_lvl11, combined_lvl12, combined_lvl13, combined_lvl14,
-                               combined_lvl15, combined_lvl16, combined_lvl17, combined_lvl18){
-  
-  #aggregate our model results at huc4
-  out <- rbind(combined_lvl0, combined_lvl1, combined_lvl2, combined_lvl3, combined_lvl4,
-               combined_lvl5, combined_lvl6, combined_lvl7, combined_lvl8, combined_lvl9,
-               combined_lvl10, combined_lvl11, combined_lvl12, combined_lvl13, combined_lvl14,
-               combined_lvl15, combined_lvl16, combined_lvl17, combined_lvl18)
-  
-  out$huc4 <- substr(out$method, 11, 16)
-  out$huc2 <- substr(out$huc4, 1, 2)
-  
-  return(out)
-}
 
 
 
@@ -226,7 +168,7 @@ aggregateAllLevels <- function(combined_lvl0, combined_lvl1, combined_lvl2, comb
 #'
 #' @name ephemeralityChecker
 #'
-#' @param other_sites: df with all the gage IDs
+#' @param other_sites: df with all the gauge IDs
 #' 
 #' @import ggplot2
 #' @import dplyr
@@ -242,7 +184,7 @@ ephemeralityChecker <- function(other_sites) {
                         parameterCd = '00060') #discharge
     
     #get mean annual flow
-    if(nrow(gageQ)==0){next} #some go these gages don't have their data online (in local USGS offices only.....)
+    if(nrow(gageQ)==0){next} #some of these gauges don't have their data online...
     
     gageQ <- gageQ %>% 
       dplyr::mutate(Q_cms = mean_va*0.0283)#cfs to cms with zero flow rounding protocol following:  https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794

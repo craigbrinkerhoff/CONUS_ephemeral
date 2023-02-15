@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 author: 'Craig Brinkerhoff'
 ---
 ## Guide to all datasets and models used in this analysis
-Unless otherwise specified, these are in the `for_ephemeral_project` sub-directory.
+Unless otherwise specified, these are in the `~/for_ephemeral_project` sub-directory.
 
 - Global Monthly Water Table Depth Model
   - **Filename:** `NAMERICA_WTD_monthlymeans.nc`
@@ -14,16 +14,9 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Resolution/Scale:** 1km
   - **Years:** 2004-2014
 
-- 2019 CONUS National Land Cover Dataset (NLCD) v 2.0 (June 2021)
-  - **Filename:** `NLCD_2019/nlcd_HUCxx.tif`
-  - **Data:** https://developers.google.com/earth-engine/datasets/catalog/USGS_NLCD_RELEASES_2019_REL_NLCD
-  - **Paper:** https://www.sciencebase.gov/catalog/item/5f21cef582cef313ed940043
-  - **Resolution/Scale:** 30m (downscaled to 1km)
-  - **Years:** 2019
-
 - CONUS Long-Term Gauge-Based Daily Precip Model
   - **Filenames:** `dailyPrecip_1980_1989.gri`, `dailyPrecip_1990_1999.gri`, `dailyPrecip_2000_2006.gri`
-    - file prep done locally via `src/netcdf_prep.R`
+    - file prep done locally via `~/src/netcdf_prep.R`
   - **Data:** https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source
   - **Paper (validation)**: https://doi.org/10.1029/2007JD009132
   - **Paper (algorithm):** https://doi.org/10.1175/JHM583.1
@@ -37,7 +30,7 @@ Unless otherwise specified, these are in the `for_ephemeral_project` sub-directo
   - **Years:** 1970-2000 (streamflow validated against 1970-2018)
 
 - USGS Streamgauge data to validate NHD streamflow model and $N_{flw}$ model
-  - **Filename:** `cache/training` directory
+  - **Filename:** `~/cache/training` directory
   - **Data:** Accessed via `dataRetrieval` R package
   - **Resolution/Scale:** NA
 

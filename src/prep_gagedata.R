@@ -1,20 +1,20 @@
 ## Craig Brinkerhoff
 ## Winter 2023
-## Functions for getting mean annual flow and flow frequency at USGS streamgages along the NHD
+## Functions for getting mean annual flow and flow frequency at USGS streamgauges along the NHD
 
 
 
-#' Returns set of USGS gages that are joined to the NHD-HR a priori (that meet USGS QA/QC requirements)
+#' Returns set of USGS gauges that are joined to the NHD-HR a priori (that meet USGS QA/QC requirements)
 #'
 #' @name getNHDGages
 #'
 #' @param path_to_data: data repo path
-#' @param codes_huc02: HUC2 basins to get gages for
+#' @param codes_huc02: HUC2 basins to get gauges for
 #'
 #' @import dplyr
 #' @import sf
 #'
-#' @return df of USGS gages on the NHD with flows converted to metric
+#' @return df of USGS gauges on the NHD with flows converted to metric
 getNHDGages <- function(path_to_data, codes_huc02){
   #get USGS stations joined to NHD that meet USGS QA/QC requirements (i.e. IDs already matched to NHD-HR)
   codes <- c(NA)
@@ -52,13 +52,13 @@ getNHDGages <- function(path_to_data, codes_huc02){
 
 
 
-#' Gather streamflow data at gauges and calculate 1) mean annual flow and 2) no flow fractions
+#' Gather discharge data at gauges and calculate 1) mean annual flow and 2) no flow fractions
 #'
 #' @name getGageData
 #'
 #' @param path_to_data: path to data working directory
 #' @param nhdGages: list of USGS streamgauges joined to NHD-HR
-#' @param codes_huc02: HUC2 basins to get gage data for
+#' @param codes_huc02: HUC2 basins to get gauge data for
 #'
 #' @import dataRetrieval
 #' @import readr
@@ -68,8 +68,8 @@ getNHDGages <- function(path_to_data, codes_huc02){
 getGageData <- function(path_to_data, nhdGages, codes_huc02){
   for(m in codes_huc02){
     #NOTE::::: will be longer than the final sites b/c some of them don't have 20 yrs of data  within the bounds.
-        #This function only finds gages that intersect our time domain, but not necessarily 20 yrs of data within the domain.
-        #Further, some gages have errors in data or are missing data and we throw them out later
+        #This function only finds gauges that intersect our time domain, but not necessarily 20 yrs of data within the domain.
+        #Further, some gauges have errors in data or are missing data and we throw them out later
     if(!file.exists(paste0('cache/training/siteNos_', m, '.rds'))){ #only do HUC2 if it hasn't been done yet
       #get usgs gages by
       sites_full <- whatNWISdata(huc=m,
@@ -80,14 +80,14 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
 
       write_rds(sites_full, paste0('cache/training/siteNos_', m, '.rds'))
       sites <- unique(sites_full$site_no)
-      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gages joined to NHD-HR a priori
+      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gauges joined to NHD-HR a priori
     }
     else{
       sites_full <- read_rds(paste0('cache/training/siteNos_', m, '.rds')) #will be longer than the final sites b/c some of them throw errors and are removed or don't have 20 yrs of data
       sites <- unique(sites_full$site_no)
-      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gages joined to NHD a priori
+      sites <- sites[which(sites %in% nhdGages$GageIDMA)] #filter for only gauges joined to NHD a priori
     }
-    if(length(sites)==0){next} #some zones don't have gages joined to NHD-HR after QA/QC (HUC04 for example)
+    if(length(sites)==0){next} #some zones don't have gauges joined to NHD-HR after QA/QC (HUC04 for example)
 
     ##########CALCUALTE MEAN ANNUAL FLOW
     results <- data.frame()
@@ -95,7 +95,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
     if(!file.exists(paste0('cache/training/trainingData_', m, '.rds'))){ #check if site has already been run
       for(i in sites){
         #GRAB GAUGE DATA
-        gageQ <- tryCatch(readNWISstat(siteNumbers = i, #check if site mets our date requirements
+        gageQ <- tryCatch(readNWISstat(siteNumbers = i, #check if site meets our date requirements
                                        parameterCd = '00060', #discharge
                                        startDate = '1970-10-01',
                                        endDate = '2018-09-30'),

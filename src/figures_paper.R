@@ -8,6 +8,7 @@
 #'
 #' @name mainFigureFunction
 #'
+#' @param path_to_data: data repo path
 #' @param shapefile_fin: final sf object with model results
 #' @param net_0107_results: final river network results for basin 0107
 #' @param net_0701_results: final river network results for basin 0701
@@ -19,12 +20,11 @@
 #' @import ggplot2
 #' @import ggsflabel
 #' @import ggspatial
-#' @import ggrepel
 #' @import cowplot
 #' @import patchwork
 #'
 #' @return main model results figure (also writes figure to file)
-mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results, net_1407_results, net_1305_results) {
+mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, net_0701_results, net_1407_results, net_1305_results) {
   theme_set(theme_classic())
 
   ##GET DATA
@@ -32,7 +32,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
   results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
 
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                          'American Samoa',
                                          'Commonwealth of the Northern Mariana Islands',
@@ -56,7 +56,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
   cdf_inset <- ggplot(results, aes(percQ_eph))+
     stat_ecdf(size=2, color='black') +
     xlab('% ephemeral discharge')+
-    ylab('Exceedance Probability')+
+    ylab('Probability')+
     theme(axis.title = element_text(size=20),
           axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
     theme(legend.position = 'none') #legend position settings
@@ -114,7 +114,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
   results_map <- results_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ##RIVER NETWORK MAP 0107-------------------------------------------------------------------------------------
-  net_0107 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_01/NHDPLUS_H_0107_HU4_GDB/NHDPLUS_H_0107_HU4_GDB.gdb', layer='NHDFlowline')
+  net_0107 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_01/NHDPLUS_H_0107_HU4_GDB/NHDPLUS_H_0107_HU4_GDB.gdb'), layer='NHDFlowline')
   net_0107 <- dplyr::left_join(net_0107, net_0107_results, 'NHDPlusID')
   net_0107 <- dplyr::filter(net_0107, is.na(perenniality)==0)
 
@@ -140,7 +140,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
     ggtitle(paste0('Merrimack River:\n', round(results[results$huc4 == '0107',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0107',]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 1407-------------------------------------------------------------------------------------------
-  net_1407 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_14/NHDPLUS_H_1407_HU4_GDB/NHDPLUS_H_1407_HU4_GDB.gdb', layer='NHDFlowline')
+  net_1407 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_14/NHDPLUS_H_1407_HU4_GDB/NHDPLUS_H_1407_HU4_GDB.gdb'), layer='NHDFlowline')
   net_1407 <- dplyr::left_join(net_1407, net_1407_results, 'NHDPlusID')
   net_1407 <- dplyr::filter(net_1407, is.na(perenniality)==0)
 
@@ -167,7 +167,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
     ggtitle(paste0('Lower Green River:\n', round(results[results$huc4 == '1407',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1407',]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 0701---------------------------------------------------------------------------
-  net_0701 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_07/NHDPLUS_H_0701_HU4_GDB/NHDPLUS_H_0701_HU4_GDB.gdb', layer='NHDFlowline')
+  net_0701 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_07/NHDPLUS_H_0701_HU4_GDB/NHDPLUS_H_0701_HU4_GDB.gdb'), layer='NHDFlowline')
   net_0701 <- dplyr::left_join(net_0701, net_0701_results, 'NHDPlusID')
   net_0701 <- dplyr::filter(net_0701, is.na(perenniality)==0)
 
@@ -194,7 +194,7 @@ mainFigureFunction <- function(shapefile_fin, net_0107_results, net_0701_results
     ggtitle(paste0('Mississippi Headwaters:\n', round(results[results$huc4 == '0701',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0701',]$percQ_eph,0), '%)'))
   
 ##RIVER NETWORK MAP 1305-----------------------------------------------------------
-  net_1305 <- sf::st_read(dsn = '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_13/NHDPLUS_H_1305_HU4_GDB/NHDPLUS_H_1305_HU4_GDB.gdb', layer='NHDFlowline')
+  net_1305 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_13/NHDPLUS_H_1305_HU4_GDB/NHDPLUS_H_1305_HU4_GDB.gdb'), layer='NHDFlowline')
   net_1305 <- dplyr::left_join(net_1305, net_1305_results, 'NHDPlusID')
   net_1305 <- dplyr::filter(net_1305, is.na(perenniality)==0)
 
@@ -342,7 +342,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     xlab('Stream Order') +
     ylab('% ephemeral streams by length')+
     scale_color_manual(name='',
-                       values=c('#2b3a67', '#b56b45'))+ #'#688B55', '#2D93AD'
+                       values=c('#2b3a67', '#b56b45'))+
     ylim(0,100)+
     labs(tag='C')+
     theme(axis.title = element_text(size=26, face='bold'),
@@ -380,6 +380,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 #'
 #' @name flowingFigureFunction
 #'
+#' @param path_to_data: data repo path
 #' @param shapefile_fin: final sf object with flowing days results
 #' @param joinedData: df of flowing days field data joined to huc4 basin model results
 #'
@@ -390,7 +391,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
-flowingFigureFunction <- function(shapefile_fin, joinedData) {
+flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
   theme_set(theme_classic())
   
   ##GET DATA
@@ -398,7 +399,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   results <- dplyr::filter(results, is.na(num_flowing_dys)==0)
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -417,7 +418,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
   cdf_inset <- ggplot(results, aes(num_flowing_dys))+
     stat_ecdf(size=2, color='black') +
     xlab('Annual ephemeral flow\ndays')+
-    ylab('Exceedance Probability')+
+    ylab('Probability')+
     xlim(0,365)+
     theme(axis.title = element_text(size=20),
           axis.text = element_text(family="Futura-Medium", size=18),
@@ -429,7 +430,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
             color='black',
             size=0.5) + #map
     scale_fill_gradientn(name='Annual ephemeral flow days',
-                         colors = c("#9e2a2b", "white", "#2b2d42"), #c("#FF4B1F", "#f7e9e8", "#044976")
+                         colors = c("#9e2a2b", "white", "#2b2d42"),
                          guide = guide_colorbar(direction = "horizontal",title.position = "bottom"),
                          limits= c(0,365))+
     geom_sf(data=states,  #conus domain
@@ -483,7 +484,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
     stat_ecdf(size=2, color='#564C4D') +
     scale_linetype_manual(name='', labels=c('In situ', 'Modeled'), values=c('dotted', 'solid'))+
     xlab('Annual ephemeral flow days')+
-    ylab('Exceedance Probability')+
+    ylab('Probability')+
     xlim(0,365)+
     labs(tag='C')+
     theme(axis.text=element_text(size=24),
@@ -524,6 +525,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
 #'
 #' @name areaMapFunction
 #'
+#' @param path_to_data: data repo path
 #' @param shapefile_fin: final sf object with model results
 #'
 #' @import sf
@@ -532,7 +534,7 @@ flowingFigureFunction <- function(shapefile_fin, joinedData) {
 #' @import cowplot
 #'
 #' @return land use results figure (also writes figure to file)
-lengthMapFunction <- function(shapefile_fin) {
+lengthMapFunction <- function(path_to_data, shapefile_fin) {
   theme_set(theme_classic())
   
   ##GET DATA
@@ -540,7 +542,7 @@ lengthMapFunction <- function(shapefile_fin) {
   results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -558,7 +560,7 @@ lengthMapFunction <- function(shapefile_fin) {
   cdf_inset <- ggplot(results, aes(percLength_eph))+
     stat_ecdf(size=2, color='black') +
     xlab('% ephemeral network\nextent')+
-    ylab('Exceedance Probability')+
+    ylab('Probability')+
     theme(axis.title = element_text(size=20),
           axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
     theme(legend.position = 'none') #legend position settings

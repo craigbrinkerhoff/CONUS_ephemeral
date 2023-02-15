@@ -140,17 +140,6 @@
         "withr"
       ]
     },
-    "biscale": {
-      "Package": "biscale",
-      "Version": "1.0.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "43427f94ce2cfcb1cebc5b06dedd0460",
-      "Requirements": [
-        "classInt",
-        "ggplot2"
-      ]
-    },
     "bit": {
       "Package": "bit",
       "Version": "4.0.4",
@@ -470,16 +459,6 @@
       "Repository": "CRAN",
       "Hash": "177475892cf4a55865868527654a7741",
       "Requirements": []
-    },
-    "ggnewscale": {
-      "Package": "ggnewscale",
-      "Version": "0.4.8",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "871327b44b04bfb19dc28f60b96806c1",
-      "Requirements": [
-        "ggplot2"
-      ]
     },
     "ggplot2": {
       "Package": "ggplot2",

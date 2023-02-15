@@ -33,11 +33,3 @@ precip26 <- brick("C:\\Users\\cbrinkerhoff\\Downloads\\precip.V1.0.2005.nc" )
 precip27 <- brick("C:\\Users\\cbrinkerhoff\\Downloads\\precip.V1.0.2006.nc" )
 precip <- raster::stack(precip21, precip22, precip23, precip24, precip25, precip26, precip27)
 writeRaster(precip, 'dailyPrecip_2000_2006')
-#precip <- rotate(precip)
-
-
-#plot(precip$X0000.12.30)
-#lons <- ncvar_get(precip, varid = 'lon')
-#lons <- 180 - lons
-
-#ncvar_add(precip, ncvar_def('lon', units = 'degrees_east', dim=list(10)))

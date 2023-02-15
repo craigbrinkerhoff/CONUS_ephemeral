@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name='ephemeral_master'
 #SBATCH -c 48  # Number of Cores per Task
-#SBATCH -p gpu-preempt
+#SBATCH -p ceewater_cjgleason-cpu
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=cbrinkerhoff@umass.edu
 #SBATCH --mem=128000 #Requested memory

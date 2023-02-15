@@ -9,11 +9,12 @@
 #'
 #' @name validationPlot
 #'
-#' @param tokunaga_df: results from network length assessment
-#' @param USGS_data: USGS mean annual flow observations at streamgauges
-#' @param nhdGages: lookup table pairing USGS gauges to the NHD reaches
-#' @param ephemeralQdataset: additional validation data for some ephemeral streams from USGS reports
-#' @param walnutGulch: additional validation data for some ephemeral streams with in situ flume records in Walnut Gulch exp catchment
+#' @param path_to_data: data repo path
+#' @param tokunaga_df: exported ephemeral influence via Tokunaga scaling AND our model
+#' @param USGS_data: USGS mean annual flow observations from streamgauges
+#' @param nhdGages: lookup table pairing USGS gauges to the NHD-HR reaches
+#' @param ephemeralQDataset: additional Q validation data for ephemeral streams from USGS reports
+#' @param walnutGulch: additional Q validation data for ephemeral streams in Walnut Gulch exp catchment
 #' @param val_shapefile_fin: final sf object with ephemeral classification validation
 #'
 #' @import sf
@@ -22,8 +23,8 @@
 #' @import cowplot
 #' @import patchwork
 #'
-#' @return combined Q validation df (also writes figure to file)
-validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin){
+#' @return combined Q validation df (written to file)
+validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, walnutGulch, val_shapefile_fin){
   theme_set(theme_classic())
   
   
@@ -32,7 +33,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   results <- val_shapefile_fin$shapefile
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -45,13 +46,16 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   
   #crop to CONUS
   results <- sf::st_intersection(results, states)
+
+  #round results
+  results$basinAccuracy <- round(results$basinAccuracy*100, 0)
   
   ##ACCURACY MAP
   accuracyFig <- ggplot(results) +
-    geom_sf(aes(fill=basinAccuracy*100), #actual map
+    geom_sf(aes(fill=basinAccuracy), #actual map
             color='black',
             size=0.5)+
-    geom_sf(data=states, #conus boundary
+    geom_sf(data=states, #CONUS boundary
             color='black',
             size=1.25,
             alpha=0)+
@@ -97,7 +101,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   
   
   #####DISCHARGE VALIDATION-------------------------------------------------
-  #rename walnut gulch discharge columes to match this df
+  #rename walnut gulch discharge columns to match this df
   walnutGulch <- walnutGulch$df #grab data frame from list
   colnames(walnutGulch) <- c('NHDPlusID', 'Q_MA', 'drainageArea_km2', 'QBMA','ToTDASqKm')
   walnutGulch <- dplyr::select(as.data.frame(walnutGulch), c('Q_MA', 'QBMA')) %>%
@@ -111,17 +115,17 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
   #now make plots!
   theme_set(theme_classic())
   
-  #add observed mean annual Q (1970-2018 calculated using gage records) to the NHD reaches for erom validation
+  #add observed mean annual Q (1970-2018 calculated using gauge records) to the NHD-HR reaches for Q validation
   qma <- USGS_data
   qma <- dplyr::select(qma, c('gageID','Q_MA', 'no_flow_fraction'))
   assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
   
   assessmentDF <- tidyr::drop_na(assessmentDF) %>%
-    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #Messager definition for non-perenniality is 1 day a year not flowing
+    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #distinction for non-perennial rivers: minimum 5 no-flow days a year
     dplyr::select('Q_MA', 'QBMA', 'type')
   
   #join two datasets together
-  assessmentDF <- rbind(assessmentDF, walnutGulch) #ephemeralQDataset
+  assessmentDF <- rbind(assessmentDF, walnutGulch)
   assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent")) #recast to be copacetic
   
   assessmentDF <- dplyr::filter(assessmentDF, !(is.na(QBMA)) & !(is.na(Q_MA)))
@@ -150,7 +154,7 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
           plot.tag = element_text(size=26,
                                   face='bold'))
   
-  ##COMBO PLOT------------------------
+  ##BUILD PLOT----------------------------
   design <- "
    AA
    AA
@@ -171,10 +175,12 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
 
 
 
+
 #' create main validation paper figure
 #'
 #' @name mappingValidationFigure
 #'
+#' @param path_to_data: data repo path
 #' @param val_shapefile_fin: final validation sf object with model results
 #'
 #' @import sf
@@ -183,15 +189,15 @@ validationPlot <- function(tokunaga_df, USGS_data, nhdGages, ephemeralQDataset, 
 #' @import cowplot
 #' @import patchwork
 #'
-#' @return main model validation figure (also writes figure to file)
-mappingValidationFigure <- function(val_shapefile_fin){
+#' @return main model validation figure (written to file)
+mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
   theme_set(theme_classic())
   
   ##GET DATA
   results <- val_shapefile_fin$shapefile
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -205,6 +211,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
   #crop to CONUS
   results <- sf::st_intersection(results, states)
   
+  #round results
   results$basinTSS <- round(results$basinTSS, 2)
   
   ##TSS MAP---------------------------------------------
@@ -253,7 +260,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
     xlab('')+
     ylab('')
   
-  ##COMBO PLOT------------------------------
+  ##BUILD PLOT----------------------------
   design <- "
   A
   B
@@ -271,6 +278,7 @@ mappingValidationFigure <- function(val_shapefile_fin){
 #'
 #' @name mappingValidationFigure2
 #'
+#' @param path_to_data: data repo path
 #' @param val_shapefile_fin: final validation sf object with model results
 #''
 #' @import sf
@@ -279,15 +287,15 @@ mappingValidationFigure <- function(val_shapefile_fin){
 #' @import cowplot
 #' @import patchwork
 #'
-#' @return main model validation figure (also writes figure to file)
-mappingValidationFigure2 <- function(val_shapefile_fin){
+#' @return main model validation figure (written to file)
+mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
   theme_set(theme_classic())
   
   ##GET DATA
   results <- val_shapefile_fin$shapefile
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -349,7 +357,7 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
     xlab('')+
     ylab('')
   
-  ##COMBO PLOT------------------------------
+  ##BUILD PLOT----------------------------
   design <- "
   A
   B
@@ -363,7 +371,7 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
 
 
 
-#' Makes boxplot summarizing classification results
+#' Makes boxplots summarizing classification results
 #'
 #' @name boxPlots_classification
 #'
@@ -372,7 +380,7 @@ mappingValidationFigure2 <- function(val_shapefile_fin){
 #' @import ggplot2
 #' @import tidyr
 #'
-#' @return figure showing reional clasification performance across accuracy metrics (also writes this to file)
+#' @return figure showing regional classification performance across accuracy metrics (written to file)
 boxPlots_classification <- function(val_shapefile_fin){
   theme_set(theme_classic())
 
@@ -396,13 +404,13 @@ boxPlots_classification <- function(val_shapefile_fin){
 
   ggsave('cache/boxPlots_classification.jpg', boxplots, width=8, height=8)
 
-  return(boxplots)
+  return('see cache/boxPlots_classification.jpg')
 }
 
 
 
 
-#' Makes boxplot summarizing sensitivity results for number flowing days calculation
+#' Makes boxplots summarizing sensitivity results for number flowing days calculation
 #'
 #' @name boxPlots_sensitivity
 #'
@@ -416,7 +424,7 @@ boxPlots_classification <- function(val_shapefile_fin){
 #' @import tidyr
 #' @import ggplot2
 #'
-#' @return figure comparing the results across the three scanerios (also wirtes figure to file)
+#' @return figure comparing the results across the three scenarios (written to file)
 boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDays_low, combined_numFlowingDays_high, combined_numFlowingDays_med_low, combined_numFlowingDays_med_high){
   theme_set(theme_classic())
 
@@ -428,7 +436,7 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
   
   combined_results <- dplyr::filter(combined_results, !is.na(numFlowingDays))
   
-  #discharge
+  #gather results
   forPlot <- tidyr::gather(combined_results, key=key, value=value, c('numFlowingDays', 'znumFlowingDays_low', 'ynumFlowingDays_med_low', 'anumFlowingDays_high', 'bnumFlowingDays_med_high'))
   forPlot$key <- as.factor(forPlot$key)
   levels(forPlot$key) <- c('High runoff 1','High runoff 2', 'Model', 'Low runoff 2', 'Low runoff 1')
@@ -449,13 +457,13 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 
   ggsave('cache/boxPlots_sensitivity.jpg', boxplotsSens, width=10, height=10)
   
-  return(boxplotsSens)
+  return('see cache/boxPlots_sensitivity.jpg')
 }
 
 
 
 
-#' Makes plots for snapping threshold sensitivity analysis
+#' Makes plots for snapping threshold parameter analysis
 #'
 #' @name snappingSensitivityFigures
 #'
@@ -464,11 +472,12 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
 #' @import tidyr
 #' @import ggplot2
 #'
-#' @return figures plotting sensitivity results (also written to file)
-snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law of stream numbers and snapping thresholds
+#' @return figures plotting sensitivity results (written to file)
+snappingSensitivityFigures <- function(out){
   theme_set(theme_classic())
 
-  forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to plot accuracy
+  #trade off plot between performance of Horton laws and snapping thresholds
+  forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to plot accuracy (below)
   forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'rmse'))
   tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
         geom_point(size=10) +
@@ -484,37 +493,34 @@ snappingSensitivityFigures <- function(out){  #tradeoff plot between horton law 
   ggsave('cache/snappingThreshTradeOff.jpg', tradeOffPlot, width=8, height=8)
 
   #check sensitivity of classification accuracy to snapping threshold
-  accuracyPlot <- ggplot(out, aes(x=factor(thresh), y=basinAccuracy.basinAccuracy*100, fill=factor(thresh))) +
-    geom_boxplot(size=1.75, color='black', color='lightblue') +
+  accuracyPlot <- ggplot(out, aes(x=factor(thresh), y=basinAccuracy.basinAccuracy*100)) +
+    geom_boxplot(size=1.75, color='black', fill='lightblue') +
     stat_summary(fun = mean, geom = "point", col = "darkred", size=6) +
-    scale_fill_brewer(palette='Set3')+
     xlab('Snapping Threshold [m]') +
-    ylab('Epehemeral Classification Accuracy [%]')+
+    ylab('Ephemeral Classification Accuracy [%]')+
     ylim(0,100)+
     theme(axis.text=element_text(size=20),
       axis.title=element_text(size=22,face="bold"),
       legend.position = 'none')
   ggsave('cache/acc_sens_to_snapping.jpg', accuracyPlot, width=8, height=8)
 
-  return(list('tradeOffPlot'=tradeOffPlot,
-              'accuracyPlot'=accuracyPlot))
+  return('see cache/snappingThreshTradeOff.jpg and cache/acc_sens_to_snapping.jpg')
 }
 
 
 
 
 
-#' Build figure showing runoff threshold calibration compared against the geomorphic model actually used
+#' Figure showing operational runoff threshold calibration
 #'
 #' @name runoffThreshCalibPlot
 #'
 #' @param calibResults: df of runoff threshold calibration results
-#' @param theoreticalThresholds: vector of by basin runoff thresholds calculated via geomorphic scaling
 #'
 #' @import ggplot2
 #' @import patchwork
 #'
-#' @return ggplot showing calibration (also writes fig to file)
+#' @return ggplot showing calibration (written to file)
 runoffThreshCalibPlot <- function(calibResults){
   theme_set(theme_classic())
   
@@ -539,19 +545,19 @@ runoffThreshCalibPlot <- function(calibResults){
   
   ggsave('cache/runoffThresh_fitting.jpg', plot, width=12, height=8)
   
-  return(plot)
+  return('see cache/runoffThresh_fitting.jpg')
 }
 
 
 
 
-#' create figure for Horton scaling result
+#' create figure for Horton scaling model
 #'
 #' @name buildScalingModelFig
 #'
 #' @param scalingModel: scaling model calculations object
 #'
-#' @return figure for explaining Hortonian scaling
+#' @return figure of Horton scaling model (written to file)
 buildScalingModelFig <- function(scalingModel){
   theme_set(theme_classic())
   
@@ -579,7 +585,7 @@ buildScalingModelFig <- function(scalingModel){
           legend.position='bottom')
   
   ggsave('cache/scalingModel.jpg', plot, width=9, height=8)
-  return(plot)
+  return('see cache/scalingModel.jpg')
 }
 
 
@@ -591,6 +597,7 @@ buildScalingModelFig <- function(scalingModel){
 #'
 #' @name areaMapFunction
 #'
+#' @param path_to_data: data repo path
 #' @param shapefile_fin: final sf object with model results
 #'
 #' @import sf
@@ -598,8 +605,8 @@ buildScalingModelFig <- function(scalingModel){
 #' @import ggplot2
 #' @import cowplot
 #'
-#' @return land use results figure (also writes figure to file)
-areaMapFunction <- function(shapefile_fin) {
+#' @return land use results figure (written to file)
+areaMapFunction <- function(path_to_data, shapefile_fin) {
   theme_set(theme_classic())
   
   ##GET DATA
@@ -607,7 +614,7 @@ areaMapFunction <- function(shapefile_fin) {
   results <- dplyr::filter(results, is.na(num_flowing_dys)==0) #remove great lakes
   
   # CONUS boundary
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                                 'American Samoa',
                                                 'Commonwealth of the Northern Mariana Islands',
@@ -625,7 +632,7 @@ areaMapFunction <- function(shapefile_fin) {
   cdf_inset <- ggplot(results, aes(percArea_eph))+
     stat_ecdf(size=2, color='black') +
     xlab('% ephemeral drainage area')+
-    ylab('Exceedance Probability')+
+    ylab('Probability')+
     theme(axis.title = element_text(size=20),
           axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
     theme(legend.position = 'none') #legend position settings
@@ -668,10 +675,132 @@ areaMapFunction <- function(shapefile_fin) {
 
 
 
+#' Verifies our model in the Walnut Gulch Experimental watershed
+#'
+#' @name walnutGulchQualitative
+#'
+#' @param rivNetFin_1505: routing model result for basin
+#' @param path_to_data: data repo path
+#'
+#' @import sf
+#' @import ggplot2
+#' @import patchwork
+#' @import dplyr
+#'
+#' @return validation plots of Walnut gulch hydrography and discharge model (written to file)
+walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
+  theme_set(theme_classic())
+  
+  #wrangling walnut gulch--------------------------
+  walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv'))
+  walnutGulch <- tidyr::gather(walnutGulch, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 6","Flume 7","Flume 11","Flume 15","Flume 103","Flume 104", "Flume 112", "Flume 121", "Flume 125"))
+  walnutGulch$date <- paste0(walnutGulch$Year, '-', walnutGulch$Month, '-', walnutGulch$Day)
+  walnutGulch$date <- lubridate::as_date(walnutGulch$date)
+  walnutGulch <- walnutGulch %>%
+    dplyr::mutate(year = lubridate::year(date)) %>%
+    dplyr::group_by(site) %>% #get no flow stats per sub watershed
+    dplyr::summarise(runoff_m_s = mean(runoff_mm, na.rm=T)*0.001/86400) %>% #m/s
+    dplyr::mutate(site = substr(site, 7, nchar(site)))
+
+  #setup flume locations----------------------------
+  flume_sites <- read.csv(paste0(path_to_data, '/exp_catchments/walnut_gulch/walnut_gulch_flumes.csv'))
+  flume_sites <- dplyr::filter(flume_sites, !is.na(drainageArea_km2)) %>%
+    dplyr::mutate(flume = as.character(flume)) %>%
+    dplyr::left_join(walnutGulch, by=c('flume'='site')) %>%
+    sf::st_as_sf(coords=c('easting', 'northing')) %>%
+    dplyr::mutate(meas_runoff_m3_s = runoff_m_s*drainageArea_km2*1e6) #m3/s
+  
+  sf::st_crs(flume_sites) <- sf::st_crs('epsg:26912')
+
+  #set up hydrography------------------------------
+  basin <- sf::st_read(paste0(path_to_data,'/exp_catchments/walnut_gulch/boundary.shp'))
+  basin <- sf::st_transform(basin, 'epsg:26912')
+  
+  #map ephemeral classification----------------------
+  network <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_15/NHDPLUS_H_1505_HU4_GDB/NHDPLUS_H_1505_HU4_GDB.gdb'), layer='NHDFlowline')
+  network<- sf::st_zm(network)
+  network <- sf::st_transform(network, 'epsg:26912')
+  network <- sf::st_intersection(network, basin)
+  
+  network <- dplyr::left_join(network, rivNetFin_1505, 'NHDPlusID')
+  network <- dplyr::filter(network, is.na(perenniality)==0)
+  
+  #snap flume data to network----------------------------
+  nearestIndex <- sf::st_nearest_feature(flume_sites, network)
+  flume_sites$NHDPlusID <- network[nearestIndex,]$NHDPlusID
+  flume_sites2 <- dplyr::left_join(as.data.frame(flume_sites), network, by='NHDPlusID') %>%
+    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 20% of one another
+  
+  #basin map----------------------------------
+  map <- ggplot(network, aes(color=perenniality)) +
+    geom_sf()+
+    geom_sf(data=flume_sites[flume_sites$NHDPlusID %in% flume_sites2$NHDPlusID,],
+            color='black',
+            size=6)+
+    scale_color_manual(name='',
+                       values=c('#f18f01', '#006e90'),
+                       labels=c('Model ephemeral', 'Model non-ephemeral')) +
+    labs(tag='A')+
+    theme(axis.text = element_text(family="Futura-Medium", size=20),
+          legend.position = c(0.8, 0.1),
+          legend.text=element_text(size=20),
+          plot.title = element_text(face = "italic", size = 26),
+          plot.tag = element_text(size=26,
+                                  face='bold'))+
+    xlab('')+
+    ylab('') +
+    ggtitle('Walnut Gulch Experimental Ephemeral Watershed, AZ')
+  
+  #Q validation-----------------------------
+  scatterPlot <- ggplot(flume_sites2, aes(x=meas_runoff_m3_s, y=Q_cms)) +
+    geom_abline(linetype='dashed', color='darkgrey', size=2) +
+    geom_point(size=8) +
+    geom_smooth(method='lm', size=1.5, color='black', se=F)+
+    labs(tag='B')+
+    xlim(0,0.1)+
+    ylim(0,0.1)+
+    annotate('text', label=expr(r^2: ~ !!round(summary(lm(Q_cms~meas_runoff_m3_s, data=flume_sites2))$r.squared,2)), x=10, y=75, size=9)+
+    annotate('text', label=paste0('n = ', nrow(flume_sites2), ' basins'), x=75, y=15, size=7, color='black')+
+    ylab(expr(bold('Model Discharge ['~frac(m^3,s)~']')))+
+    xlab(expr(bold('Mean Annual Discharge ['~frac(m^3,s)~']')))+
+    theme(axis.title = element_text(size=20, face='bold'),
+          axis.text = element_text(size=18,face='bold'),
+          legend.position='none',
+          plot.tag = element_text(size=26,
+                                  face='bold'))
+  
+  ##BUILD PLOT----------------------------
+  design <- "
+    AA
+    AA
+    AA
+    BB
+  "
+  
+  comboPlot <- patchwork::wrap_plots(A=map, B=scatterPlot, design=design)
+  ggsave('cache/walnutGulch.jpg', comboPlot, width=13, height=12)
+  
+  #prep output
+  out <- list('see cache/walnutGulch.jpg',
+              'df'=flume_sites2 %>% select(c('NHDPlusID', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'TotDASqKm')),
+              'percQEph_exported'=network[which.max(network$Q_cms),]$percQEph_reach)
+
+  return(out)
+}
+
+
+
+
+
+
+
+
+
 #' create ephemeral hydrography map per huc4 basin
 #'
 #' @name hydrographyFigureSmall
 #'
+#' @param path_to_data: data repo path
 #' @param shapefile_fin: final model results shapefile
 #' @param net_results: hydrography df detailing each reach's perenniality
 #' @param huc4: huc4 basin id 
@@ -682,7 +811,7 @@ areaMapFunction <- function(shapefile_fin) {
 #' @import cowplot
 #'
 #' @return ggplot object of hydrography map
-hydrographyFigureSmall <- function(shapefile_fin, net_results, huc4){
+hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc4){
   theme_set(theme_classic())
   
   ##GET DATA--------------------------------
@@ -692,7 +821,7 @@ hydrographyFigureSmall <- function(shapefile_fin, net_results, huc4){
   exported_abs <- results[results$huc4 == huc4,]$QEph_exported_cms
   exported_perc <- results[results$huc4 == huc4,]$percQEph_exported
 
-  net <- sf::st_read(dsn = paste0('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/HUC2_',huc2,'/NHDPLUS_H_',huc4,'_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  net <- sf::st_read(dsn = paste0(path_to_data,'/HUC2_',huc2,'/NHDPLUS_H_',huc4,'_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
   if('MULTICURVE' %in% sf::st_geometry_type(net)){
     net <- sf::st_cast(net, 'MULTILINESTRING') #plotting functions can't handle the few streamlines saved as multicurve....
   }
@@ -740,22 +869,22 @@ hydrographyFigureSmall <- function(shapefile_fin, net_results, huc4){
 #'
 #' @name comboHydroSmalls
 #'
-#' @param hydroMap_1: ggplot obejct mapping network 1
-#' @param hydroMap_2: ggplot obejct mapping network 2
-#' @param hydroMap_3: ggplot obejct mapping network 3
-#' @param hydroMap_4: ggplot obejct mapping network 4
-#' @param hydroMap_5: ggplot obejct mapping network 5
-#' @param hydroMap_6: ggplot obejct mapping network 6
-#' @param hydroMap_7: ggplot obejct mapping network 7
-#' @param hydroMap_8: ggplot obejct mapping network 8
-#' @param hydroMap_9: ggplot obejct mapping network 9
-#' @param hydroMap_10: ggplot obejct mapping network 10
-#' @param hydroMap_11: ggplot obejct mapping network 11
-#' @param hydroMap_12: ggplot obejct mapping network 12
-#' @param hydroMap_13: ggplot obejct mapping network 13
-#' @param hydroMap_14: ggplot obejct mapping network 14
-#' @param hydroMap_15: ggplot obejct mapping network 15
-#' @param hydroMap_16: ggplot obejct mapping network 16
+#' @param hydroMap_1: ggplot object mapping network 1
+#' @param hydroMap_2: ggplot object mapping network 2
+#' @param hydroMap_3: ggplot object mapping network 3
+#' @param hydroMap_4: ggplot object mapping network 4
+#' @param hydroMap_5: ggplot object mapping network 5
+#' @param hydroMap_6: ggplot object mapping network 6
+#' @param hydroMap_7: ggplot object mapping network 7
+#' @param hydroMap_8: ggplot object mapping network 8
+#' @param hydroMap_9: ggplot object mapping network 9
+#' @param hydroMap_10: ggplot object mapping network 10
+#' @param hydroMap_11: ggplot object mapping network 11
+#' @param hydroMap_12: ggplot object mapping network 12
+#' @param hydroMap_13: ggplot object mapping network 13
+#' @param hydroMap_14: ggplot object mapping network 14
+#' @param hydroMap_15: ggplot object mapping network 15
+#' @param hydroMap_16: ggplot object mapping network 16
 #' @param imageID: id for writing image to file
 #'
 #' @import sf
@@ -785,7 +914,7 @@ comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
       guides(color = guide_legend(override.aes = list(size=10))))
   
   
-  ##COMBO PLOT------------------------------
+  ##BUILD PLOT----------------------------
   design <- "
     ABCD
     ABCD
@@ -817,19 +946,19 @@ comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
 #'
 #' @name comboHydroSmalls
 #'
-#' @param hydroMap_1: ggplot obejct mapping network 1
-#' @param hydroMap_2: ggplot obejct mapping network 2
-#' @param hydroMap_3: ggplot obejct mapping network 3
-#' @param hydroMap_4: ggplot obejct mapping network 4
-#' @param hydroMap_5: ggplot obejct mapping network 5
-#' @param hydroMap_6: ggplot obejct mapping network 6
-#' @param hydroMap_7: ggplot obejct mapping network 7
-#' @param hydroMap_8: ggplot obejct mapping network 8
-#' @param hydroMap_9: ggplot obejct mapping network 9
-#' @param hydroMap_10: ggplot obejct mapping network 10
-#' @param hydroMap_11: ggplot obejct mapping network 11
-#' @param hydroMap_12: ggplot obejct mapping network 12
-#' @param hydroMap_13: ggplot obejct mapping network 13
+#' @param hydroMap_1: ggplot object mapping network 1
+#' @param hydroMap_2: ggplot object mapping network 2
+#' @param hydroMap_3: ggplot object mapping network 3
+#' @param hydroMap_4: ggplot object mapping network 4
+#' @param hydroMap_5: ggplot object mapping network 5
+#' @param hydroMap_6: ggplot object mapping network 6
+#' @param hydroMap_7: ggplot object mapping network 7
+#' @param hydroMap_8: ggplot object mapping network 8
+#' @param hydroMap_9: ggplot object mapping network 9
+#' @param hydroMap_10: ggplot object mapping network 10
+#' @param hydroMap_11: ggplot object mapping network 11
+#' @param hydroMap_12: ggplot object mapping network 12
+#' @param hydroMap_13: ggplot object mapping network 13
 #' @param imageID: id for writing image to file
 #'
 #' @import sf
@@ -859,7 +988,7 @@ comboHydroSmalls_13 <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
       guides(color = guide_legend(override.aes = list(size=10))))
   
   
-  ##COMBO PLOT------------------------------
+  ##BUILD PLOT----------------------------
   design <- "
     ABCD
     ABCD

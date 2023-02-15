@@ -1,0 +1,34 @@
+---
+title: "Indiana hydrography QAQC"
+output: html_document
+date: "`r Sys.Date()`"
+author: 'Craig Brinkerhoff'
+---
+
+## MANUALLY FIXING INDIANA HYDROGRAPHY
+Indiana NHD hydrography is too dense and drainage density is artificially bounded by the state borders. To fix this, I manually verified the general headwater drainage area for the non-Indiana portion of the drainage networks, and set stream order thresholds, usually a little below the median, to 're-extract' reasonable river networks for Indiana. Note that various network parameters than need to be adjusted: stream order, startFlag.
+
+### GUIDELINES
+HUC4: 0508
+ StreamOrder > 2 (3+)
+
+HUC4: 0509:
+ StreamOrder > 2 (3+)
+
+HUC4: 0514:
+ StreamOrder > 2 (3+)
+
+HUC4: 0512:
+ StreamOrder > 2 (3+)
+
+HUC4: 0712
+ StreamOrder > 3 (4+)
+
+HUC4: 0404:
+ StreamOrder > 2 (3+)
+
+HUC4: 0405:
+ StreamOrder > 3 (4+)
+
+HUC4: 0410:
+ StreamOrder > 2 (3+)

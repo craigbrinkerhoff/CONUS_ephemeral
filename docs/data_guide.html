@@ -11,7 +11,7 @@
 
 <meta name="author" content="Craig Brinkerhoff" />
 
-<meta name="date" content="2023-02-03" />
+<meta name="date" content="2023-02-15" />
 
 <title>Data Guide</title>
 
@@ -365,7 +365,7 @@ pre code {
 
 <h1 class="title toc-ignore">Data Guide</h1>
 <h4 class="author">Craig Brinkerhoff</h4>
-<h4 class="date">2023-02-03</h4>
+<h4 class="date">2023-02-15</h4>
 
 </div>
 
@@ -373,7 +373,7 @@ pre code {
 <div id="guide-to-all-datasets-and-models-used-in-this-analysis" class="section level2">
 <h2>Guide to all datasets and models used in this analysis</h2>
 <p>Unless otherwise specified, these are in the
-<code>for_ephemeral_project</code> sub-directory.</p>
+<code>~/for_ephemeral_project</code> sub-directory.</p>
 <ul>
 <li>Global Monthly Water Table Depth Model
 <ul>
@@ -386,22 +386,13 @@ model): <a href="https://doi.org/doi:10.1126/science.1229881" class="uri">https:
 <li><strong>Resolution/Scale:</strong> 1km</li>
 <li><strong>Years:</strong> 2004-2014</li>
 </ul></li>
-<li>2019 CONUS National Land Cover Dataset (NLCD) v 2.0 (June 2021)
-<ul>
-<li><strong>Filename:</strong>
-<code>NLCD_2019/nlcd_HUCxx.tif</code></li>
-<li><strong>Data:</strong> <a href="https://developers.google.com/earth-engine/datasets/catalog/USGS_NLCD_RELEASES_2019_REL_NLCD" class="uri">https://developers.google.com/earth-engine/datasets/catalog/USGS_NLCD_RELEASES_2019_REL_NLCD</a></li>
-<li><strong>Paper:</strong> <a href="https://www.sciencebase.gov/catalog/item/5f21cef582cef313ed940043" class="uri">https://www.sciencebase.gov/catalog/item/5f21cef582cef313ed940043</a></li>
-<li><strong>Resolution/Scale:</strong> 30m (downscaled to 1km)</li>
-<li><strong>Years:</strong> 2019</li>
-</ul></li>
 <li>CONUS Long-Term Gauge-Based Daily Precip Model
 <ul>
 <li><strong>Filenames:</strong> <code>dailyPrecip_1980_1989.gri</code>,
 <code>dailyPrecip_1990_1999.gri</code>,
 <code>dailyPrecip_2000_2006.gri</code>
 <ul>
-<li>file prep done locally via <code>src/netcdf_prep.R</code></li>
+<li>file prep done locally via <code>~/src/netcdf_prep.R</code></li>
 </ul></li>
 <li><strong>Data:</strong> <a href="https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source" class="uri">https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source</a></li>
 <li><strong>Paper (validation)</strong>: <a href="https://doi.org/10.1029/2007JD009132" class="uri">https://doi.org/10.1029/2007JD009132</a></li>
@@ -420,7 +411,7 @@ directories</li>
 </ul></li>
 <li>USGS Streamgauge data to validate NHD streamflow model and <span class="math inline">\(N_{flw}\)</span> model
 <ul>
-<li><strong>Filename:</strong> <code>cache/training</code>
+<li><strong>Filename:</strong> <code>~/cache/training</code>
 directory</li>
 <li><strong>Data:</strong> Accessed via <code>dataRetrieval</code> R
 package</li>

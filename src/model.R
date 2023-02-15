@@ -1,4 +1,4 @@
-  ## Primary model functions that are leveraged throughout the ~/src/analysis.R functions (that facilitate the actual analysis)
+## Primary model functions that are leveraged throughout the ~/src/analysis.R functions (that facilitate the actual analysis)
 ## Craig Brinkerhoff
 ## Fall 2022
 
@@ -6,7 +6,7 @@
 
 
 
-#' Calculates river ephemerality status using Fan et al 2017 monthly WTD (accounting for non-CONUS streams)
+#' Calculates river ephemerality using Fan et al 2017 monthly WTD (accounting for non-CONUS streams)
 #'
 #' @name perenniality_func_fan
 #'
@@ -22,9 +22,9 @@
 #' @param wtd_m_10: Water table depth- October
 #' @param wtd_m_11: Water table depth- November
 #' @param wtd_m_12: Water table depth- December
-#' @param depth: depth derived via hydraulic geomtery or lake volume scaling
+#' @param depth: depth from hydraulic scaling
 #' @param thresh: water table depth threshold for 'perennial'
-#' @param err: error tolerance for thresholding
+#' @param err: error tolerance for threshold (not actually used)
 #' @param conus: flag for foreign or not
 #' @param lakeAreaSqKm: fractional lake surface area per reach [km2]
 #' @param FCode_riv: river code from NHD-HR
@@ -33,15 +33,15 @@
 perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm, FCode_riv){
   if(conus == 0){ #foreign stream handling
     return('foreign')
-  } else if(substr(FCode_riv,1,3) == 336){ #Fype for canal/ditch
+  } else if(substr(FCode_riv,1,3) == 336){ #canal/ditch handling
       return('canal_ditch')
-  } else if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm < 0.01){ #small ponds
+  } else if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm < 0.01){ #small ponds handling (https://doi.org/10.1029/2019GL083937)
       return('small_pond')
   } else if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0) { #there are some NA WTDs for very short reaches that consist only of 'perennial boundary conditions' in the water table model, i.e. ocean or great lakes
       return('non_ephemeral')
   } else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){
-      if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all wtd must not intersect river
-        if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following Schmadel 2019
+      if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all twelve months the water table must not intersect river
+        if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following https://doi.org/10.1029/2019GL083937
           return('non_ephemeral')
         } else{
           return('ephemeral') 
@@ -53,6 +53,8 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
         return('non_ephemeral')
       }
 }
+
+
 
 
 
@@ -73,13 +75,14 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
 perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniality_vec, order_vec, curr_Q, Q_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
 
-  foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1) #scenario where incoming foreign reach is likely not ephemeral, i.e. a not-headwater (1st order) stream
+  #scenario where incoming foreign reach is likely not ephemeral, i.e. a not-headwater (1st order) stream
+  foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1)
 
   out <- curr_perr #otherwise, leave as is
   if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #assumption: once a river turns non-ephemeral, it stays that way downstream
     out <- 'non_ephemeral'
   }
-  else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers inflowing from Canada/Mexico
+  else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers flowing in from Canada/Mexico
     out <- 'non_ephemeral'
   }
 
@@ -89,7 +92,8 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
 
 
 
-#' Calculates lateral discharge / runoff contribution for a reach
+
+#' Calculates lateral discharge / runoff contribution for a reach's catchment
 #'
 #' @name getdQ
 #'
@@ -134,11 +138,11 @@ getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
 
 
 
-#' Calculate % ephemeral contribution for some accumulated property in a reach in the network.
+#' Calculate % ephemeral contribution for discharge or drainage area accumulated property in a reach in the network.
 #'
 #' @name getPercEph
 #'
-#' @note: set up for either discharge or drainage area (the 'property' param)
+#' @note: set up for either discharge or drainage area (the 'property' parameter)
 #'
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
@@ -164,13 +168,13 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
 
   upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)
 
-  #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero (handles ost streamflow too)
+  #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero
   Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
   
   #if losing stream, set the weight to zero as it's not contributing anything to the stream
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)
   
-  #weighted mean of the streamflow contributions (lateral + n upstream contributions, weighted by discharge)
+  #weighted mean of the discharge contributions (lateral + n upstream contributions, weighted by discharge)
   out <- weighted.mean(c(upstream_percEphs, Ephflag), c(upstreamProperties, lateralProperty))
   
   #handle 0 drainage areas creating infinite values (only a handful)
