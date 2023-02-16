@@ -1,4 +1,5 @@
 ## Cache
+Figures generated during the analysis
 
 - supplemental figures
 - paper figures
