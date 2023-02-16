@@ -1,6 +1,6 @@
 #!/bin/sh
 #SBATCH --job-name={{ job_name }}
-#SBATCH --partition=gpu-preempt
+#SBATCH --partition=ceewater_cjgleason-cpu
 #SBATCH --output={{ log_file | /dev/null }} # you can add .%a for array index
 #SBATCH --error={{ log_file | /dev/null }}
 #SBATCH --mem-per-cpu={{ memory | 64000 }}

@@ -8,7 +8,7 @@
 #'
 #' @name mainFigureFunction
 #'
-#' @param path_to_data: data repo path
+#' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
 #' @param net_0107_results: final river network results for basin 0107
 #' @param net_0701_results: final river network results for basin 0701
@@ -41,12 +41,12 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                          'Puerto Rico',
                                          'United States Virgin Islands',
                                          'Hawaii'))) #remove non CONUS states/territories
-  states <- st_union(states)
+  states <- sf::st_union(states)
 
-  #results shapefile
+  #round results
   results$percQ_eph <- round(results$percQEph_exported*100,0) #setup percent
 
-  #labels for select basins with subplots
+  #labels for basins with subplots in the figure
   results$ids_west <- ifelse(results$huc4 == '1305', 'B',
                                 ifelse(results$huc4 == '1407', 'C',NA))
   results$ids_east <- ifelse(results$huc4 == '0107', 'D',NA)
@@ -111,7 +111,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     xlab('')+
     ylab('')
 
-  results_map <- results_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
+  results_map <- results_map +
+    patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ##RIVER NETWORK MAP 0107-------------------------------------------------------------------------------------
   net_0107 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_01/NHDPLUS_H_0107_HU4_GDB/NHDPLUS_H_0107_HU4_GDB.gdb'), layer='NHDFlowline')
@@ -275,7 +276,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   #get regions
   combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
   combined_results_by_order$huc4 <- substr(combined_results_by_order$method, 18, 21)
-  east <- c('0101', '0102', '0103', '0104', '0105', '0106', '0107', '0108', '0109', '0110',
+  east <- c('0101', '0102', '0103', '0104', '0105', '0106', '0107', '0108', '0109', '0110', #all basins east of the Mississippi River (determined visually)
             '0202', '0203', '0206', '0207', '0208', '0204', '0205',
             '0301', '0302', '0303', '0304', '0305', '0306', '0307', '0308', '0309', '0310', '0311', '0312', '0313', '0314', '0315', '0316', '0317', '0318',
             '0401', '0402', '0403', '0404', '0405', '0406', '0407', '0408', '0409', '0410', '0411', '0412', '0413', '0414', '0420', '0427', '0429', '0430',
@@ -293,7 +294,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   ####SUMMARY STATS-------------------
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
-  dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
+    dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
 
   ####DISCHARGE PLOT--------------------
   plotQ <- ggplot(combined_results_by_order, aes(fill=region, x=factor(StreamOrde), y=percQEph_reach_median*100)) +
@@ -380,9 +381,9 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 #'
 #' @name flowingFigureFunction
 #'
-#' @param path_to_data: data repo path
-#' @param shapefile_fin: final sf object with flowing days results
-#' @param joinedData: df of flowing days field data joined to huc4 basin model results
+#' @param path_to_data: data repo directory path
+#' @param shapefile_fin: final sf object with model results
+#' @param joinedData: df of in situ Nflw joined to HUC4 basins (for verification)
 #'
 #' @import sf
 #' @import dplyr
@@ -410,9 +411,9 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
                                                 'Hawaii'))) #remove non CONUS states/territories
   states <- sf::st_union(states)
 
+  #round results
   joinedData$num_flowing_dys <- round(joinedData$num_flowing_dys,0)
   joinedData$n_flw_d <- round(joinedData$n_flw_d,0)
-  joinedData$region <- ifelse(substr(joinedData$huc4,1,2) %in% c('01', '02', '03', '04', '05', '06', '07', '08', '09'), 'East', 'West') #assign east vs west
 
   #INSET MAP-----------------------------------------------
   cdf_inset <- ggplot(results, aes(num_flowing_dys))+
@@ -507,7 +508,8 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
    BBCC
    "
   
-  flowingDaysFig <- flowingDaysFig + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)  
+  flowingDaysFig <- flowingDaysFig + 
+    patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)  
   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysCDF, design=design)
 
   ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
@@ -525,7 +527,7 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
 #'
 #' @name areaMapFunction
 #'
-#' @param path_to_data: data repo path
+#' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
 #'
 #' @import sf
@@ -551,9 +553,9 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
                                                 'Puerto Rico',
                                                 'United States Virgin Islands',
                                                 'Hawaii'))) #remove non CONUS states/territories
-  states <- st_union(states)
+  states <- sf::st_union(states)
   
-  #results shapefile
+  #round results
   results$percLength_eph <- round(results$perc_length_eph*100,0) #setup percent
 
   #INSET MAP-----------------------------------------------
@@ -594,7 +596,8 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
     ylab('')
   
   #add inset
-  length_map <- length_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
+  length_map <- length_map + 
+    patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ggsave('cache/paper_figures/fig4.jpg', length_map, width=20, height=13)
   return('see cache/paper_figures/fig4.jpg')

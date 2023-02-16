@@ -1,5 +1,7 @@
 #ignore all targets
 _targets/objects
 .future/
-cache/*.csv
-docs/manuscript
+cache/*.jpg
+cache/*.rds
+docs/manuscript/drafts
+docs/manuscript/CONUS_ephemeral.docx

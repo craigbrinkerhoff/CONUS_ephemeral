@@ -10,22 +10,23 @@
 #'
 #' @name perenniality_func_fan
 #'
-#' @param wtd_m_01: Water table depth- January
-#' @param wtd_m_02: Water table depth- February
-#' @param wtd_m_03: Water table depth- March
-#' @param wtd_m_04: Water table depth- April
-#' @param wtd_m_05: Water table depth- May
-#' @param wtd_m_06: Water table depth- June
-#' @param wtd_m_07: Water table depth- July
-#' @param wtd_m_08: Water table depth- August
-#' @param wtd_m_09: Water table depth- September
-#' @param wtd_m_10: Water table depth- October
-#' @param wtd_m_11: Water table depth- November
-#' @param wtd_m_12: Water table depth- December
-#' @param depth: depth from hydraulic scaling
-#' @param thresh: water table depth threshold for 'perennial'
+#' @param wtd_m_01: Water table depth- January [m]
+#' @param wtd_m_02: Water table depth- February [m]
+#' @param wtd_m_03: Water table depth- March [m]
+#' @param wtd_m_04: Water table depth- April [m]
+#' @param wtd_m_05: Water table depth- May [m]
+#' @param wtd_m_06: Water table depth- June [m]
+#' @param wtd_m_07: Water table depth- July [m]
+#' @param wtd_m_08: Water table depth- August [m]
+#' @param wtd_m_09: Water table depth- September [m]
+#' @param wtd_m_10: Water table depth- October [m]
+#' @param wtd_m_11: Water table depth- November [m]
+#' @param wtd_m_12: Water table depth- December [m]
+#' @param width: width from hydraulic scaling [m]
+#' @param depth: depth from hydraulic scaling [m]
+#' @param thresh: water table depth threshold for 'perennial' [m]
 #' @param err: error tolerance for threshold (not actually used)
-#' @param conus: flag for foreign or not
+#' @param conus: flag for foreign or not [0/1]
 #' @param lakeAreaSqKm: fractional lake surface area per reach [km2]
 #' @param FCode_riv: river code from NHD-HR
 #'
@@ -66,7 +67,7 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
 #' @param curr_perr: current perenniality status
-#' @param perenniality_vec: full network vector of current perenniality statuses. This is amended online during routing.
+#' @param perenniality_vec: full network vector of current perenniality statuses. This is updated online while routing.
 #' @param order_vec: full network vector of stream orders
 #' @param curr_Q: reach discharge [m3/s]
 #' @param Q_vec: full network vector of discharges [m3/s]
@@ -93,7 +94,7 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
 
 
 
-#' Calculates lateral discharge / runoff contribution for a reach's catchment
+#' Calculates lateral discharge / runoff contribution for an individual reach's catchment
 #'
 #' @name getdQ
 #'
@@ -114,16 +115,16 @@ getdQ <- function(fromNode, toNode_vec, curr_Q, Q_vec){
 
 
 
-#' Calculates accumulated drainage area for a reach
+#' Calculates cumulative drainage area for a reach
 #'
 #' @name getTotDA
 #'
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
-#' @param curr_A: reach discharge [m3/s]
-#' @param A_vec: full network vector of discharges [m3/s]
+#' @param curr_A: reach's individual catchment ares [km2]
+#' @param A_vec: full network vector of cumulative drainage areas [km2]
 #'
-#' @return contributing drainage area per reach
+#' @return cumulative drainage area per reach
 getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
   upstreamA <- sum(A_vec[upstream_reaches], na.rm=T)
@@ -138,17 +139,15 @@ getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
 
 
 
-#' Calculate % ephemeral contribution for discharge or drainage area accumulated property in a reach in the network.
+#' Calculate % ephemeral contribution for discharge or drainage area for a given reach in the network.
 #'
 #' @name getPercEph
-#'
-#' @note: set up for either discharge or drainage area (the 'property' parameter)
 #'
 #' @param fromNode: upstream-end reach node
 #' @param toNode_vec: full network vector of downstream-end reach nodes
 #' @param curr_perr: current perenniality status
 #' @param curr_dQ: reach lateral runoff [m3/s]
-#' @param curr_dArea: reach lateral drainage area [km2]
+#' @param curr_dArea: reach catchment area [km2]
 #' @param curr_Property: reach accumulated property [m3/s] or [km2]
 #' @param Property_vec: full network vector of accumulated property [m3/s] or [km2]
 #' @param percEph_vec: full network vector of percent property [%]

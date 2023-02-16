@@ -30,7 +30,7 @@
 #'
 #' @name prepValDF
 #'
-#' @param path_to_data: path to data directory
+#' @param path_to_data: data repo directory path
 #'
 #' @import readr
 #' @import dplyr
@@ -40,7 +40,7 @@ prepValDF <- function(path_to_data){
   `%notin%` <- Negate(`%in%`)
 
   #load in validation dataset: we queried the "Clean Water Act Approved Jurisdictional Determinations" database on 06/20/2022 for all JDs requested by landowners.
-    #filter for decisions made under the NWPR (post 2020) because these ones explicitly distinguish ephemeral features as their own classes
+    #filter for decisions made under the NWPR (post 2020) because these ones explicitly distinguish ephemeral features as their own class
   validationDF <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
   validationDF <- dplyr::filter(validationDF, `JD Basis` == 'NWPR')
 
@@ -51,7 +51,7 @@ prepValDF <- function(path_to_data){
   colnames(validationDF) <- c('JD_ID', 'resource_type', 'project_id', 'long', 'lat', 'wotus_class', 'huc8')
   validationDF$huc4 <- substr(validationDF$huc8, 1, 4)
 
-  #reclassify as ephemeral/not ephemeral.
+  #recast as ephemeral/not ephemeral.
   validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3' | substr(validationDF$resource_type, 1, 5) == 'RHAB3', 'ephemeral', 'non_ephemeral')
 
   return(validationDF)
@@ -65,22 +65,22 @@ prepValDF <- function(path_to_data){
 #' Joins EPA WOTUS Jurisdictional distinctions to NHD-HR hydrography:
 #'    1) Auto-finds the correct UTM zone to project data
 #'    2) Gets distance between EPA in situ ephemeral classification and nearest NHD-HR reach
-#'    3) Also grabs USGS gauges that fit 'non-ephemeral' status and appends adds them to the validation set
+#'    3) Also grabs USGS gauges that fit 'non-ephemeral' status and adds them to the validation set
 #'
 #' @name snapValidateToNetwork
 #'
-#' @param path_to_data: path to data directory
-#' @param validationDF: WOTUS Jurisdictional distinction dataset (pre-cleaned and prepped)
+#' @param path_to_data: data repo directory path
+#' @param validationDF: WOTUS Jurisdictional distinction dataset (already cleaned and prepped)
 #' @param USGS_data: USGS gauge IDs and 'no flow fractions'
 #' @param nhdGages: lookup table linking USGS gauges to NHD-HR reach ids
-#' @param nhd_df: model result river network (as data.frame)
+#' @param nhd_df: basin routing table + results
 #' @param huc4id: HUC4 id for current basin
-#' @param noFlowGageThresh: Threshold for 'certainly non-ephemeral', i.e. % of year that streamgauges can run dry while certainly not being ephemeral
+#' @param noFlowGageThresh: Threshold for 'certainly non-ephemeral', i.e. % of year that streamgauges can run dry while almost certainly not being ephemeral
 #'
 #' @import sf
 #' @import dplyr
 #'
-#' @return df with WOTUS validation points associated with NHD reaches (and their respective dicstance [m] from the reach)
+#' @return df with WOTUS validation points associated with NHD reaches (and their respective distance [m] from the reach)
 snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGages, nhd_df, huc4id, noFlowGageThresh) {
   indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #Indiana-effected basins
 
@@ -205,7 +205,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 #'
 #' @param rivNetFin_0106: 0106 river network, needed to pair in situ data in 0106 with model results
 #' @param rivNetFin_0108: 0108 river network, needed to pair in situ data in 0108 with model results
-#' @param path_to_data: path to data directory
+#' @param path_to_data: data repo directory path
 #' @param field_dataset our in situ river ephemerality classifications in New England (summer 2022)
 #'
 #' @import dplyr
@@ -304,9 +304,9 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 #'
 #' @name setupEphemeralQValidation
 #'
-#' @param path_to_data: character string to data repo
-#' @param walnutGulch: walnut gulch data frame for runoff data
-#' @param ephemeralUSGSDischarge: usgs ephemeral gauge list
+#' @param path_to_data: data repo directory path
+#' @param walnutGulch: df of walnut gulch runoff data
+#' @param ephemeralUSGSDischarge: USGS ephemeral gauge list
 #' @param rivNetFin_1008: routing model result for basin 1008
 #' @param rivNetFin_1009: routing model result for basin 1009
 #' @param rivNetFin_1012: routing model result for basin 1012
@@ -380,19 +380,19 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
 #'
 #' @name tokunaga_eph
 #'
-#' @param nhd_df: routing model result for basin
+#' @param nhd_df: basin routing table + results
 #' @param results: model results for huc4 basin
 #' @param huc4: huc4 basin id
 #'
 #' @import dplyr
 #'
-#' @return df containing 1) model results and 2) scaling results
+#' @return df containing 1) model results and 2) tokunaga scaling results
 tokunaga_eph <- function(nhd_df, results, huc4){
   #prep results for joining to df
   results <- data.frame('StreamOrde'=max(nhd_df$StreamOrde),
                         'percQEph_exported' = results[1,]$percQEph_exported)
 
-  #calc tokunaga ratios using length instead of number
+  #calculate tokunaga ratios using length instead of number
   out <- nhd_df %>%
     dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')),

@@ -8,8 +8,8 @@
 #'
 #' @name getNHDGages
 #'
-#' @param path_to_data: data repo path
-#' @param codes_huc02: HUC2 basins to get gauges for
+#' @param path_to_data: data repo directory path
+#' @param codes_huc02: HUC2 basin IDs
 #'
 #' @import dplyr
 #' @import sf
@@ -52,13 +52,13 @@ getNHDGages <- function(path_to_data, codes_huc02){
 
 
 
-#' Gather discharge data at gauges and calculate 1) mean annual flow and 2) no flow fractions
+#' Gather in situ discharge at gauges and calculate 1) mean annual flow and 2) no flow fractions
 #'
 #' @name getGageData
 #'
-#' @param path_to_data: path to data working directory
-#' @param nhdGages: list of USGS streamgauges joined to NHD-HR
-#' @param codes_huc02: HUC2 basins to get gauge data for
+#' @param path_to_data: data repo directory path
+#' @param nhdGages: list of USGS streamgauges joined to NHD-HR a priori
+#' @param codes_huc02: HUC2 basin IDs (used to bin API calls to get streamgauge data)
 #'
 #' @import dataRetrieval
 #' @import readr
@@ -130,7 +130,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
 
     write_rds(results, paste0('cache/training/trainingData_', m, '.rds'))
 
-    Sys.sleep(60) #wait 1 minute to USGS doesn't get angry :)
+    Sys.sleep(60) #wait 1 minute so that USGS doesn't get angry :)
    }
   }
 

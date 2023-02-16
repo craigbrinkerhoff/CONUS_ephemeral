@@ -9,9 +9,9 @@
 #'
 #' @name summariseWTD
 #'
-#' @param wtd: vector of water table depths along a stream reach
+#' @param wtd: vector of water table depths along a stream reach [m]
 #'
-#' @return out: summarized water table depth along reach
+#' @return out: summary stats for wtd pixels along a reach [m]
 summariseWTD <- function(wtd){
   median <- median(wtd, na.rm=T)
   mean <- mean(wtd, na.rm=T)
@@ -78,15 +78,15 @@ depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
 
 
 
-#' Adds 'memory days' to number of flowing days timeseries given a lag time.
+#' Adds 'memory days' to number of flowing days timeseries given a memory parameter
 #' 
 #' @note This function specifically avoids double counting flowing days, by only adding memory flowing days if the day is not already tagged as flowing
 #'
 #' @name addingRunoffMemory
 #'
 #' @param precip: flowing on/off binary timeseries as a vector [0/1]
-#' @param memory: number of days lag that runoff is still being generated from a rain event [days]
-#' @param thresh: runoff threshold (expressed as precip) as set in main analysis [m]
+#' @param memory: number of days memory that runoff is still being generated from a rain event [days]
+#' @param thresh: runoff threshold (expressed as precip using basin runoff efficiency) [m]
 #'
 #' @return updated flowing on/off binary timeseries (with lagged days now flagged as flowing too)
 addingRunoffMemory <- function(precip, memory, thresh){
@@ -138,11 +138,11 @@ long2UTM <- function(long) {
 
 
 
-#' Fixes geometries that are saved as multicurves rather than multilines
+#' Fixes geometries that are saved as multicurves rather than multilines in the NHD-HR
 #'
 #' @name fixGeometries
 #'
-#' @param rivnet: river network hydrography object
+#' @param rivnet: sf object for basin hydrography
 #'
 #' @import dplyr
 #' @import sf
@@ -164,7 +164,7 @@ fixGeometries <- function(rivnet){
 
 
 
-#' Plots and saves mean annual hydrographs so we can manually verify these are 'more ephemeral than intermittent' (and vice versa)
+#' Plots and saves mean annual hydrographs so we can manually verify that they are ephemeral and not intermittent
 #'
 #' @name ephemeralityChecker
 #'

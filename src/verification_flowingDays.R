@@ -5,11 +5,11 @@
 
 
 
-#' Calculates Nflw for USGS ephemeral streamgauges using observed record
+#' Calculates in situ mean annual discharge and Nflw for USGS ephemeral streamgauges
 #'
 #' @name wrangleUSGSephGages
 #'
-#' @param other_sites: lookup table of USGS ephemeral gages used in this study
+#' @param other_sites: lookup table of USGS ephemeral streamgauges
 #'
 #' @import dataRetrieval
 #' @import dplyr
@@ -46,7 +46,7 @@ wrangleUSGSephGages <- function(other_sites){
   out <- out %>%
     dplyr::left_join(other_sites, by=c('gageID'='wy_eph_gages')) %>% #to get the gauge drainage area
     dplyr::select(c('gageID', 'huc4', 'reference','meas_runoff_m3_s', 'drainageArea_km2', 'num_flowing_dys', 'period_of_record_yrs', 'lon', 'lat')) %>%
-    dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.md for 'eph_int' vs 'eph' was determined
+    dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined
                                               '06313700',
                                               '06425750',
                                               '06425780',
@@ -84,21 +84,20 @@ wrangleUSGSephGages <- function(other_sites){
 #' Wrangles existing (published) ephemeral field data to calculate in situ Nflw
 #'
 #' @name wrangleFlowingFieldData
-#' @note data comes from the following field studies (all saved in data repo except the Duke Forest data which is hardcoded here):
+#' @note data comes from the following field studies (some are hardcoded into this function, but most are saved in the data repo):
+#'    Duke Forest, NC: https://doi.org/10.1002/hyp.11301 (1 years data)
+#'    Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
+#'    Mohave and Yuma Basins, AZ: https://doi.org/10.1029/2018WR023714 (2-3 years data)
+#'    Reynold's Creek, ID: https://doi.org/10.1029/2001WR000413 (29 years of data) Ephemeral site identification within catchment uses https://doi.org/10.1029/2001WR000420
+#'    Santa Rita Basin, AZ: doi:10.1029/2006WR005733 (46 years of data)
+#'    Walnut Gulch Basin, AZ: doi:10.1029/2006WR005733 (45 years of data)
+#'    Montoyas Catchment near Albuquerque, NM:  https://doi.org/10.1016/j.ejrh.2022.101089 (6 years of data)
+#'    More Arizona data for various arid catchments https://doi.org/10.1016/j.jaridenv.2016.12.004 (2 years of data). This has additional data for Santa Rita basin that gets averaged into the Santa Rita dataset
+#'    Geulph Ontario data  https://doi.org/10.1002/hyp.10136 (1/3 year of data)
+#'    Gage data from Wyoming, Colorado, and New Mexico per ephemeral gages from USGS reports (data for a few years in the 1970s)
 #'
-#' Duke Forest, NC: https://doi.org/10.1002/hyp.11301 (1 years data)
-#' Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
-#' Mohave and Yuma Basins, AZ: https://doi.org/10.1029/2018WR023714 (2-3 years data)
-#' Reynold's Creek, ID: https://doi.org/10.1029/2001WR000413 (29 years of data) Ephemeral site identification within catchment uses https://doi.org/10.1029/2001WR000420
-#' Santa Rita Basin, AZ: doi:10.1029/2006WR005733 (46 years of data)
-#' Walnut Gulch Basin, AZ: doi:10.1029/2006WR005733 (45 years of data)
-#' Montoyas Catchment near Albuquerque, NM:  https://doi.org/10.1016/j.ejrh.2022.101089 (6 years of data)
-#' More Arizona data for various arid catchments https://doi.org/10.1016/j.jaridenv.2016.12.004 (2 years of data). This has additional data for Santa Rita basin that gets averaged into the Santa Rita dataset
-#' Geulph Ontario data  https://doi.org/10.1002/hyp.10136 (1/3 year of data)
-#' Gage data from Wyoming, Colorado, and New Mexico per ephemeral gages from USGS reports (data for a few years in the 1970s)
-#'
-#' @param path_to_data: path to data repo
-#' @param ephemeralQDataset: USGS ephemeral streamgauges Nflw df (to be joined to the field-study in situ data wrangled here)
+#' @param path_to_data: data repo path directory
+#' @param ephemeralQDataset: df of USGS ephemeral streamgauges' in situ Nflw (to be joined to the other in situ data here)
 #'
 #' @import readr
 #' @import dplyr
@@ -208,6 +207,8 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                            'ma_num_flowing_days'=(365*0.44), #see paper main text for these numbers
                            'reference'='@zimmerBidirectionalStreamGroundwater2017')
 
+
+
   #add Montoyas watershed, urban system near Albuquerque, New Mexico manually (https://doi.org/10.1016/j.ejrh.2022.101089)-------------------------------------
   montoyas <- data.frame('watershed'='montoyas',
                          'site'='a',
@@ -238,11 +239,11 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 
   #add USGS ephemeral gage data (already calculated and red into function)-----------------------------
    ephemeralQDataset <- as.data.frame(ephemeralQDataset)
-   ephemeralQDataset <- dplyr::filter(ephemeralQDataset, type == 'eph')#remove the ambiguous 'ephemeral/intermittent' rivers flagged in the setupEphemeralQValidation function
+   ephemeralQDataset <- dplyr::filter(ephemeralQDataset, type == 'eph')#remove the ambiguous 'ephemeral/intermittent' rivers flagged in the setupEphemeralQValidation function and manually QAQC'd
   
 
 
-  #just pass along since I already got ma num flowing days per site (in setupEphemeralQValidation function)
+  #just pass along since I already got mean annual Nflw per site (in setupEphemeralQValidation function)
   eph_gages <- data.frame('watershed'=ephemeralQDataset$huc4,
                           'site'=ephemeralQDataset$gageID,
                           'period_of_record_yrs'=ephemeralQDataset$period_of_record_yrs,
@@ -258,9 +259,9 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   output <- results_all %>%
     dplyr::group_by(watershed) %>%
     dplyr::summarise(watershed=first(watershed),
-                     n_flw_d = median(ma_num_flowing_days,na.rm=T),  #take catchment average across all flumed reaches (if necessary)
+                     n_flw_d = mean(ma_num_flowing_days,na.rm=T),  #take catchment average across all flumed reaches (if necessary)
                      num_sample_yrs = round(mean(period_of_record_yrs),0), #mean across catchment reaches (mean of constants, just to propagate value)
-                     drainage_area_km2 = median(drainage_area_km2),
+                     drainage_area_km2 = mean(drainage_area_km2),
                      n_sites=n(),
                      reference=first(reference)) %>%
     #Here we assign approximate lat/lons for the basins (so these can be mapped later in the paper figures)
@@ -300,15 +301,15 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 
 
 
-#' Spatially joins field Nflw dataset to HUC4 basins (and takes HUC4 average when necessary)
+#' Spatially joins field Nflw dataset to HUC4 basins (and takes basin average when necessary)
 #'
 #' @name flowingValidate
 #'
-#' @param validationData: wrangled flowing days validation dataset
-#' @param path_to_data: path to data repo
-#' @param codes_huc02: all HUC2 basins
+#' @param validationData: wrangled flowing days verification dataset
+#' @param path_to_data: data repo path directory
+#' @param codes_huc02: all HUC2 basin IDs
 #' @param combined_results: all HUC4 basin model results
-#' @param combined_runoffEff: df of runoff efficiencies per basin
+#' @param combined_runoffEff: df of basin-average runoff efficiencies
 #'
 #' @import sf
 #' @import dplyr
@@ -346,12 +347,12 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
 #'
 #' @name flowingValidateSensitivityWrapper
 #'
-#' @param flowingFieldData: field data on mean annual number of flowing days in ephemeral streams
-#' @param runoffEffScalar_real: runoff scalar parameter used in model, held constant here
-#' @param runoffMemory_real: runoff memory parameter used in model, held constant here
+#' @param flowingFieldData: in situ ephemeral Nflw dataset
+#' @param runoffEffScalar_real: runoff scalar parameter
+#' @param runoffMemory_real: runoff memory parameter
 #' @param runoff_threshs: runoff thresholds to be tested
-#' @param path_to_data: path to data repo
-#' @param combined_runoffEff: runoff efficiencies for all basins
+#' @param path_to_data: data repo path directory
+#' @param combined_runoffEff: df of basin-average runoff efficiencies
 #'
 #' @import Metrics
 #' @import dplyr

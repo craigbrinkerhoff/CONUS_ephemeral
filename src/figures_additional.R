@@ -1,6 +1,6 @@
 ## Craig Brinkerhoff
 ## Winter 2023
-## Functions for additional results figures that aren't created in 'src/paperFigures.R'. These are mostly troubleshooting figures and/or supplemental info figures
+## Functions for supplementary figures.
 
 
 
@@ -9,10 +9,10 @@
 #'
 #' @name validationPlot
 #'
-#' @param path_to_data: data repo path
-#' @param tokunaga_df: exported ephemeral influence via Tokunaga scaling AND our model
+#' @param path_to_data: data repo directory path
+#' @param tokunaga_df: results from Tokunaga scaling exercise
 #' @param USGS_data: USGS mean annual flow observations from streamgauges
-#' @param nhdGages: lookup table pairing USGS gauges to the NHD-HR reaches
+#' @param nhdGages: lookup table pairing USGS gauges to NHD-HR reaches
 #' @param ephemeralQDataset: additional Q validation data for ephemeral streams from USGS reports
 #' @param walnutGulch: additional Q validation data for ephemeral streams in Walnut Gulch exp catchment
 #' @param val_shapefile_fin: final sf object with ephemeral classification validation
@@ -77,7 +77,7 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   
   
   #####TOKUNAGA ROUTING VERIFICATION---------------------------------------------------
-  #dont plot the great lakes because the network scaling makes no sense
+  #don't plot the great lakes (or basins with foreign streams) because the network scaling makes no sense
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
@@ -127,7 +127,6 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   #join two datasets together
   assessmentDF <- rbind(assessmentDF, walnutGulch)
   assessmentDF$type <- factor(assessmentDF$type, levels = c("Perennial", "Ephemeral/Intermittent")) #recast to be copacetic
-  
   assessmentDF <- dplyr::filter(assessmentDF, !(is.na(QBMA)) & !(is.na(Q_MA)))
   
   #Model plot
@@ -180,8 +179,8 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
 #'
 #' @name mappingValidationFigure
 #'
-#' @param path_to_data: data repo path
-#' @param val_shapefile_fin: final validation sf object with model results
+#' @param path_to_data: data repo directory path
+#' @param val_shapefile_fin: final validation sf object with validation results
 #'
 #' @import sf
 #' @import dplyr
@@ -239,7 +238,7 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
     xlab('')+
     ylab('')
   
-  ##number MAP------------------------------------------------
+  ##NUMBER MAP------------------------------------------------
   numberFig <- ggplot(results) +
     geom_sf(aes(fill=n_total), color='black', size=0.3) +
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
@@ -279,8 +278,8 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
 #' @name mappingValidationFigure2
 #'
 #' @param path_to_data: data repo path
-#' @param val_shapefile_fin: final validation sf object with model results
-#''
+#' @param val_shapefile_fin: final validation sf object with validation results
+#'
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
@@ -309,6 +308,7 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
   #crop to CONUS
   results <- sf::st_intersection(results, states)
   
+  #round results
   results$basinSensitivity <- round(results$basinSensitivity*100, 0)
   results$basinSpecificity <- round(results$basinSpecificity*100, 0)
   
@@ -375,7 +375,7 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
 #'
 #' @name boxPlots_classification
 #'
-#' @param val_shapefile_fin: HUC2 validation shapefile
+#' @param val_shapefile_fin: final validation sf object with validation results
 #'
 #' @import ggplot2
 #' @import tidyr
@@ -482,7 +482,7 @@ snappingSensitivityFigures <- function(out){
   tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
         geom_point(size=10) +
         geom_line(linetype='dashed', size=1) +
-        scale_color_brewer(palette='Accent', name='', labels=c('MAE of log(N)', 'RMSE of log(N)'))+
+        scale_color_brewer(palette='Accent', name='', labels=c(expression(MAE~of~log(N[m])), expression(RMSE~of~log(N[m]))))+
         xlab('Snapping Threshold [m]') +
         ylab('Value')+
         ylim(0,1)+
@@ -511,7 +511,7 @@ snappingSensitivityFigures <- function(out){
 
 
 
-#' Figure showing operational runoff threshold calibration
+#' Figure for calibration of operational runoff threshold
 #'
 #' @name runoffThreshCalibPlot
 #'
@@ -555,7 +555,7 @@ runoffThreshCalibPlot <- function(calibResults){
 #'
 #' @name buildScalingModelFig
 #'
-#' @param scalingModel: scaling model calculations object
+#' @param scalingModel: Horton law ephemeral scaling model object
 #'
 #' @return figure of Horton scaling model (written to file)
 buildScalingModelFig <- function(scalingModel){
@@ -597,7 +597,7 @@ buildScalingModelFig <- function(scalingModel){
 #'
 #' @name areaMapFunction
 #'
-#' @param path_to_data: data repo path
+#' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
 #'
 #' @import sf
@@ -625,8 +625,8 @@ areaMapFunction <- function(path_to_data, shapefile_fin) {
                                                 'Hawaii'))) #remove non CONUS states/territories
   states <- st_union(states)
   
-  #results shapefile
-  results$percArea_eph <- round(results$percAreaEph_exported*100,0) #setup percent
+  #round result
+  results$percArea_eph <- round(results$percAreaEph_exported*100,0)
   
   #INSET MAP-----------------------------------------------
   cdf_inset <- ggplot(results, aes(percArea_eph))+
@@ -679,8 +679,8 @@ areaMapFunction <- function(path_to_data, shapefile_fin) {
 #'
 #' @name walnutGulchQualitative
 #'
-#' @param rivNetFin_1505: routing model result for basin
-#' @param path_to_data: data repo path
+#' @param rivNetFin_1505: routing model result for basin 1505 (which includes Walnut Gulch)
+#' @param path_to_data: data repo directory path
 #'
 #' @import sf
 #' @import ggplot2
@@ -796,13 +796,13 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
 
 
 
-#' create ephemeral hydrography map per huc4 basin
+#' Create ephemeral hydrography map per basin
 #'
 #' @name hydrographyFigureSmall
 #'
-#' @param path_to_data: data repo path
-#' @param shapefile_fin: final model results shapefile
-#' @param net_results: hydrography df detailing each reach's perenniality
+#' @param path_to_data: data repo directorypath
+#' @param shapefile_fin: sf object of final model results
+#' @param net_results: river network results for basin
 #' @param huc4: huc4 basin id 
 #'
 #' @import sf
@@ -865,7 +865,7 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
 
 
 
-#' combines 16 hydrography ggplots into single patchwork plot
+#' combines 16 hydrography ggplots into single patchwork plot and write to file
 #'
 #' @name comboHydroSmalls
 #'
@@ -942,7 +942,7 @@ comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
 
 
 
-#' combines 13 hydrography ggplots into single patchwork plot
+#' Combines 13 hydrography ggplots into single patchwork plot and writes to file
 #'
 #' @name comboHydroSmalls
 #'

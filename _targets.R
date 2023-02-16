@@ -47,7 +47,7 @@ runoffEffScalar_real <- 0
 runoffMemory_real <- 4 #[dys] bulk memory parameter that represents delayed arrival of streamflow (lumped to represent all mechanisms- Hortonian, Dunnian, and/or interflow). Informed by https://doi.org/10.1029/2021WR030186
 runoffThresh_scalar <- 2.5 #[mm/dy] the calibrated value (see flowingDaysCalibrate)
 
-#New England field sites data
+#New England field sites data (most other data is accessed form within function calls FYI)
 field_dataset <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/new_england_fieldSites.csv')) #our in situ ephemeral classifications in northeastern US
 
 #### SETUP STATIC BRANCHING FOR PARALLEL ROUTING WITHIN PROCESSING LEVELS-----------------------------------------------------
@@ -913,7 +913,7 @@ list(
                                                       hydroMap_1802, hydroMap_1803, hydroMap_1804, hydroMap_1805,
                                                       hydroMap_1806, hydroMap_1807, hydroMap_1808, hydroMap_1809, hydroMap_1810,13)), #hydrography map 13
 
-  #GENERATE GUIDE TO DATA/MODEL INPUTS
+  #GENERATE SOME DOCS
   tar_render(data_guide, "docs/data_guide.Rmd", deployment='main'), #data guide
   tar_render(README_indiana, "docs/README_indiana.Rmd", deployment='main'), #data guide
   tar_render(README_usgs_eph_gauges, "docs/README_usgs_eph_gauges.Rmd", deployment='main') #data guide

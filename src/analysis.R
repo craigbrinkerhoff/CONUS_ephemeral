@@ -48,7 +48,7 @@ extractData <- function(path_to_data, huc4){
   #USGS NHD
   dsnPath <- paste0(path_to_data, '/HUC2_', huc2, '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb')
 
-  #load river network, depending on indiana-effect or not
+  #load river network, depending on Indiana-effect or not (see ~/docs/README_Indiana.html for more details)
   if(huc4 %in% indiana_hucs) {
     nhd <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/indiana/indiana_fixed_', huc4, '.shp'))
     nhd <- sf::st_zm(nhd)
@@ -238,7 +238,7 @@ extractData <- function(path_to_data, huc4){
 #'
 #' @name routeModel
 #' 
-#' @param nhd_df: routing table
+#' @param nhd_df: basin routing table
 #' @param huc4: huc basin level 4 code
 #' @param thresh: threshold for 'persistent surface groundwater'
 #' @param err: error tolerance for calculation (if desired)
@@ -411,7 +411,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 #'
 #' @name calcFlowingDays
 #'
-#' @param path_to_data: path to data repo
+#' @param path_to_data: data repo path directory
 #' @param huc4: huc basin level 4 code
 #' @param runoff_eff: calculated runoff ratio per HUC4 basin
 #' @param runoff_thresh: [mm] operational runoff threshold for ephemeral streamflow
@@ -512,7 +512,7 @@ scalingFunc <- function(validationResults){
 #' @name snappingSensitivityWrapper
 #'
 #' @param threshs: snapping thresholds to test
-#' @param combined_validation: validation dataset (with snapping distances)
+#' @param combined_validation: validation dataset with snapping distances to NHD-HR reaches
 #' @param ourFieldData: our in situ ephemeral classifications of river ephemerality in northeastern US (to be joined to combined_validation)
 #'
 #' @import Metrics
@@ -578,9 +578,9 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 #'
 #' @name getResultsExported
 #'
-#' @param nhd_df: routing table with model results
+#' @param nhd_df: basin routing table + results
 #' @param huc4: huc basin level 4 code
-#' @param numFlowingDays: model estimated number of flowing days (basin average). This just gets passed along
+#' @param numFlowingDays: model estimated Nflw. This just gets passed along as a result
 #' 
 #' @import dplyr
 #'
@@ -626,7 +626,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays){
 #'
 #' @name getResultsByOrder
 #'
-#' @param nhd_df: model results routing table
+#' @param nhd_df: basin routing table + results
 #' @param huc4: huc basin level 4 code
 #' 
 #' @import dplyr
@@ -674,7 +674,7 @@ getResultsByOrder <- function(nhd_df, huc4){
 #'
 #' @name ephemeralFirstOrder
 #'
-#' @param nhd_df: routing model result for basin
+#' @param nhd_df: basin routing table + results
 #' @param huc4: huc4 basin id
 #'
 #' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
@@ -713,9 +713,9 @@ ephemeralFirstOrder <- function(nhd_df, huc4) {
 #'
 #' @name getExportedQ
 #'
-#' @param model: huc4 routing table
+#' @param model: basin routing table + results
 #' @param huc4: river network basin code
-#' @param lookUpTable: table indicating the downstream basins (when applicable) for all CONUS basins
+#' @param lookUpTable: lookup table to get the downstream basins (when applicable) for all CONUS basins
 #'
 #' @import dplyr
 #' @import sf

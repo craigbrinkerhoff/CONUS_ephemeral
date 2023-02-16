@@ -10,7 +10,7 @@
 #'
 #' @param path_to_data: data repo path directory
 #' @param codes_huc02: all HUC level 2 regions currently being ran
-#' @param combined_results: all model results combined into a single target
+#' @param combined_results: all model results aggregated into single target
 #'
 #' @import sf
 #' @import dplyr
@@ -49,7 +49,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 #'
 #' @param path_to_data: data repo path directory
 #' @param codes_huc02: all HUC level 2 regions currently being ran
-#' @param validationResults: all validation results combined into a single target
+#' @param validationResults: all validation results aggregated into single target
 #'
 #' @import sf
 #' @import dplyr

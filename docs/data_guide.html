@@ -11,7 +11,7 @@
 
 <meta name="author" content="Craig Brinkerhoff" />
 
-<meta name="date" content="2023-02-15" />
+<meta name="date" content="2023-02-16" />
 
 <title>Data Guide</title>
 
@@ -365,20 +365,19 @@ pre code {
 
 <h1 class="title toc-ignore">Data Guide</h1>
 <h4 class="author">Craig Brinkerhoff</h4>
-<h4 class="date">2023-02-15</h4>
+<h4 class="date">2023-02-16</h4>
 
 </div>
 
 
 <div id="guide-to-all-datasets-and-models-used-in-this-analysis" class="section level2">
 <h2>Guide to all datasets and models used in this analysis</h2>
-<p>Unless otherwise specified, these are in the
-<code>~/for_ephemeral_project</code> sub-directory.</p>
+<p>Everything is in the <code>CONUS_ephemeral_data</code> directory.</p>
 <ul>
 <li>Global Monthly Water Table Depth Model
 <ul>
 <li><strong>Filename:</strong>
-<code>NAMERICA_WTD_monthlymeans.nc</code></li>
+<code>~/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc</code></li>
 <li><strong>Data:</strong> <a href="http://thredds-gfnl.usc.es/thredds/catalog/GLOBALWTDFTP/catalog.html" class="uri">http://thredds-gfnl.usc.es/thredds/catalog/GLOBALWTDFTP/catalog.html</a></li>
 <li><strong>Paper:</strong> <a href="https://doi.org/10.1073/pnas.1712381114" class="uri">https://doi.org/10.1073/pnas.1712381114</a> (detailed in
 that paper, as well as an eLetter on this paper (older version of the
@@ -388,10 +387,11 @@ model): <a href="https://doi.org/doi:10.1126/science.1229881" class="uri">https:
 </ul></li>
 <li>CONUS Long-Term Gauge-Based Daily Precip Model
 <ul>
-<li><strong>Filenames:</strong> <code>dailyPrecip_1980_1989.gri</code>,
-<code>dailyPrecip_1990_1999.gri</code>,
-<code>dailyPrecip_2000_2006.gri</code>
+<li><strong>Filenames:</strong>
+<code>~/for_ephemeral_project/dailyPrecip_1980_1989.gri</code>
 <ul>
+<li><code>~/for_ephemeral_project/dailyPrecip_1990_1999.gri</code>,</li>
+<li><code>~/for_ephemeral_project/dailyPrecip_2000_2006.gri</code></li>
 <li>file prep done locally via <code>~/src/netcdf_prep.R</code></li>
 </ul></li>
 <li><strong>Data:</strong> <a href="https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source" class="uri">https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source</a></li>
@@ -400,16 +400,15 @@ model): <a href="https://doi.org/doi:10.1126/science.1229881" class="uri">https:
 <li><strong>Resolution/Scale:</strong> 28km</li>
 <li>1980-2006</li>
 </ul></li>
-<li>CONUS hydrography and mean annual streamflow model
+<li>CONUS hydrography and mean annual discharge model
 <ul>
-<li><strong>Filename:</strong> <code>src/CONUS_ephemeral_data/</code>
-directories</li>
+<li><strong>Filename:</strong> see README.md</li>
 <li><strong>Link:</strong> <a href="https://www.usgs.gov/national-hydrography/nhdplus-high-resolution" class="uri">https://www.usgs.gov/national-hydrography/nhdplus-high-resolution</a></li>
 <li><strong>Resolution/Scale:</strong> 1:24,000</li>
-<li><strong>Years:</strong> 1970-2000 (streamflow validated against
+<li><strong>Years:</strong> 1970-2000 (discharge validated against
 1970-2018)</li>
 </ul></li>
-<li>USGS Streamgauge data to validate NHD streamflow model and <span class="math inline">\(N_{flw}\)</span> model
+<li>USGS Streamgauge data to validate NHD discharge model and <span class="math inline">\(N_{flw}\)</span> model
 <ul>
 <li><strong>Filename:</strong> <code>~/cache/training</code>
 directory</li>
@@ -419,7 +418,8 @@ package</li>
 </ul></li>
 <li>USGS HUC4 Runoff Data (weighted average per basin)
 <ul>
-<li><strong>Filename:</strong> <code>HUC4_runoff_mm.txt</code></li>
+<li><strong>Filename:</strong>
+<code>~/for_ephemeral_project/HUC4_runoff_mm.txt</code></li>
 <li><strong>Data (indirect):</strong> <a href="https://waterwatch.usgs.gov/index.php?id=romap3&amp;sid=w__download" class="uri">https://waterwatch.usgs.gov/index.php?id=romap3&amp;sid=w__download</a></li>
 <li><strong>Paper (concept):</strong> <a href="https://doi.org/10.1111/1752-1688.12431" class="uri">https://doi.org/10.1111/1752-1688.12431</a></li>
 <li><strong>Resolution/Scale:</strong> HUC4 basins</li>
@@ -428,18 +428,37 @@ package</li>
 <li>EPA/Corps of Engineers Voluntary WOTUS Jurisdictional Determinations
 Database (downloaded 06/20/2022)
 <ul>
-<li><strong>Filename</strong>: <code>jds202206201319.csv</code></li>
+<li><strong>Filename</strong>:
+<code>~/for_ephemeral_project/jds202206201319.csv</code></li>
 <li><strong>Data:</strong> <a href="https://watersgeo.epa.gov/cwa/CWA-JDs/" class="uri">https://watersgeo.epa.gov/cwa/CWA-JDs/</a></li>
 <li><strong>Paper:</strong> NA</li>
+<li><strong>Resolution/Scale:</strong> NA</li>
+</ul></li>
+<li>In situ data on ephemeral flow frequency
+<ul>
+<li><strong>Filename</strong>:
+<code>~/for_ephemeral_project/flowingDays_data/</code> all field data in
+here</li>
+<li><strong>Data:</strong> See Table S2</li>
+<li><strong>Paper:</strong> See Table S2</li>
 <li><strong>Resolution/Scale:</strong> NA</li>
 </ul></li>
 <li>Field-estimated stream type (ephemeral/intermittent/perennial) for
 select New England streams
 <ul>
 <li><strong>Filename</strong>:
-<code>new_england_fieldSites.csv</code></li>
+<code>~/for_ephemeral_project/new_england_fieldSites.csv</code></li>
 <li><strong>Data:</strong> Summer 2022</li>
 <li><strong>Method followed:</strong> <a href="https://files.nc.gov/ncdeq/Water%20Quality/Surface%20Water%20Protection/401/Policies_Guides_Manuals/StreamID_v_4point11_Final_sept_01_2010.pdf" class="uri">https://files.nc.gov/ncdeq/Water%20Quality/Surface%20Water%20Protection/401/Policies_Guides_Manuals/StreamID_v_4point11_Final_sept_01_2010.pdf</a></li>
+<li><strong>Resolution/Scale:</strong> NA</li>
+</ul></li>
+<li>Walnut Gulch Experimental Watershed
+<ul>
+<li><strong>Filename</strong>:
+<code>~/exp_catchments/walnut_gulch/</code> for flume data and basin
+shapefile</li>
+<li><strong>Data:</strong> <a href="https://www.tucson.ars.ag.gov/dap/" class="uri">https://www.tucson.ars.ag.gov/dap/</a></li>
+<li><strong>Paper:</strong> NA</li>
 <li><strong>Resolution/Scale:</strong> NA</li>
 </ul></li>
 </ul>
