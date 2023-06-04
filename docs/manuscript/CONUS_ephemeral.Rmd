@@ -95,7 +95,7 @@ fig_nums_supp(name = "drainageAreaMap",caption = "Contiguous United States map o
 
 ##############SET UP AUTOMATIC FIGURE NUMBERING AND CAPTIONS--------------------------------
 fig_nums <- captioner::captioner(prefix = "Figure")
-fig_nums(name = "figQ",caption = paste0("Ephemeral stream water contributions to CONUS drainage networks. (A) Contiguous United States map of the percent of discharge exported from drainage networks that is ephemerally sourced (equation S1) with inset of the empirical cumulative distribution function of the basins. (B-E) Drainage network maps and ephemeral export percents for four representative basins: (B) endorheic desert basin, (C) arid western basin, (D) temperate, mountainous basin, and (E) a temperate, flat basin. For (B-E): reach width corresponds to the size of the river (specifically, the logarithmic bins of discharge relative to map scale). For each basin we also provide the mean annual volume of exported water that is ephemerally sourced. All 205 basins are mapped in Figs. S", fig_nums_supp("hydrographies1", display="n"), '-S', fig_nums_supp("hydrographies13", display="n"), "."))
+fig_nums(name = "figQ",caption = paste0("Ephemeral stream water contributions to CONUS drainage networks. (A) Contiguous United States map of the percent of discharge exported from drainage networks that is ephemerally sourced (equation S1) with inset of the empirical cumulative distribution function of the basins. (B-E) Drainage network maps and ephemeral export percents for four representative basins: (B) endorheic desert basin, (C) arid western basin, (D) temperate, mountainous basin, and (E) a temperate, flat basin. For (B-E): reach width corresponds to the size of the river (specifically, the logarithmic bins of discharge relative to map scale). For each basin we also provide the mean annual volume of exported water that is ephemerally sourced. All 205 basins are mapped in figs. S", fig_nums_supp("hydrographies1", display="n"), '-S', fig_nums_supp("hydrographies13", display="n"), "."))
 
 fig_nums(name="figQ_SO", caption="Ephemeral stream water contributions by river size. (A) Median percent of discharge that is ephemerally sourced by stream order, where Tukey-style boxplots are composed of 205 CONUS basins and show distributions using boxes (the 25th to 75th percentiles or the 'interquartile range' IQR), whisker lines (1.5 times the IQR), and outlier points (higher/lower than 1.5 times the IQR). Bold points/lines show the average trend across CONUS basins. (B) Same, but for the median percent of upstream drainage area that is ephemeral. (C) Percent of total network length that is ephemeral. Note that only one network has 11 stream orders: the lower Columbia River.")
 
@@ -217,7 +217,10 @@ references need to be moved here manually
 We thank Y. Fan Reinfelder, the USGS, the EPA, and many field workers for making their data and/or models freely available. We also thank B. Saccardi for helping manually verify portions of the basin routing scheme. All modeling was performed on the Unity cluster at the Massachusetts Green High Performance Computing Center (MGHPCC). 
 
 ### Funding
-CBB was supported by a NASA FINESST fellowship (award 80NSSC21K1591) and a NSF RoL FELS RAISE grant to CJG (principal investigator: PAR, award 1840243).
+
+-   National Aeronautics and Space Administration fellowship 80NSSC21K1591 (CBB)
+
+-   National Science Foundation grant 1840243 (CBB, CJG, PAR)
 
 ### Author Contributions
 
@@ -239,7 +242,7 @@ CBB was supported by a NASA FINESST fellowship (award 80NSSC21K1591) and a NSF R
 Authors declare that they have no competing interests.
 
 ### Data and materials availability
-All data are available in the manuscript or the supplementary materials. Code used to run our analysis and build our figures is available at https://github.com/craigbrinkerhoff/CONUS_ephemeral.
+All data are available in the manuscript or the supplementary materials. Code used to run our analysis and build our figures is available at https://github.com/craigbrinkerhoff/CONUS_ephemeral and archived at [@brinkerhoffCraigbrinkerhoffCONUSEphemeral2023].
 
 ## Supplementary Materials
 
@@ -251,16 +254,7 @@ All data are available in the manuscript or the supplementary materials. Code us
 
 -   Tables S1 to S4
 
--   References (*44-76*)
-
-## Figure captions
-**Fig. `r fig_nums("figQ", display="n")`:** `r substr(fig_nums("figQ", display="full"), 11, nchar(fig_nums("figQ", display="full")))`
-
-**Fig. `r fig_nums("figQ_SO", display="n")`:** `r substr(fig_nums("figQ_SO", display="full"), 11, nchar(fig_nums("figQ_SO", display="full")))`
-
-**Fig. `r fig_nums("figNflw", display="n")`:** `r substr(fig_nums("figNflw", display="full"), 11, nchar(fig_nums("figNflw", display="full")))`
-
-**Fig. `r fig_nums("figLengthEph", display="n")`:** `r substr(fig_nums("figLengthEph", display="full"), 11, nchar(fig_nums("figLengthEph", display="full")))`
+-   References (*45-77*)
 
 \newpage
 
@@ -427,35 +421,35 @@ Here, we use Tokunaga ratios to calculate the average number of upstream ephemer
 
 ![**Figure S`r fig_nums_supp("nFlwSens", display="n")`:** `r substr(fig_nums_supp("nFlwSens", display="full"), 11, nchar(fig_nums_supp("nFlwSens", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/boxPlots_sensitivity.jpg)
 
-![**Figure S`r fig_nums_supp("runoffCalib", display="n")`:** `r substr(fig_nums_supp("runoffCalib", display="full"), 11, nchar(fig_nums_supp("runoffCalib", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/runoffThresh_fitting.jpg)
+![**Figure S`r fig_nums_supp("runoffCalib", display="n")`:** `r substr(fig_nums_supp("runoffCalib", display="full"), 12, nchar(fig_nums_supp("runoffCalib", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/runoffThresh_fitting.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies1", display="n")`:** `r substr(fig_nums_supp("hydrographies1", display="full"), 11, nchar(fig_nums_supp("hydrographies1", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_1.jpg)
+![**Figure S`r fig_nums_supp("hydrographies1", display="n")`:** `r substr(fig_nums_supp("hydrographies1", display="full"), 12, nchar(fig_nums_supp("hydrographies1", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_1.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies2", display="n")`:** `r substr(fig_nums_supp("hydrographies2", display="full"), 11, nchar(fig_nums_supp("hydrographies2", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_2.jpg)
+![**Figure S`r fig_nums_supp("hydrographies2", display="n")`:** `r substr(fig_nums_supp("hydrographies2", display="full"), 12, nchar(fig_nums_supp("hydrographies2", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_2.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies3", display="n")`:** `r substr(fig_nums_supp("hydrographies3", display="full"), 11, nchar(fig_nums_supp("hydrographies3", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_3.jpg)
+![**Figure S`r fig_nums_supp("hydrographies3", display="n")`:** `r substr(fig_nums_supp("hydrographies3", display="full"), 12, nchar(fig_nums_supp("hydrographies3", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_3.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies4", display="n")`:** `r substr(fig_nums_supp("hydrographies4", display="full"), 11, nchar(fig_nums_supp("hydrographies4", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_4.jpg)
+![**Figure S`r fig_nums_supp("hydrographies4", display="n")`:** `r substr(fig_nums_supp("hydrographies4", display="full"), 12, nchar(fig_nums_supp("hydrographies4", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_4.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies5", display="n")`:** `r substr(fig_nums_supp("hydrographies5", display="full"), 11, nchar(fig_nums_supp("hydrographies5", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_5.jpg)
+![**Figure S`r fig_nums_supp("hydrographies5", display="n")`:** `r substr(fig_nums_supp("hydrographies5", display="full"), 12, nchar(fig_nums_supp("hydrographies5", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_5.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies6", display="n")`:** `r substr(fig_nums_supp("hydrographies6", display="full"), 11, nchar(fig_nums_supp("hydrographies6", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_6.jpg)
+![**Figure S`r fig_nums_supp("hydrographies6", display="n")`:** `r substr(fig_nums_supp("hydrographies6", display="full"), 12, nchar(fig_nums_supp("hydrographies6", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_6.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies7", display="n")`:** `r substr(fig_nums_supp("hydrographies7", display="full"), 11, nchar(fig_nums_supp("hydrographies7", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_7.jpg)
+![**Figure S`r fig_nums_supp("hydrographies7", display="n")`:** `r substr(fig_nums_supp("hydrographies7", display="full"), 12, nchar(fig_nums_supp("hydrographies7", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_7.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies8", display="n")`:** `r substr(fig_nums_supp("hydrographies8", display="full"), 11, nchar(fig_nums_supp("hydrographies8", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_8.jpg)
+![**Figure S`r fig_nums_supp("hydrographies8", display="n")`:** `r substr(fig_nums_supp("hydrographies8", display="full"), 12, nchar(fig_nums_supp("hydrographies8", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_8.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies9", display="n")`:** `r substr(fig_nums_supp("hydrographies9", display="full"), 11, nchar(fig_nums_supp("hydrographies9", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_9.jpg)
+![**Figure S`r fig_nums_supp("hydrographies9", display="n")`:** `r substr(fig_nums_supp("hydrographies9", display="full"), 12, nchar(fig_nums_supp("hydrographies9", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_9.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies10", display="n")`:** `r substr(fig_nums_supp("hydrographies10", display="full"), 11, nchar(fig_nums_supp("hydrographies10", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_10.jpg)
+![**Figure S`r fig_nums_supp("hydrographies10", display="n")`:** `r substr(fig_nums_supp("hydrographies10", display="full"), 12, nchar(fig_nums_supp("hydrographies10", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_10.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies11", display="n")`:** `r substr(fig_nums_supp("hydrographies11", display="full"), 11, nchar(fig_nums_supp("hydrographies11", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_11.jpg)
+![**Figure S`r fig_nums_supp("hydrographies11", display="n")`:** `r substr(fig_nums_supp("hydrographies11", display="full"), 12, nchar(fig_nums_supp("hydrographies11", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_11.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies12", display="n")`:** `r substr(fig_nums_supp("hydrographies12", display="full"), 11, nchar(fig_nums_supp("hydrographies12", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_12.jpg)
+![**Figure S`r fig_nums_supp("hydrographies12", display="n")`:** `r substr(fig_nums_supp("hydrographies12", display="full"), 12, nchar(fig_nums_supp("hydrographies12", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_12.jpg)
 
-![**Figure S`r fig_nums_supp("hydrographies13", display="n")`:** `r substr(fig_nums_supp("hydrographies13", display="full"), 11, nchar(fig_nums_supp("hydrographies13", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_13.jpg)
+![**Figure S`r fig_nums_supp("hydrographies13", display="n")`:** `r substr(fig_nums_supp("hydrographies13", display="full"), 12, nchar(fig_nums_supp("hydrographies13", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/hydrographyMaps_13.jpg)
 
-![**Figure S`r fig_nums_supp("drainageAreaMap", display="n")`:** `r substr(fig_nums_supp("drainageAreaMap", display="full"), 11, nchar(fig_nums_supp("drainageAreaMap", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/drainageAreaMap.jpg)
+![**Figure S`r fig_nums_supp("drainageAreaMap", display="n")`:** `r substr(fig_nums_supp("drainageAreaMap", display="full"), 12, nchar(fig_nums_supp("drainageAreaMap", display="full")))`](/nas/cee-water/cjgleason/craig/CONUS_ephemeral/cache/drainageAreaMap.jpg)
 
 ## Supplementary Tables
 
