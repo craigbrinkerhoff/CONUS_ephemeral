@@ -133,7 +133,7 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   eromVerification_QBMA <- ggplot(assessmentDF, aes(x=Q_MA, y=QBMA, color=type)) +
     geom_abline(linetype='dashed', color='darkgrey', size=2)+
     geom_point(size=4)+
-    xlab('Observed Mean Annual Flow')+
+    xlab(expr(Observed~Mean~Annual~Flow~(frac(m^3,s))))+ 
     ylab('USGS Discharge Model')+
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     scale_color_manual(name='', values=c('#007E5D', '#E7C24B', '#775C04'))+
@@ -169,6 +169,137 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   return(assessmentDF)
   
 }
+
+
+
+
+
+
+
+#' create stream order results figure (fig 2)
+#'
+#' @name streamOrderPlotPhysiographic
+#'
+#' @param combined_results_by_order: df of model results per stream order
+#' @param combined_results: df of model results
+#'
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#' @import patchwork
+#'
+#' @return flowing days figure (also writes figure to file)
+streamOrderPlotPhysiographic <- function(path_to_data, shapefile, combined_results_by_order, combined_results){
+  theme_set(theme_classic())
+  sf::sf_use_s2(FALSE)
+
+  #get physiographic regions
+  combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
+  combined_results_by_order$huc4 <- substr(combined_results_by_order$method, 18, 21)
+
+  regions <- sf::st_read(paste0(path_to_data, '/other_shapefiles/physio.shp')) #physiographic regions
+  
+  regions <- fixGeometries(regions)
+  shapefile <- sf::st_join(shapefile$shapefile, regions, largest=TRUE) #take the physiogrpahic region that the basin is mostly in (dominant intersection)
+  region_df <- data.frame('huc4'=shapefile$huc4,
+                          'province'=shapefile$DIVISION)
+
+  combined_results_by_order <- dplyr::left_join(combined_results_by_order, region_df, by='huc4')
+
+  keepHUCs <- combined_results[is.na(combined_results$num_flowing_dys)==0,]$huc4
+  combined_results_by_order <- dplyr::filter(combined_results_by_order, huc4 %in% keepHUCs)
+  
+  ####SUMMARY STATS-------------------
+  forPlot <- dplyr::group_by(combined_results_by_order, province, StreamOrde) %>%
+    dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
+
+  ####DISCHARGE PLOT--------------------
+  plotQ <- ggplot(combined_results_by_order, aes(fill=province, x=factor(StreamOrde), y=percQEph_reach_median*100)) +
+    stat_summary(fun = mean,geom = 'line',aes(group = province, colour = province),position = position_dodge(width = 0.9), size=2)+
+    stat_summary(fun = mean,geom = 'point',aes(group = province, colour = province),size=12, position = position_dodge(width = 0.9))+
+    xlab('') +
+    ylab('Median % ephemeral discharge')+
+    scale_fill_brewer(name='',
+                     palette='Dark2')+
+    scale_color_brewer(name='',
+                       palette='Dark2')+
+    ylim(0,100)+
+    labs(tag='A')+
+    theme(axis.title = element_text(size=26, face='bold'),
+          axis.text = element_text(size=24,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.position='none',
+          legend.text = element_text(size=24))
+
+  ####AREA PLOT--------------------
+  plotArea <- ggplot(combined_results_by_order, aes(fill=province, x=factor(StreamOrde), y=percAreaEph_reach_median*100)) +
+    stat_summary(fun = mean,geom = 'line',aes(group = province, colour = province),position = position_dodge(width = 0.9), size=2)+
+    stat_summary(fun = mean,geom = 'point',aes(group = province, colour = province),size=12, position = position_dodge(width = 0.9))+
+    xlab('') +
+    ylab('Median % ephemeral drainage area')+
+    scale_fill_brewer(name='',
+                     palette='Dark2')+
+    scale_color_brewer(name='',
+                       palette='Dark2')+
+    ylim(0,100)+
+    labs(tag='B')+
+    theme(axis.title = element_text(size=26, face='bold'),
+          axis.text = element_text(size=24,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.position='none')
+  
+  
+  ####N PLOT--------------------
+  plotN <- ggplot(forPlot, aes(color=province, x=factor(StreamOrde), y=percLength_eph_order*100, group=province)) +
+    geom_line(size=3)+
+    geom_point(size=18)+
+    xlab('Stream Order') +
+    ylab('% ephemeral streams by length')+
+    scale_color_brewer(name='',
+                    palette='Dark2')+
+    ylim(0,100)+
+    labs(tag='C')+
+    theme(axis.title = element_text(size=26, face='bold'),
+          axis.text = element_text(size=24,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'),
+          legend.position='bottom',
+          legend.text = element_text(size=26))
+
+
+  insetMap <- ggplot(regions) +
+    geom_sf(aes(fill=DIVISION), #actual map
+            color='black',
+            size=0) +
+    scale_fill_brewer(name='', palette='Dark2') +
+    theme(legend.position='none') +
+    theme(axis.title = element_text(size=26, face='bold'),
+          axis.text = element_text(size=24,face='bold'),
+          plot.tag = element_text(size=26,
+                                  face='bold'))
+
+    plotN <- plotN + 
+          patchwork::inset_element(insetMap, right = 0.99, bottom = 0.4, left = 0.4, top = 0.99)  
+
+  ##BUILD PLOT----------------------------
+  design <- "
+    AB
+    CC
+  "
+
+  comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, C=plotN, design=design)
+  
+  
+  ggsave('cache/by_order_and_physio_region.jpg', comboPlot, width=25, height=20)
+  return(combined_results_by_order)
+}
+
+
+
+
+
 
 
 
@@ -796,6 +927,87 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
 
 
 
+#' create ephemeral flow frequency paper figure (fig 3)
+#'
+#' @name flowingFigureFunction
+#'
+#' @param path_to_data: data repo directory path
+#' @param shapefile_fin: final sf object with model results
+#' @param joinedData: df of in situ Nflw joined to HUC4 basins (for verification)
+#'
+#' @import sf
+#' @import dplyr
+#' @import ggplot2
+#' @import cowplot
+#' @import patchwork
+#'
+#' @return flowing days figure (also writes figure to file)
+flowingDatesFigureFunction <- function(path_to_data, shapefile_fin) {
+  theme_set(theme_classic())
+  
+  ##GET DATA
+  results <- shapefile_fin$shapefile
+  results <- dplyr::filter(results, is.na(num_flowing_dys)==0)
+  results$mean_date_flowing <- round(results$mean_date_flowing,0)
+  results$mean_date_flowing <- as.character(as.integer(results$mean_date_flowing))
+  results$mean_date_flowing <- ifelse(is.nan(results$mean_date_flowing) | is.na(results$mean_date_flowing), 0, results$mean_date_flowing)
+
+  # CONUS boundary
+  states <- sf::st_read(paste0(path_to_data, '/other_shapefiles/cb_2018_us_state_5m.shp'))
+  states <- dplyr::filter(states, !(NAME %in% c('Alaska',
+                                                'American Samoa',
+                                                'Commonwealth of the Northern Mariana Islands',
+                                                'Guam',
+                                                'District of Columbia',
+                                                'Puerto Rico',
+                                                'United States Virgin Islands',
+                                                'Hawaii'))) #remove non CONUS states/territories
+  states <- sf::st_union(states)
+
+  ##MAIN MAP------------------------------------------
+  #interpolate color scale
+  nb.cols <- 13
+  mycolors <- colorRampPalette(c('#bdbdbd', RColorBrewer::brewer.pal(9, "YlGnBu")))(nb.cols)
+
+  results$mean_date_flowing <- factor(results$mean_date_flowing, levels=c(0,1,2,3,4,5,6,7,8,9,10,11,12))
+
+  #plot
+  flowingDaysFig <- ggplot(results) +
+    geom_sf(aes(fill=mean_date_flowing), #observed
+            color='black',
+            size=0.5) + #map
+    scale_fill_manual(values=mycolors,
+                      breaks=c('0','1','2','3','4','5','6','7','8','9','10','11','12'),
+                      labels=c('None', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'),
+                      name='Mean Flowing Month',
+                      drop=FALSE)+
+    geom_sf(data=states,  #conus domain
+            color='black',
+            size=1.0,
+            alpha=0)+
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(legend.position = 'bottom',
+          legend.key.size = unit(2, 'cm'))+ #legend position settings
+    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.title = element_text(face = "bold", size = 20),
+          legend.text = element_text(family = "Futura-Medium", size = 18),
+          plot.tag = element_text(size=26,
+                                  face='bold'))+
+    guides(fill=guide_legend(nrow=2,byrow=TRUE))+
+    xlab('')+
+    ylab('')
+
+  ggsave('cache/meanFlowDate.jpg', flowingDaysFig, width=20, height=15)
+  return('see cache/meanFlowDate.jpg')
+}
+
+
+
+
+
+
+
+
 #' Create ephemeral hydrography map per basin
 #'
 #' @name hydrographyFigureSmall
@@ -832,8 +1044,9 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
   #recast foreign streams as non-ephemeral for visualization's sake
   net$perenniality <- ifelse(net$perenniality == 'foreign', 'non_ephemeral', net$perenniality)
   
-  #make plot name that is line-aware (so cool!!)
-  plotName <- paste0(name,': ', round(exported_abs*86400*365*1e-9,0), ' km3/yr (', round(exported_perc*100,0), '%)')
+  #make plot name that is line-aware using stringr
+  exported_number <- ifelse(round(exported_abs*86400*365*1e-9,0) == 0, signif(exported_abs*86400*365*1e-9,2), round(exported_abs*86400*365*1e-9,0)) #round using significant digits if less than 0 km3/yr
+  plotName <- paste0(name,': ', exported_number, ' km3/yr (', round(exported_perc*100,0), '%)')
   plotName <- stringr::str_wrap(plotName, 20) #wrap to twenty characters, seems to fit nicely
 
   #make hydrography map (keeping legend for later)

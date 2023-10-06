@@ -18,6 +18,8 @@ source('src/verification_flowingDays.R')
 source('src/figures_additional.R')
 source('src/figures_paper.R')
 source('src/map.R')
+source('src/validation_wtd.R')
+source('src/uncertaintyAnalysis.R')
 
 plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
@@ -51,6 +53,9 @@ runoffThresh_scalar <- 2.5 #[mm/dy] the calibrated value (see flowingDaysCalibra
 #New England field sites data (most other data is accessed form within function calls FYI)
 field_dataset <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/new_england_fieldSites.csv')) #our in situ ephemeral classifications in northeastern US
 
+#for Monte Carlo dynmaic branching
+set.seed(546)
+
 #### SETUP STATIC BRANCHING FOR PARALLEL ROUTING WITHIN PROCESSING LEVELS-----------------------------------------------------
 #Headwater basins that export into the next level of basins
 mapped_lvl0 <- tar_map(
@@ -60,22 +65,24 @@ mapped_lvl0 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 0,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', NA),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, NA)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -87,22 +94,24 @@ mapped_lvl1 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 1,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl0),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl0)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), # calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 2 downstream basins
@@ -113,22 +122,24 @@ mapped_lvl2 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 2,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl1),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl1)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 3 downstream basins
@@ -139,22 +150,24 @@ mapped_lvl3 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 3,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl2),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl2)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 4 downstream basins
@@ -165,22 +178,24 @@ mapped_lvl4 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 4,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl3),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl3)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 5 downstream basins
@@ -191,22 +206,24 @@ mapped_lvl5 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 5,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl4),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl4)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 6 downstream basins
@@ -217,22 +234,24 @@ mapped_lvl6 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 6,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl5),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl5)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 7 downstream basins
@@ -243,22 +262,24 @@ mapped_lvl7 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 7,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl6),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl6)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 #level 8 downstream basins
@@ -269,22 +290,24 @@ mapped_lvl8 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 8,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl7),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl7)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -296,22 +319,24 @@ mapped_lvl9 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 9,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl8),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl8)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -323,22 +348,24 @@ mapped_lvl10 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 10,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl9),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl9)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -350,22 +377,24 @@ mapped_lvl11 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 11,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl10),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl10)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -377,22 +406,24 @@ mapped_lvl12 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 12,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl11),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl11)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -404,22 +435,24 @@ mapped_lvl13 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 13,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl12),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl12)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -431,22 +464,24 @@ mapped_lvl14 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 14,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl13),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl13)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -458,22 +493,24 @@ mapped_lvl15 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 15,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl14),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl14)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -485,22 +522,24 @@ mapped_lvl16 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 16,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl15),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl15)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -512,22 +551,24 @@ mapped_lvl17 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 17,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl16),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl16)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -539,22 +580,24 @@ mapped_lvl18 <- tar_map(
     huc4 = lookUpTable[lookUpTable$level == 18,]$HUC4,
   ),
   names = "huc4",
-  tar_target(extractedRivNet, method_function(path_to_data, huc4)), #extract water table depths along river reaches
-      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, 'median', exported_percEph_lvl17),cue = tar_cue(mode = "never")), #calculate perenniality
-  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays)), #get results at basin exporting reaches
+  tar_target(extractedRivNet, method_function(path_to_data, huc4, validated_Hb)), #extract water table depths along river reaches
+      tar_target(rivNetFin, routeModel(extractedRivNet, huc4, threshold, error, exported_percEph_lvl17)), #calculate perenniality
+  tar_target(results, getResultsExported(rivNetFin, huc4, numFlowingDays, datesFlowingDays)), #get results at basin exporting reaches
       tar_target(results_by_order, getResultsByOrder(rivNetFin, huc4)), #get results by stream order
-      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable),cue = tar_cue(mode = "never")), #get exported ephemeral contribution paired with IDs for basins downstream
+      tar_target(exported_percEph, getExportedQ(rivNetFin, huc4, lookUpTable)), #get exported ephemeral contribution paired with IDs for basins downstream
       tar_target(percEph_firstOrder, ephemeralFirstOrder(rivNetFin, huc4)), #get percent of first order and headwater streams that are ephemeral
       tar_target(percEph_tokunaga, tokunaga_eph(rivNetFin, results, huc4)), #get ephemeral contribution via tokunaga scaling
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
       tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
       tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+  tar_target(map, indvRiverMaps(rivNetFin, huc4)),
+  tar_target(written, exportResults(rivNetFin, huc4))
 )
 
 
@@ -575,6 +618,14 @@ list(
   tar_target(ephemeralQDataset_all, wrangleUSGSephGages(usgs_eph_sites)), #get mean annual flow for USGS ephemeral gauges to validate discharge model
   tar_target(checkUSGSephHydrographs, ephemeralityChecker(usgs_eph_sites)), #builds hydrographs for USGS 'ephemeral' gauges to aid in manual QAQC of these data
   tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, ephemeralQDataset_all, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305), deployment='main'), #gather and prep Nflw data from USGS ephemeral gauges 
+
+  ##VALIDATE GROUNDWATER MODEL
+  tar_target(conus_wells, getWellDepths(codes_huc02)),
+  tar_target(gauge_wtds, getGaugewtd(USGS_data)),
+  tar_target(validated_wells, join_wtd(path_to_data, conus_wells, gauge_wtds)),
+
+  ##VALIDATE BANKFULL DEPTH MODELS
+  tar_target(validated_Hb, validateHb()),
 
   #Nflw MODEL
   tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data, ephemeralQDataset_all)), #gather and prep Nflw data from 1) field studies and 2) USGS ephemeral gauges
@@ -832,6 +883,10 @@ list(
                                        mapped_lvl6$runoffEff, mapped_lvl7$runoffEff, mapped_lvl8$runoffEff, mapped_lvl9$runoffEff, mapped_lvl10$runoffEff, mapped_lvl11$runoffEff,
                                        mapped_lvl12$runoffEff, mapped_lvl13$runoffEff, mapped_lvl14$runoffEff, mapped_lvl15$runoffEff, mapped_lvl16$runoffEff, mapped_lvl17$runoffEff, mapped_lvl18$runoffEff), command = dplyr::bind_rows(!!!.x, .id = "method"), deployment='main'), #aggregate model targets across branches
 
+  tar_combine(combined_datesFlowingDays, list(mapped_lvl0$datesFlowingDays, mapped_lvl1$datesFlowingDays, mapped_lvl2$datesFlowingDays, mapped_lvl3$datesFlowingDays, mapped_lvl4$datesFlowingDays, mapped_lvl5$datesFlowingDays,
+                                            mapped_lvl6$datesFlowingDays, mapped_lvl7$datesFlowingDays, mapped_lvl8$datesFlowingDays, mapped_lvl9$datesFlowingDays, mapped_lvl10$datesFlowingDays, mapped_lvl11$datesFlowingDays,
+                                            mapped_lvl12$datesFlowingDays, mapped_lvl13$datesFlowingDays, mapped_lvl14$datesFlowingDays, mapped_lvl15$datesFlowingDays, mapped_lvl16$datesFlowingDays, mapped_lvl17$datesFlowingDays, mapped_lvl18$datesFlowingDays), command = c(!!!.x), deployment='main'), #aggregate model targets across branches
+
   tar_combine(combined_numFlowingDays, list(mapped_lvl0$numFlowingDays, mapped_lvl1$numFlowingDays, mapped_lvl2$numFlowingDays, mapped_lvl3$numFlowingDays, mapped_lvl4$numFlowingDays, mapped_lvl5$numFlowingDays,
                                             mapped_lvl6$numFlowingDays, mapped_lvl7$numFlowingDays, mapped_lvl8$numFlowingDays, mapped_lvl9$numFlowingDays, mapped_lvl10$numFlowingDays, mapped_lvl11$numFlowingDays,
                                             mapped_lvl12$numFlowingDays, mapped_lvl13$numFlowingDays, mapped_lvl14$numFlowingDays, mapped_lvl15$numFlowingDays, mapped_lvl16$numFlowingDays, mapped_lvl17$numFlowingDays, mapped_lvl18$numFlowingDays), command = c(!!!.x), deployment='main'), #aggregate model targets across branches
@@ -863,7 +918,16 @@ list(
   #MAKE FINAL SHAPEFILES WITH RESULTS
   tar_target(shapefile_fin, saveShapefile(path_to_data, codes_huc02, combined_results), deployment='main'), #model results shapefile (HUC4 level)
   tar_target(val_shapefile_fin, saveValShapefile(path_to_data, codes_huc02, validationResults), deployment='main'), #validation results shapefile (HUC2 level)
-  
+
+  #UNCERTAINTY ANALYSIS--------------------------------------
+  tar_target(mc_samples, seq(1,1000,1)),
+  tar_target(mcUncertainty_0107, runMonteCarlo('0107', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Merrimack River basin
+  tar_target(mcUncertainty_1703, runMonteCarlo('1703', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Yakima River basin
+  tar_target(mcUncertainty_1402, runMonteCarlo('1402', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Gunnison River basin
+  tar_target(mcUncertainty_0311, runMonteCarlo('0311', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Suwanee River basin
+  tar_target(mcUncertainty_1504, runMonteCarlo('1504', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Upper Gila River basin
+  tar_target(mcUncertaintyResults, uncertaintyFigures(path_to_data, shapefile_fin, mcUncertainty_0107, mcUncertainty_1402, mcUncertainty_1703, mcUncertainty_0311, mcUncertainty_1504), deployment="main"), #uncertainty figures
+
   #GENERATE MANUSCRIPT FIGURES--------------
   tar_target(fig1, mainFigureFunction(path_to_data, shapefile_fin, rivNetFin_0107, rivNetFin_0701, rivNetFin_1407, rivNetFin_1305), deployment='main'), #fig 1
   tar_target(fig2, streamOrderPlot(combined_results_by_order, combined_results), deployment='main'), #fig 2
@@ -881,6 +945,8 @@ list(
   tar_target(validationMap2, mappingValidationFigure2(path_to_data, val_shapefile_fin), deployment='main'), #third set of validation maps
   tar_target(drainageAreaMap, areaMapFunction(path_to_data, shapefile_fin), deployment='main'), #% ephemeral drainage area map
   tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'), #walnut gulch additional validation figure
+  tar_target(meanFlowingMonth, flowingDatesFigureFunction(path_to_data, shapefile_fin), deployment='main'), #average flowing day of the year map
+  tar_target(streamOrderPlot_by_physiographicRegion, streamOrderPlotPhysiographic(path_to_data, shapefile_fin, combined_results_by_order, combined_results), deployment='main'),
   tar_target(comboHydrographyMaps_1, comboHydroSmalls(hydroMap_0101, hydroMap_0102, hydroMap_0103, hydroMap_0104,
                                                      hydroMap_0105, hydroMap_0106, hydroMap_0107, hydroMap_0108,
                                                      hydroMap_0109, hydroMap_0110, hydroMap_0202, hydroMap_0203,
@@ -935,26 +1001,26 @@ list(
 
 
   #BUILD BIG MAP FOR JOB TALK..... (make sure to turn of cue=never on all of the rivNetFin and exported_percEph objects.... Had to do this right before STanford.....)
-  tar_combine(combined_rivermaps, list(mapped_lvl0$map,
-                                       mapped_lvl1$map,
-                                       mapped_lvl2$map,
-                                       mapped_lvl3$map,
-                                       mapped_lvl4$map,
-                                       mapped_lvl5$map,
-                                       mapped_lvl6$map,
-                                       mapped_lvl7$map,
-                                       mapped_lvl8$map,
-                                       mapped_lvl9$map,
-                                       mapped_lvl10$map,
-                                       mapped_lvl11$map,
-                                       mapped_lvl12$map,
-                                       mapped_lvl13$map,
-                                       mapped_lvl14$map,
-                                       mapped_lvl15$map,
-                                       mapped_lvl16$map,
-                                       mapped_lvl17$map,
-                                       mapped_lvl18$map), deployment='main', command = list(!!!.x)),
-  tar_target(figMainMap, mainMapFunction(combined_rivermaps,map_0107, map_0108,map_0109,map_0110,map_0106, map_0104, map_0430, map_0202)),
+#  tar_combine(combined_rivermaps, list(mapped_lvl0$map,
+#                                       mapped_lvl1$map,
+#                                       mapped_lvl2$map,
+#                                       mapped_lvl3$map,
+#                                       mapped_lvl4$map,
+#                                       mapped_lvl5$map,
+#                                       mapped_lvl6$map,
+#                                       mapped_lvl7$map,
+#                                       mapped_lvl8$map,
+#                                       mapped_lvl9$map,
+#                                       mapped_lvl10$map,
+#                                       mapped_lvl11$map,
+#                                       mapped_lvl12$map,
+#                                       mapped_lvl13$map,
+#                                       mapped_lvl14$map,
+#                                       mapped_lvl15$map,
+#                                       mapped_lvl16$map,
+#                                       mapped_lvl17$map,
+#                                       mapped_lvl18$map), deployment='main', command = list(!!!.x)),
+#  tar_target(figMainMap, mainMapFunction(combined_rivermaps,map_0107, map_0108,map_0109,map_0110,map_0106, map_0104, map_0430, map_0202)),
 
 
   #GENERATE SOME DOCS

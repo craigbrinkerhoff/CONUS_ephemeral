@@ -283,7 +283,7 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
     dplyr::mutate(dups = n()) %>%
     dplyr::filter(dups == 1)
 
-  #number of in situ perreniality classifications on the NHD-HR (given snapping threshold)
+  #number of in situ pereniality classifications on the NHD-HR (given snapping threshold)
   onNHD_tot <- nrow(verifyDFfin[verifyDFfin$distinction == 'ephemeral',])
 
   out <- list('validation_fin'=verifyDFfin,

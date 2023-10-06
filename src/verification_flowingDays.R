@@ -17,12 +17,12 @@
 #' @return df of all USGS streamgauges with observed Nflw and drainage areas
 wrangleUSGSephGages <- function(other_sites){
   #USGS ephemeral gauges
-  other_sites$wy_eph_gages <- substr(other_sites$name, 6,nchar(other_sites$name))
+  other_sites$short_name <- substr(other_sites$name, 6,nchar(other_sites$name))
   
   #loop through gauges and calculate Nflw from observed record
   out <- data.frame()
-  for(i in other_sites$wy_eph_gages){
-    gageQ <- readNWISdv(siteNumbers = i, #check if site mets our date requirements
+  for(i in other_sites$short_name){
+    gageQ <- dataRetrieval::readNWISdv(siteNumbers = i, #check if site mets our date requirements
                         parameterCd = '00060') #discharge
     
     #get mean annual flow
@@ -44,7 +44,7 @@ wrangleUSGSephGages <- function(other_sites){
 
   #prep output
   out <- out %>%
-    dplyr::left_join(other_sites, by=c('gageID'='wy_eph_gages')) %>% #to get the gauge drainage area
+    dplyr::left_join(other_sites, by=c('gageID'='short_name')) %>% #to get the gauge drainage area
     dplyr::select(c('gageID', 'huc4', 'reference','meas_runoff_m3_s', 'drainageArea_km2', 'num_flowing_dys', 'period_of_record_yrs', 'lon', 'lat')) %>%
     dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined
                                               '06313700',
@@ -378,9 +378,10 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
       rmse <- Metrics::rmse(temp$num_flowing_dys, temp$n_flw_d)
 
       temp2 <- data.frame('thresh'=i,
-                          'r2'=r2,
-                          'mae'=mae,
-                          'rmse'=rmse)
+                          'r2'=r2, na.rm=T,
+                          'mae'=mae, na.rm=T,
+                          'rmse'=rmse, na.rm=T)
+
       out <- rbind(out, temp2)
     }
 

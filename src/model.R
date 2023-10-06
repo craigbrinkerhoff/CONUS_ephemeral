@@ -22,7 +22,6 @@
 #' @param wtd_m_10: Water table depth- October [m]
 #' @param wtd_m_11: Water table depth- November [m]
 #' @param wtd_m_12: Water table depth- December [m]
-#' @param width: width from hydraulic scaling [m]
 #' @param depth: depth from hydraulic scaling [m]
 #' @param thresh: water table depth threshold for 'perennial' [m]
 #' @param err: error tolerance for threshold (not actually used)
@@ -31,7 +30,7 @@
 #' @param FCode_riv: river code from NHD-HR
 #'
 #' @return status: perennial, intermittent, or ephemeral
-perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, width, depth, thresh, err, conus, lakeAreaSqKm, FCode_riv){
+perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err, conus, lakeAreaSqKm, FCode_riv){
   if(conus == 0){ #foreign stream handling
     return('foreign')
   } else if(substr(FCode_riv,1,3) == 336){ #canal/ditch handling

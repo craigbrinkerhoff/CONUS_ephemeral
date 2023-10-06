@@ -27,26 +27,36 @@ summariseWTD <- function(wtd){
 
 
 
-#' width for rivers or lakes/reservoirs
-#'
-#' @name width_func
-#'
-#' @param waterbody: flag for whether reach is a river or lake/reservoir #[1/0]
-#' @param Q: discharge [m3/s]
-#' @param a: width~Q AHG model intercept
-#' @param b: width~Q AHG model coefficient
-#'
-#' @return river width via hydraulic geometry [m]
-width_func <- function(waterbody, Q, a, b){
-  if (waterbody == 'River') {
-    output <- exp(a)*Q^(b) #river width [m]
-  }
-  else {
-    output <- NA #river width makes no sense in lakes so don't do it!
-  }
-  return(output)
-}
+# bankful_depth_func <- function(DIVISION, drainageArea){
 
+#   #BANKFUL DEPTH MODEL LOOKUP TABLE ( https://doi.org/10.1111/jawr.12282)
+#   Hb <- ifelse(DIVISION == 'APPALACHIAN HIGHLANDS', 0.26*drainageArea^0.287, #meters
+#             ifelse(DIVISION == 'LAURENTIAN UPLAND', 0.31*drainageArea^0.202,
+#                 ifelse(DIVISION == 'ATLANTIC PLAIN', 0.24*drainageArea^0.323,
+#                     ifelse(DIVISION == 'INTERIOR PLAINS', 0.38*drainageArea^0.191,
+#                         ifelse(DIVISION == 'INTERIOR HIGHLANDS', 0.27*drainageArea^0.267,
+#                             ifelse(DIVISION == 'ROCKY MOUNTAIN SYSTEM', 0.23*drainageArea^0.225,
+#                                 ifelse(DIVISION == 'INTERMONTANE PLATEAUS', 0.07*drainageArea^0.329,
+#                                     ifelse(DIVISION == 'PACIFIC MOUNTAIN SYSTEM', 0.23*drainageArea^0.294, NA))))))))
+
+#   return(Hb)
+# }
+
+
+
+
+# bankful_depth_see <- function(DIVISION){
+#   Hb_see <- ifelse(DIVISION == 'APPALACHIAN HIGHLANDS', 0.12, #standard error of the estimate (meters)
+#             ifelse(DIVISION == 'LAURENTIAN UPLAND', 0.14,
+#                 ifelse(DIVISION == 'ATLANTIC PLAIN', 0.15,
+#                     ifelse(DIVISION == 'INTERIOR PLAINS', 0.25,
+#                         ifelse(DIVISION == 'INTERIOR HIGHLANDS', 0.15,
+#                             ifelse(DIVISION == 'ROCKY MOUNTAIN SYSTEM', 0.19,
+#                                 ifelse(DIVISION == 'INTERMONTANE PLATEAUS', 0.25,
+#                                     ifelse(DIVISION == 'PACIFIC MOUNTAIN SYSTEM', 0.19, NA))))))))
+
+#   return(Hb_see)
+# }
 
 
 
@@ -64,9 +74,9 @@ width_func <- function(waterbody, Q, a, b){
 #' @param f: depth~Q AHG model coefficient
 #'
 #' @return river depth via hydraulic geometry [m]
-depth_func <- function(waterbody, Q, lakeVol, lakeArea, c, f) {
+depth_func <- function(waterbody, lakeVol, lakeArea, physio_region, drainageArea, a, b) {
   if (waterbody == 'River') {
-    output <- exp(c)*Q^(f) #river depth [m]
+    output <- a*drainageArea^b # bankfullriver depth [m]
   }
   else {
     output <- lakeVol/lakeArea #mean lake depth [m]
@@ -116,8 +126,6 @@ addingRunoffMemory <- function(precip, memory, thresh){
 
   return(out)
 }
-
-
 
 
 
@@ -204,4 +212,51 @@ ephemeralityChecker <- function(other_sites) {
     
   }
   return(wy_eph_Q)
+}
+
+
+
+
+
+exportResults <- function(rivNetFin, huc4){
+
+  rivMetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'percQEph_reach'))
+
+  readr::write_csv(rivNetFin, paste0('cache/results_written/results_', huc4, '.csv'))
+
+  return('written to file')
+}
+
+
+
+
+
+
+validateHb <- function(){
+  dataset <- readr::read_csv('data/bhg_us_database_bieger_2015.csv') %>% #available by searching for paper at https://swat.tamu.edu/search
+    dplyr::select(c('Physiographic Division', '...9', '...15'))
+  
+  colnames(dataset) <- c('DIVISION', 'DA_km2', 'Hb_m')
+
+  dataset$Hb_m <- as.numeric(dataset$Hb_m)
+  dataset$DA_km2 <- as.numeric(dataset$DA_km2)
+
+  dataset <- tidyr::drop_na(dataset)
+
+  division <- toupper(sort(unique(dataset$DIVISION)))
+
+  models <- dplyr::group_by(dataset, DIVISION) %>%
+    dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>%
+    dplyr::summarise(a = 10^(model$coef[1]),
+                     b = model$coef[2],
+                     r2 = summary(model)$r.squared,
+                     mean_residual = mean(model$residuals, na.rm=T),
+                     sd_residual = sd(model$residuals, na.rm=T),
+                     see = sd(model$residuals, na.rm=T)) %>%
+    dplyr::mutate(division = division)
+
+
+  models[models$division == "INTERMONTANE PLATEAU",]$division <- "INTERMONTANE PLATEAUS"
+  
+  return(models)
 }

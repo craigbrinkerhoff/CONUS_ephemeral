@@ -2,4 +2,6 @@
 _targets/objects
 .future/
 docs/manuscript/drafts
+docs/manuscript/submitted
 docs/manuscript/CONUS_ephemeral.docx
+cache/results_written/

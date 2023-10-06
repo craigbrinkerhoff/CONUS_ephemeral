@@ -17,7 +17,7 @@
 #' @import dplyr
 #'
 #' @return df of NHD-HR routing table with all necessary attributes
-extractData <- function(path_to_data, huc4){
+extractData <- function(path_to_data, huc4, Hbmodel){
   ########SETUP
   indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #Indiana-effected basins
 
@@ -25,8 +25,18 @@ extractData <- function(path_to_data, huc4){
 
   huc2 <- substr(huc4, 1, 2)
 
+  #setup physiographic region
+  huc4id <- huc4
+  shapefile <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name')) %>% dplyr::filter(huc4 == huc4id)
+
+  regions <- sf::st_read(paste0(path_to_data, '/other_shapefiles/physio.shp')) #physiographic regions
+  regions <- fixGeometries(regions)
+
+  shapefile <- sf::st_join(shapefile, regions, largest=TRUE) #take the physiogrpahic region that the basin is mostly in (dominant intersection)
+  physio_region <- shapefile$DIVISION
+
   # setup CONUS shapefile
-  states <- sf::st_read('/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data/other_shapefiles/cb_2018_us_state_5m.shp')
+  states <- sf::st_read(paste0(path_to_data,'/other_shapefiles/cb_2018_us_state_5m.shp'))
   states <- dplyr::filter(states, !(NAME %in% c('Alaska',
                                          'American Samoa',
                                          'Commonwealth of the Northern Mariana Islands',
@@ -59,6 +69,13 @@ extractData <- function(path_to_data, huc4){
     nhd <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
     nhd <- sf::st_zm(nhd)
     nhd <- fixGeometries(nhd) #~src/utils.R
+  }
+
+  #fix Great lake basins with fake shoreline rivers
+  if(huc4 %in% c('0402', '0405', '0406', '0407', '0408', '0411', '0412','0401','0410','0414','0403','0404')) {
+    fix <- readr::read_csv(paste0('data/fix_',huc4,'.csv'))
+    model <- dplyr::left_join(nhd, fix, by='NHDPlusID') %>%
+      dplyr::filter(GL_pass == '1')
   }
 
   #load waterbodies
@@ -127,15 +144,10 @@ extractData <- function(path_to_data, huc4){
   nhd$frac_lakeVol_m3 <- nhd$lakeVol_m3 * nhd$lakePercent
   nhd$frac_lakeSurfaceArea_m2 <- nhd$LakeAreaSqKm * nhd$lakePercent * 1e6
 
-  #get river width and depth using hydraulic scaling
-  depAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/depAHG.rds') #depth AHG model
-  widAHG <- readr::read_rds('/nas/cee-water/cjgleason/craig/RSK600/cache/widAHG.rds') #width AHG model
-  nhd$a <- widAHG$coefficients[1]
-  nhd$b <- widAHG$coefficients[2]
-  nhd$c <- depAHG$coefficients[1]
-  nhd$f <- depAHG$coefficients[2]
-  nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$Q_cms, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, nhd$c, nhd$f)
-  nhd$width_m <- mapply(width_func, nhd$waterbody, nhd$Q_cms, nhd$a, nhd$b)
+  #get river depth using hydraulic scaling
+  nhd$a <- Hbmodel[Hbmodel$division == physio_region,]$a
+  nhd$b <- Hbmodel[Hbmodel$division == physio_region,]$b
+  nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, physio_region, nhd$TotDASqKm, nhd$a, nhd$b)
 
   ########EXTRACT DATA TO NHD-HR
   #convert back to terra to do extractions
@@ -164,7 +176,7 @@ extractData <- function(path_to_data, huc4){
 
   #Wrangle everything into a lightweight routing table (no spatial info anymore)
   nhd_df <- as.data.frame(nhd)
-  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'TerminalPa', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'width_m', 'depth_m', 'LakeAreaSqKm'))
+  nhd_df <- dplyr::select(nhd_df, c('NHDPlusID', 'StreamOrde', 'TerminalPa', 'HydroSeq', 'FromNode','ToNode', 'conus', 'FCode_riv', 'FCode_waterbody', 'waterbody', 'AreaSqKm', 'TotDASqKm','Q_cms', 'Q_cms_adj', 'LengthKM', 'depth_m', 'LakeAreaSqKm'))
 
   nhd_df$wtd_m_min_01 <- as.numeric(nhd_wtd_01$WTD_1.min)
   nhd_df$wtd_m_median_01 <- as.numeric(nhd_wtd_01$WTD_1.median)
@@ -242,25 +254,24 @@ extractData <- function(path_to_data, huc4){
 #' @param huc4: huc basin level 4 code
 #' @param thresh: threshold for 'persistent surface groundwater'
 #' @param err: error tolerance for calculation (if desired)
-#' @param summarizer: OUT OF DATE NEED TO REMOVE AS ITS NOW REDUNDANT
 #' @param upstreamDF: data frame of 'exporting Q reaches' for basins from previous level
 #'
 #' @import dplyr
 #' @import readr
 #'
 #' @return routing table with reach perenniality added
-routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
+routeModel <- function(nhd_df, huc4, thresh, err, upstreamDF){
   huc2 <- substr(huc4, 1, 2)
 
   #remove streams with absolutely no mean annual flow
   nhd_df <- dplyr::filter(nhd_df, Q_cms > 0)
 
   ######INTIAL PASS AT ASSIGNING PERENNIALITY using just water table depth (function handles non-CONUS streams, canals, ditches, and small ponds)
-  nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$width_m, nhd_df$depth_m, thresh, err, nhd_df$conus, nhd_df$LakeAreaSqKm, nhd_df$FCode_riv)
+  nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$depth_m, thresh, err, nhd_df$conus, nhd_df$LakeAreaSqKm, nhd_df$FCode_riv)
 
   #some streams that are adjacent to swamps/marshes are tagged as artificial paths (i.e. lakes) even though they are streams.
-      #We can use the lack of assigned widths to lakes/reservoirs to remap these back to streams, i.e. 460
-  nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & is.na(nhd_df$width_m)== 0, '46000', nhd_df$FCode_riv)
+      #We can use the lwaterbody tag to remap these back to streams, i.e. 460
+  nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & nhd_df$waterbody == 'River', '46000', nhd_df$FCode_riv)
 
   #####ROUTING
   #sort rivers from upstream to downstream
@@ -320,7 +331,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, summarizer, upstreamDF){
   nhd_df$perenniality <- ifelse(nhd_df$perenniality %in% c('canal_ditch', 'small_pond'), 'non_ephemeral', nhd_df$perenniality)
 
   out <- nhd_df %>%
-    dplyr::select('NHDPlusID','ToNode', 'TerminalPa', 'StreamOrde', 'FCode_riv', 'FCode_waterbody','AreaSqKm', 'TotDASqKm', 'Q_cms', 'dQ_cms', 'width_m', 'LengthKM', 'perenniality', 'percQEph_reach', 'percAreaEph_reach')
+    dplyr::select('NHDPlusID','ToNode', 'TerminalPa', 'StreamOrde', 'FCode_riv', 'FCode_waterbody','AreaSqKm', 'TotDASqKm', 'Q_cms', 'dQ_cms', 'LengthKM', 'perenniality', 'percQEph_reach', 'percAreaEph_reach')
   
   return(out)
 }
@@ -407,7 +418,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 
 
 
-#' Calculates a first-order 'number flowing days' per HUC4 basin using long-term runoff ratio and daily precip for 1980-2010.
+#' Calculates a first-order 'number ephemeral flowing days' per HUC4 basin
 #'
 #' @name calcFlowingDays
 #'
@@ -416,13 +427,14 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 #' @param runoff_eff: calculated runoff ratio per HUC4 basin
 #' @param runoff_thresh: [mm] operational runoff threshold for ephemeral streamflow
 #' @param runoffEffScalar: [percent] sensitivity parameter to use to perturb model sensitivity to runoff efficiency
-#' @param runoffMemory: bulk 'runoff memory' parameter for Nflw model
+#' @param memory: bulk 'runoff memory' parameter for Nflw model
 #'
 #' @import terra
 #' @import raster
 #'
 #' @return number of flowing days for a given HUC4 basin
-calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, runoffMemory){
+calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, memory){
+
   if(is.na(runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff)){ #great lakes handling
     return(NA)
   }
@@ -431,39 +443,143 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
   huc2 <- substr(huc4, 1, 2)
   basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
   basin <- basins[basins$huc4 == huc4,]
-  basin <- terra::project(basin, '+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 ')
+  basin <- terra::project(basin, '+proj=longlat +datum=WGS84 +no_defs')
   basin <- as(basin, 'Spatial')
-  
-  #add year gridded precipitation (decade chunks to use less memory)
-  #1980-1989
-  precip_1 <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1980_1989.gri')) #daily precip for 1980-1989
-  precip_1 <- raster::rotate(precip_1) #convert 0-360 lon to -180-180 lon
-  precip_1 <- raster::crop(precip_1, basin)
-  
-  #1990-1999
-  precip_2 <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_1990_1999.gri')) #daily precip for 1990-1999
-  precip_2 <- raster::rotate(precip_2) #convert 0-360 lon to -180-180 lon
-  precip_2 <- raster::crop(precip_2, basin)
-  
-  #2000-2006
-  precip_3 <- raster::brick(paste0(path_to_data, '/for_ephemeral_project/dailyPrecip_2000_2006.gri')) #daily precip for 2000-2006
-  precip_3 <- raster::rotate(precip_3) #convert 0-360 lon to -180-180 lon
-  precip_3 <- raster::crop(precip_3, basin)
 
   #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency (both calculated per basin previously)
   thresh <- runoff_thresh / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
-  precip_1_t <- raster::calc(precip_1, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required) (~src/utils.R)
-  precip_2_t <- raster::calc(precip_2, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required) (~src/utils.R)
-  precip_3_t <- raster::calc(precip_3, fun=function(x){addingRunoffMemory(x, runoffMemory, thresh)}) #calculate number of days flowing per cell, introducing 'runoff memory' that handles potential double counting (if required) (~src/utils.R)
-    
 
-  numFlowingDays_1 <- (raster::cellStats(precip_1_t, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
-  numFlowingDays_2 <- (raster::cellStats(precip_2_t, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
-  numFlowingDays_3 <- (raster::cellStats(precip_3_t, 'mean')) #average over HUC4 basin DEFAULT FUNCTION IGNORES NAs
-  
-  numFlowingDays <- (numFlowingDays_1+numFlowingDays_2+numFlowingDays_3)/27 #average number of dys per year across the record (27 years)
+  #loop through years
+  numFlowingDays <- rep(NA,27) #years
+  k <- 1
+  for(i in seq(1980,2006,1)){
+    precip <- raster::stack(paste0(path_to_data, '/for_ephemeral_project/precip_model/precip.V1.0.',i,'.nc'))
+    precip <- terra::rotate(precip) #convert 0-360 lon to -180-180 lon
+    precip <- terra::crop(precip, basin)
+
+    #convert to terra to df
+    precip <- terra::rast(precip)
+    df <- as.data.frame(precip) #convert rasterLayer to df for easy summarizing across basin and over time
+
+    #average across the basin (across pixels) so we have a single timeseries
+    df <- colMeans(df, na.rm=T)
+
+    #convert to flowing/non-flowing
+    df[df < thresh] <- 0
+    df[df >= thresh] <- 1
+
+    orig <- df
+
+    # add watershed memory
+     if(memory == 0){
+       out <- sum(df)
+       return(mean(out, na.rm=T))
+     }
+     else{
+       #propagate memory for days following runoff events
+       for(m in 1:length(orig)){
+          if(df[m] == 1 & orig[m] == 1){
+            for(j in seq(1+m,memory+m,1)){
+              df[j] <- 1
+            }
+        }
+       }
+       df <- df[1:length(orig)] #remove 'memory' added beyond the year days (meaningless add ons)
+    }
+
+    #total flowing days per year
+    numFlowingDays[k] <- sum(df)
+
+    k <- k + 1
+  }
+
+  avg_numFlowingDays <- mean(numFlowingDays, na.rm=T)
     
-  return(numFlowingDays)
+  return(avg_numFlowingDays)
+}
+
+
+
+
+
+
+
+#' Calculates a first-order average month for 'ephemeral flowing days' per HUC4 basin
+#'
+#' @name calcDatesFlowingDays
+#'
+#' @param path_to_data: data repo path directory
+#' @param huc4: huc basin level 4 code
+#' @param runoff_eff: calculated runoff ratio per HUC4 basin
+#' @param runoff_thresh: [mm] operational runoff threshold for ephemeral streamflow
+#' @param runoffEffScalar: [percent] sensitivity parameter to use to perturb model sensitivity to runoff efficiency
+#' @param memory: bulk 'runoff memory' parameter for Nflw model
+#'
+#' @import terra
+#' @import raster
+#'
+#' @return mean month that ephemeeral flowing days occur ( for a given HUC4 basin)
+calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, memory){
+  if(is.na(runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff)){ #great lakes handling
+    return(NA)
+  }
+
+  #get basin to clip precip model
+  huc2 <- substr(huc4, 1, 2)
+  basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
+  basin <- basins[basins$huc4 == huc4,]
+  basin <- terra::project(basin, '+proj=longlat +datum=WGS84 +no_defs')
+  basin <- as(basin, 'Spatial')
+
+  #obtain results for flowing days, given a runoff threshold and huc4-scale runoff efficiency (both calculated per basin previously)
+  thresh <- runoff_thresh / (runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff + runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff*runoffEffScalar) #convert runoff thresh to precip thresh using runoff efficiency coefficient
+
+  #loop through years
+  daysFlowingDays <- rep(NA,27) #years
+  k <- 1
+  for(i in seq(1980,2006,1)){
+    precip <- raster::stack(paste0(path_to_data, '/for_ephemeral_project/precip_model/precip.V1.0.',i,'.nc'))
+    precip <- terra::rotate(precip) #convert 0-360 lon to -180-180 lon
+    precip <- terra::crop(precip, basin)
+
+    #convert to terra to df
+    precip <- terra::rast(precip)
+    df <- as.data.frame(precip) #convert rasterLayer to df for easy summarizing across basin and over time
+
+    #average across the basin (across pixels) so we have a single timeseries
+    df <- colMeans(df, na.rm=T)
+
+    #convert to flowing/non-flowing
+    df[df < thresh] <- 0
+    df[df >= thresh] <- 1
+
+    orig <- df
+
+    # add watershed memory
+     if(memory == 0){
+       out <- sum(df)
+       return(mean(out, na.rm=T))
+     }
+     else{
+       #propagate memory for days following runoff events
+       for(m in 1:length(orig)){
+          if(df[m] == 1 & orig[m] == 1){
+            for(j in seq(1+m,memory+m,1)){
+              df[j] <- 1
+            }
+        }
+       }
+       df <- df[1:length(orig)] #remove 'memory' added beyond the year days (meaningless add ons)
+    }
+
+    flowing_dates <- as.numeric(substr(names(df[df == 1]), 7,8)) #extract months from flowing days
+    median_flowing_month <- mean(flowing_dates, na.rm=T)
+    daysFlowingDays[k] <- median_flowing_month
+
+    k <- k + 1
+  }
+
+  return(mean(daysFlowingDays, na.rm=T))
 }
 
 
@@ -585,7 +701,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 #' @import dplyr
 #'
 #' @return fraction of exported water and drainage area that is ephemeral
-getResultsExported <- function(nhd_df, huc4, numFlowingDays){
+getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
   #water volume ephemeral fraction at outlets
   exportDF <- dplyr::group_by(nhd_df, TerminalPa) %>%
     dplyr::arrange(desc(Q_cms)) %>% 
@@ -605,6 +721,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays){
                     'QEph_exported_cms'= sum(exportDF$Q_cms*exportDF$percQEph_reach),
                     'AreaEph_exported_km2'= sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach),
                     'num_flowing_dys'=numFlowingDays,
+                    'mean_date_flowing'=datesFlowingDays,
                     'n_eph'=n_eph,
                     'n_total'=n_total,
                     'perc_length_eph'=perc_length_eph,
