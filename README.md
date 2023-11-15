@@ -1,6 +1,6 @@
 # Ephemeral stream water contributions to United States drainage networks
 
-This repo contains the pipeline to reproduce our assessment of ephemeral streams in the contiguous United States. It uses `targets` to launch (and monitor) a fully reproducible pipeline in `R` on an HPC. For more on using `targets`, see [here](https://books.ropensci.org/targets/). Pipeline parameters are described and assigned in the *_targets.R* script.
+This repo contains the pipeline for our assessment of ephemeral streams in the contiguous United States. It uses `targets` to launch (and monitor) a fully reproducible pipeline in `R` on an HPC. For more on using `targets`, see [here](https://books.ropensci.org/targets/). Pipeline parameters are described and assigned in the *_targets.R* script.
 
 We also knit the entire manuscript in `RMarkdown` for reproducibility. Note that the actual target objects are not included and so to do this, you would need to rerun the entire pipeline.
 
@@ -9,6 +9,9 @@ We also knit the entire manuscript in `RMarkdown` for reproducibility. Note that
 conda activate CONUS_ephemeral-env
 sbatch run.sh
 ```
+
+## Usage notes
+Our model was developed for global scale analysis, and so we caution against over-interpreting results for individual river reaches. Please see the manuscript for more detail.
 
 ## Manuscript
 ```

@@ -5,6 +5,19 @@
 
 
 
+
+
+#' Extract mean monthly well depths from USGS wells
+#'
+#' @name getWellDepths
+#'
+#' @param codes_huc2: huc2 regional codes to get NWIS wells
+#' 
+#' @import readr
+#' @import dplyr
+#' @import dataRetrieval
+#'
+#' @return df of mean monthly groundwater depths
 getWellDepths <- function(codes_huc2){
 
     out <- data.frame() #results holder
@@ -58,6 +71,17 @@ getWellDepths <- function(codes_huc2){
 
 
 
+#' Extract 'groundwater depths' from USGS streamgauges in perrenial rivers
+#'
+#' @name getGaugewtd
+#'
+#' @param USGS_data: huc2 regional codes to get NWIS wells
+#' 
+#' @import readr
+#' @import dplyr
+#' @import dataRetrieval
+#'
+#' @return df of mean monthly groundwater depths at perennial rivers
 getGaugewtd <- function(USGS_data){
 
     USGS_data <- dplyr::filter(USGS_data, no_flow_fraction == 0) #only keep the gages that flow year round (perennial) to be conservative. Later code keeps all twelve values.
@@ -86,7 +110,21 @@ getGaugewtd <- function(USGS_data){
 
 
 
-
+#' Extract 'groundwater depths' from USGS streamgauges in perrenial rivers
+#'
+#' @name join_wtd
+#'
+#' @param path_to_data: data repo path directory
+#' @param USGS_data: huc2 regional codes to get NWIS wells
+#' @param conus_well_depths: df of well depths
+#' @param gauge_wtds: df of perennial river groundwater depths
+#' 
+#' @import readr
+#' @import dplyr
+#' @import terra
+#' @import ggplot2
+#'
+#' @return df of mean monthly groundwater depths at perennial rivers
 join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     #these have already been filtered for only gages that flow 100% of the time, i.e. perennial rivers where the water table will be 0m year round (so just assign the 0m to all 12 months)
     gauge_wtds$month <- 1

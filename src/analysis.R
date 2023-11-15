@@ -11,6 +11,7 @@
 #'
 #' @param path_to_data: data repo path directory
 #' @param huc4: huc basin level 4 code
+#' @param Hbmodel: lookup table for Hb model
 #'
 #' @import terra
 #' @import sf
@@ -697,6 +698,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 #' @param nhd_df: basin routing table + results
 #' @param huc4: huc basin level 4 code
 #' @param numFlowingDays: model estimated Nflw. This just gets passed along as a result
+#' @param datesFlowingDays: model estimated mean month flowing. This just gets passed along as a result
 #' 
 #' @import dplyr
 #'
@@ -732,6 +734,11 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
 
 
 
+
+
+getMeanReachLen <- function(nhd_df, huc4){
+  return(mean(nhd_df$LengthKM, na.rm=T))
+}
 
 
 

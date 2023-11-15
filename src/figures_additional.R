@@ -180,6 +180,8 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
 #'
 #' @name streamOrderPlotPhysiographic
 #'
+#' @param path_to_data: data repo directory path
+#' @param shapefile: sf object of basins and results
 #' @param combined_results_by_order: df of model results per stream order
 #' @param combined_results: df of model results
 #'
@@ -933,7 +935,6 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
 #'
 #' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
-#' @param joinedData: df of in situ Nflw joined to HUC4 basins (for verification)
 #'
 #' @import sf
 #' @import dplyr
@@ -1045,7 +1046,7 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
   net$perenniality <- ifelse(net$perenniality == 'foreign', 'non_ephemeral', net$perenniality)
   
   #make plot name that is line-aware using stringr
-  exported_number <- ifelse(round(exported_abs*86400*365*1e-9,0) == 0, signif(exported_abs*86400*365*1e-9,2), round(exported_abs*86400*365*1e-9,0)) #round using significant digits if less than 0 km3/yr
+  exported_number <- signif(exported_abs*86400*365*1e-9,2)#ifelse(round(exported_abs*86400*365*1e-9,1) == 0, signif(exported_abs*86400*365*1e-9,2), round(exported_abs*86400*365*1e-9,1)) #round using significant digits if less than 0 km3/yr
   plotName <- paste0(name,': ', exported_number, ' km3/yr (', round(exported_perc*100,0), '%)')
   plotName <- stringr::str_wrap(plotName, 20) #wrap to twenty characters, seems to fit nicely
 

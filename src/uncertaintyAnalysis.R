@@ -4,7 +4,18 @@
 
 
 
-
+#' Run Monte Carlo uncertainty analysis on a given basin
+#'
+#' @name runMonteCarlo
+#'
+#' @param huc4: huc4 basin id
+#' @param threshold: threshold for initial water table classification
+#' @param error: error buffer (set to 0)
+#' @param gw_error_model: residuals distribution for gw model
+#' @param Hb_error_model: residuals distribution for bankfull depth model
+#' @param seetID: random seed ID
+#'
+#' @return percent water volume ephemeral per reach
 runMonteCarlo <- function(huc4, threshold, error, gw_error_model, Hb_error_model, seedID){
   #set.seed(seedID) #set seed for reproducibility of random process
 
@@ -27,7 +38,8 @@ runMonteCarlo <- function(huc4, threshold, error, gw_error_model, Hb_error_model
 #'
 #' @param path_to_data: data repo path directory
 #' @param huc4: huc basin level 4 code
-#' @param gw_error_model: Residual distribution for sampling errors from the model
+#' @param gw_error_model: residuals distribution for gw model
+#' @param Hb_error_model: residuals distribution for bankfull depth model
 #'
 #' @import terra
 #' @import sf

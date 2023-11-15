@@ -26,52 +26,16 @@ summariseWTD <- function(wtd){
 
 
 
-
-# bankful_depth_func <- function(DIVISION, drainageArea){
-
-#   #BANKFUL DEPTH MODEL LOOKUP TABLE ( https://doi.org/10.1111/jawr.12282)
-#   Hb <- ifelse(DIVISION == 'APPALACHIAN HIGHLANDS', 0.26*drainageArea^0.287, #meters
-#             ifelse(DIVISION == 'LAURENTIAN UPLAND', 0.31*drainageArea^0.202,
-#                 ifelse(DIVISION == 'ATLANTIC PLAIN', 0.24*drainageArea^0.323,
-#                     ifelse(DIVISION == 'INTERIOR PLAINS', 0.38*drainageArea^0.191,
-#                         ifelse(DIVISION == 'INTERIOR HIGHLANDS', 0.27*drainageArea^0.267,
-#                             ifelse(DIVISION == 'ROCKY MOUNTAIN SYSTEM', 0.23*drainageArea^0.225,
-#                                 ifelse(DIVISION == 'INTERMONTANE PLATEAUS', 0.07*drainageArea^0.329,
-#                                     ifelse(DIVISION == 'PACIFIC MOUNTAIN SYSTEM', 0.23*drainageArea^0.294, NA))))))))
-
-#   return(Hb)
-# }
-
-
-
-
-# bankful_depth_see <- function(DIVISION){
-#   Hb_see <- ifelse(DIVISION == 'APPALACHIAN HIGHLANDS', 0.12, #standard error of the estimate (meters)
-#             ifelse(DIVISION == 'LAURENTIAN UPLAND', 0.14,
-#                 ifelse(DIVISION == 'ATLANTIC PLAIN', 0.15,
-#                     ifelse(DIVISION == 'INTERIOR PLAINS', 0.25,
-#                         ifelse(DIVISION == 'INTERIOR HIGHLANDS', 0.15,
-#                             ifelse(DIVISION == 'ROCKY MOUNTAIN SYSTEM', 0.19,
-#                                 ifelse(DIVISION == 'INTERMONTANE PLATEAUS', 0.25,
-#                                     ifelse(DIVISION == 'PACIFIC MOUNTAIN SYSTEM', 0.19, NA))))))))
-
-#   return(Hb_see)
-# }
-
-
-
-
-
 #' depth for rivers or lakes/reservoirs
 #'
 #' @name depth_func
 #'
 #' @param waterbody: flag for whether reach is a river or lake/reservoir [1/0]
-#' @param Q: discharge [m3/s]
 #' @param lakeVol: lake/reservoir volume, using fraction assigned to this flowline [m3]
 #' @param lakeArea: lake/reservoir surface area, using fraction assigned to this flowline [m2]
-#' @param c: depth~Q AHG model intercept
-#' @param f: depth~Q AHG model coefficient
+#' @param physio_region: physiographic region from lookup table
+#' @param a: depth~DA model intercept from lookup table
+#' @param b: depth~DA model coefficient from lookup table
 #'
 #' @return river depth via hydraulic geometry [m]
 depth_func <- function(waterbody, lakeVol, lakeArea, physio_region, drainageArea, a, b) {
@@ -217,7 +181,16 @@ ephemeralityChecker <- function(other_sites) {
 
 
 
-
+#' Write results to file
+#'
+#' @name exportResults
+#'
+#' @param other_sites: df with all the gauge IDs
+#' 
+#' @import readr
+#' @import dplyr
+#'
+#' @return writes model results to file
 exportResults <- function(rivNetFin, huc4){
 
   rivMetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'percQEph_reach'))
@@ -231,7 +204,14 @@ exportResults <- function(rivNetFin, huc4){
 
 
 
-
+#' Build and validate the Hb~DA models using their paper's source data
+#'
+#' @name validateHb
+#' 
+#' @import readr
+#' @import dplyr
+#'
+#' @return suite of models by physiographic region
 validateHb <- function(){
   dataset <- readr::read_csv('data/bhg_us_database_bieger_2015.csv') %>% #available by searching for paper at https://swat.tamu.edu/search
     dplyr::select(c('Physiographic Division', '...9', '...15'))
