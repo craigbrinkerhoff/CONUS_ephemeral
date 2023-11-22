@@ -11,7 +11,7 @@ sbatch run.sh
 ```
 
 ## Usage notes
-Our model was developed for global scale analysis, and so we caution against over-interpreting results for individual river reaches. Please see the manuscript for more detail.
+Our model was developed for continental-scale analysis, and so we caution against over-interpreting results for individual river reaches. Please see the manuscript for more detail.
 
 ## Manuscript
 ```

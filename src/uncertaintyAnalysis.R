@@ -13,12 +13,10 @@
 #' @param error: error buffer (set to 0)
 #' @param gw_error_model: residuals distribution for gw model
 #' @param Hb_error_model: residuals distribution for bankfull depth model
-#' @param seetID: random seed ID
+#' @param seedID: random seed ID for specific MC instance
 #'
-#' @return percent water volume ephemeral per reach
+#' @return percent water volume ephemeral per reach (for a given MC instance)
 runMonteCarlo <- function(huc4, threshold, error, gw_error_model, Hb_error_model, seedID){
-  #set.seed(seedID) #set seed for reproducibility of random process
-
   #run model
   extracted <- extractDataMC(path_to_data, huc4, gw_error_model, Hb_error_model)
   model <- routeModel(extracted, huc4, threshold, error, NA)
@@ -34,7 +32,7 @@ runMonteCarlo <- function(huc4, threshold, error, gw_error_model, Hb_error_model
 #'
 #' @name extractDataMC
 #'
-#' @note Be aware of the explicit repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there are assumed internal folders.
+#' @note Be aware of the explicit repo structure within the data repo, i.e. even though the user specifies the path to the data repo, there is an assumed internal file structure (see README).
 #'
 #' @param path_to_data: data repo path directory
 #' @param huc4: huc basin level 4 code
@@ -92,7 +90,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
     nhd <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/indiana/indiana_fixed_', huc4, '.shp'))
     nhd <- sf::st_zm(nhd)
     colnames(nhd)[10] <- 'WBArea_Permanent_Identifier'
-    nhd$NHDPlusID <- round(nhd$NHDPlusID, 0) #some of these have digits for some reason......
+    nhd$NHDPlusID <- round(nhd$NHDPlusID, 0)  #remove erronous decimals
   }
   else{
     nhd <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
@@ -146,12 +144,12 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   #assign waterbody type for depth modeling
   nhd$waterbody <- ifelse(is.na(nhd$WBArea_Permanent_Identifier)==0 & is.na(nhd$LakeAreaSqKm) == 0 & nhd$LakeAreaSqKm > 0, 'Lake/Reservoir', 'River')
 
-  #fix erronous IDs for matching basins for routing (manually identified in CO2 projects)
+  #fix erronous IDs for matching basins for routing (manually identified in the version of NHD-HR used in this study)
   if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100384878,]$StreamOrde <- 8}   #fix erroneous 'divergent' reach in the Ohio mainstem (matching Indiana file upstream)
   if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100569580,]$ToNode <- 22000100085737} #from/to node ID typo (from Ohio River to Missouri River) so I manually fix it
   if(huc4 == '0706'){nhd[nhd$NHDPlusID == 22000400022387,]$StreamOrde <- 7} #error in stream order calculation because reach is miss-assigned as stream order 0 (on divergent path) which isn't true. Easiest to just skip over the reach because it's just a connector into the Mississippi River (from Wisconsin river)
   
-  #no divergent channels, i.e. all downstream routing flows into a single downstream reach.
+  #remove divergent channels, i.e. all downstream routing flows into a single downstream reach.
   nhd <- dplyr::filter(nhd, StreamOrde > 0)
 
   #calculate lake volumes (when appropriate)
@@ -171,7 +169,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   b <- Hb_error_model[Hb_error_model$division == physio_region,]$b
   nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, physio_region, nhd$TotDASqKm, a, b)
 
-  #get error distribution for physio region Hb model
+  #get error distribution for Hb model (https://doi.org/10.1111/jawr.12282)
   see <- Hb_error_model[Hb_error_model$division == physio_region,]$see
   mean <- Hb_error_model[Hb_error_model$division == physio_region,]$mean_residual
 
@@ -222,8 +220,8 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd_df$wtd_t_median_11 <- as.numeric(nhd_wtd_11$WTD_11.median)*-1
   nhd_df$wtd_t_median_12 <- as.numeric(nhd_wtd_12$WTD_12.median)*-1
 
-  #setup errors over time and space (12 months, n reaches)
-  error <- rnorm(n=nrow(nhd_df), mean=gw_error_model$mean, sd=gw_error_model$sd) #gw_error_model$mean
+  #setup GW errors over time and space (12 months, n reaches)
+  error <- rnorm(n=nrow(nhd_df), mean=gw_error_model$mean, sd=gw_error_model$sd)
   nhd_df$error <- error
 
   #randomly sample and apply groundwater model uncertainty
@@ -240,7 +238,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd_df$wtd_k_median_11 <- ifelse(nhd_df$wtd_t_median_11 < 1e-10, 0, log10(nhd_df$wtd_t_median_11)) - nhd_df$error
   nhd_df$wtd_k_median_12 <- ifelse(nhd_df$wtd_t_median_12 < 1e-10, 0, log10(nhd_df$wtd_t_median_12)) - nhd_df$error
 
-  #flip back to mdodel setup (natural space, negative)
+  #flip back to model setup (natural space, negative)
   nhd_df$wtd_m_median_01 <- ifelse(nhd_df$wtd_k_median_01 == 0, 0, -1*10^(nhd_df$wtd_k_median_01))
   nhd_df$wtd_m_median_02 <- ifelse(nhd_df$wtd_k_median_02 == 0, 0, -1*10^(nhd_df$wtd_k_median_02))
   nhd_df$wtd_m_median_03 <- ifelse(nhd_df$wtd_k_median_03 == 0, 0, -1*10^(nhd_df$wtd_k_median_03))
@@ -260,6 +258,23 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
 
 
 
+#' Preps hydrography shapefiles into lightweight routing tables. Also extracts monthly water table depth per streamline
+#'
+#' @name uncertaintyFigures
+#'
+#' @param path_to_data: data repo path directory
+#' @param shapefile_fin: final HUC4 model results shapeifle (as sf object)
+#' @param mc0107: Monte Carlo results for basin 0107
+#' @param mc1402: Monte Carlo results for basin 1402
+#' @param mc1703: Monte Carlo results for basin 1703
+#' @param mc0311: Monte Carlo results for basin 0311
+#' @param mc1504: Monte Carlo results for basin 1504
+#'
+#' @import terra
+#' @import sf
+#' @import dplyr
+#'
+#' @return Monte Carlo analysis results figure (written to file)
 uncertaintyFigures <- function(path_to_data, shapefile_fin, mc0107, mc1402, mc1703, mc0311, mc1504){
   theme_set(theme_classic())
   
@@ -284,13 +299,14 @@ uncertaintyFigures <- function(path_to_data, shapefile_fin, mc0107, mc1402, mc17
                                                 'Hawaii'))) #remove non CONUS states/territories
   states <- st_union(states)
 
-
+  #setup mc distribution sigmas for plotting----------------------------------------------
   results$sigmas_east <- ifelse(results$huc4 == '0107', paste0(round(sd(mc0107)*100,2),'%'),
                             ifelse(results$huc4 == '0311', paste0(round(sd(mc0311)*100,2),'%'),NA))
   results$sigmas_west <- ifelse(results$huc4 == '1402', paste0(round(sd(mc1402)*100,2),'%'),
                             ifelse(results$huc4 == '1703', paste0(round(sd(mc1703)*100,2),'%'),NA))
   results$sigma_gila <- ifelse(results$huc4 == '1504', paste0(round(sd(mc1504)*100,2),'%'),NA)
 
+  #PLOT---------------------------------------------------------
   map <- ggplot(results) +
     geom_sf(aes(fill=flag),
             size=0.5,

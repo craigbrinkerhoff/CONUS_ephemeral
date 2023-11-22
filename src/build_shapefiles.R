@@ -1,21 +1,21 @@
 ## Craig Brinkerhoff
 ## functions to build shapefiles from results (both model and validation results)
-## Winter 2023
+## Fall 2023
 
 
 
-#' Joins all HUC4 shapefiles + results into a single shapefile for mapping and exporting
+#' Joins all HUC4 shapefiles + results into a single shapefile for mapping
 #'
 #' @name saveShapefile
 #'
 #' @param path_to_data: data repo path directory
-#' @param codes_huc02: all HUC level 2 regions currently being ran
+#' @param codes_huc02: all HUC level 2 regions
 #' @param combined_results: all model results aggregated into single target
 #'
 #' @import sf
 #' @import dplyr
 #'
-#' @return print statement as it writes to file + the sf object shapefile
+#' @return print statement + the sf object
 saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   #read in all HUC4 basins
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name'))
@@ -43,12 +43,12 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
 
 
 
-#' Joins all HUC4 shapefiles + validation results into a single shapefile for mapping and exporting
+#' Joins all HUC2 shapefiles + validation results into a single shapefile for mapping
 #'
 #' @name saveValShapefile
 #'
 #' @param path_to_data: data repo path directory
-#' @param codes_huc02: all HUC level 2 regions currently being ran
+#' @param codes_huc02: all HUC level 2 regions
 #' @param validationResults: all validation results aggregated into single target
 #'
 #' @import sf
@@ -66,7 +66,7 @@ saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
   }
 
   #join validation results
-    #distinction is truth, perenniality is model
+    #distinction == ground truth, perenniality == model prediction
   out <- validationResults$validation_fin
   out$TP <- ifelse(out$distinction == 'ephemeral' & out$perenniality == 'ephemeral', 1, 0)
   out$FP <- ifelse(out$distinction == 'non_ephemeral' & out$perenniality == 'ephemeral', 1, 0)

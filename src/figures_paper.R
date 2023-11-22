@@ -1,6 +1,6 @@
 ## FUNCTIONS FOR PAPER FIGURES
 ## Craig Brinkerhoff
-## Winter 2023
+## Fall 2023
 
 
 
@@ -23,7 +23,7 @@
 #' @import cowplot
 #' @import patchwork
 #'
-#' @return main model results figure (also writes figure to file)
+#' @return print statement where main results figure is written to file
 mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, net_0701_results, net_1407_results, net_1305_results) {
   theme_set(theme_classic())
 
@@ -58,8 +58,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     xlab('% ephemeral discharge')+
     ylab('Probability')+
     theme(axis.title = element_text(size=20),
-          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
-    theme(legend.position = 'none') #legend position settings
+          axis.text = element_text(family="Futura-Medium", size=18))+
+    theme(legend.position = 'none')
 
   #MAIN MAP------------------------------------------------------------------------------
   results_map <- ggplot(results) +
@@ -95,19 +95,19 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                    ylim=c(48,50),
                                    xlim=c(-88,-87))+
     scale_fill_gradientn(name='% Discharge ephemeral',
-                         colors=c('white', '#3E1F47'), # 281F32
+                         colors=c('white', '#3E1F47'),
                          limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",
                                                 title.position = "bottom"))+
     labs(tag='A')+
     theme(axis.text = element_text(family="Futura-Medium", size=20),
-          legend.key.size = unit(2, 'cm'))+ #axis text settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 20),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
                               face='bold'))+
-    theme(legend.position = c(.15, 0.1))+ #legend position settings
+    theme(legend.position = c(.15, 0.1))+
     xlab('')+
     ylab('')
 
@@ -230,7 +230,7 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                                         legend.box="vertical",
                                                         legend.margin=margin(),
                                                         legend.spacing.x = unit(2, 'cm')) +
-                                                  guides(color = guide_legend(override.aes = list(size=10)))) #fill legend size settings
+                                                  guides(color = guide_legend(override.aes = list(size=10))))
 
     ##BUILD PLOT----------------------------
     design <- "
@@ -247,8 +247,9 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     "
     comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1407, D=hydrography_0107+theme(legend.position='none'), E=hydrography_0701, F=hydrography_legend, design=design)
 
-   ggsave('cache/paper_figures/fig1.jpg', comboPlot, width=20, height=20)
-   return('see cache/paper_figures/fig1.jpg')
+   ggsave('cache/paper_figures/fig1.tiff', comboPlot, width=20, height=20)
+   ggsave('cache/paper_figures/fig1.png', comboPlot, width=20, height=20)
+   return('see cache/paper_figures/fig1.tiff')
 }
 
 
@@ -266,14 +267,13 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
 #'
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
 streamOrderPlot <- function(combined_results_by_order, combined_results){
   theme_set(theme_classic())
   
-  #get regions
+  #get regions sorted out for plotting------------------------------------------------------------
   combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
   combined_results_by_order$huc4 <- substr(combined_results_by_order$method, 18, 21)
   east <- c('0101', '0102', '0103', '0104', '0105', '0106', '0107', '0108', '0109', '0110', #all basins east of the Mississippi River (determined visually)
@@ -363,8 +363,9 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, C=plotN, design=design)
   
   
-  ggsave('cache/paper_figures/fig2.jpg', comboPlot, width=20, height=20)
-  return('see cache/paper_figures/fig2.jpg')
+  ggsave('cache/paper_figures/fig2.tiff', comboPlot, width=20, height=20)
+  ggsave('cache/paper_figures/fig2.png', comboPlot, width=20, height=20)  
+  return('see cache/paper_figures/fig2.tiff')
 }
 
 
@@ -383,12 +384,11 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 #'
 #' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
-#' @param joinedData: df of in situ Nflw joined to HUC4 basins (for verification)
+#' @param joinedData: df of in situ Nflw data joined to HUC4 basins (for verification)
 #'
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
@@ -416,7 +416,7 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
   joinedData$n_flw_d <- round(joinedData$n_flw_d,0)
 
   #INSET MAP-----------------------------------------------
-  cdf_inset <- ggplot(results, aes(num_flowing_dys))+
+  cdf_inset <- ggplot(results, aes(num_flowing_dys))+ #modeled Nflw
     stat_ecdf(size=2, color='black') +
     xlab('Annual ephemeral flow\ndays')+
     ylab('Probability')+
@@ -427,9 +427,9 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
   
   ##MAIN MAP------------------------------------------
   flowingDaysFig <- ggplot(results) +
-    geom_sf(aes(fill=num_flowing_dys), #observed
+    geom_sf(aes(fill=num_flowing_dys), #modeled Nflw
             color='black',
-            size=0.5) + #map
+            size=0.5) +
     scale_fill_gradientn(name='Annual ephemeral flow days',
                          colors = c("#9e2a2b", "white", "#2b2d42"),
                          guide = guide_colorbar(direction = "horizontal",title.position = "bottom"),
@@ -438,15 +438,15 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
             color='black',
             size=1.0,
             alpha=0)+
-    geom_sf(data=joinedData,  #verification data locations
+    geom_sf(data=joinedData,  #in situ data locations for model verification
             color='#564C4D',
             size=10,
             stroke=2)+
     labs(tag='A')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(.15, 0.10),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 20),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -479,7 +479,7 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
           plot.tag = element_text(size=26,
                                   face='bold'))
   
-  ##HISTOGRAM FIGURE------------------
+  ##ECDF VERIFICATION FIGURE------------------
   forPlot <- tidyr::gather(joinedData, key=key, value=value, c('num_flowing_dys', 'n_flw_d'))
   flowingDaysCDF <- ggplot(forPlot, aes(value, linetype=key))+
     stat_ecdf(size=2, color='#564C4D') +
@@ -495,7 +495,7 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
           legend.text = element_text(family = "Futura-Medium", size = 26),
           plot.tag = element_text(size=26,
                                   face='bold')) +
-    guides(linetype=guide_legend(keywidth = 3, keyheight = 1)) #linetype size legend settings
+    guides(linetype=guide_legend(keywidth = 3, keyheight = 1))
   
   ##BUILD PLOT------------------------
   design <- "
@@ -512,8 +512,9 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
     patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)  
   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysCDF, design=design)
 
-  ggsave('cache/paper_figures/fig3.jpg', comboPlot, width=20, height=20)
-  return('see cache/paper_figures/fig3.jpg')
+  ggsave('cache/paper_figures/fig3.tiff', comboPlot, width=20, height=20)
+  ggsave('cache/paper_figures/fig3.png', comboPlot, width=20, height=20)
+  return('see cache/paper_figures/fig3.tiff')
 }
 
 
@@ -523,9 +524,9 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
 
 
 
-#' create ephemeral drainage area paper figure
+#' create ephemeral network length paper figure (fig 4)
 #'
-#' @name areaMapFunction
+#' @name lengthMapFunction
 #'
 #' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
@@ -533,9 +534,9 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
+#' @import patchwork
 #'
-#' @return land use results figure (also writes figure to file)
+#' @return ephemeral network length results figure (written to file- location print returned from this function)
 lengthMapFunction <- function(path_to_data, shapefile_fin) {
   theme_set(theme_classic())
   
@@ -564,12 +565,12 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
     xlab('% ephemeral network\nextent')+
     ylab('Probability')+
     theme(axis.title = element_text(size=20),
-          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
-    theme(legend.position = 'none') #legend position settings
+          axis.text = element_text(family="Futura-Medium", size=18))+
+    theme(legend.position = 'none')
 
   #LENGTH MAP-------------------------------------------------
   length_map <- ggplot(results) +
-    geom_sf(aes(fill=percLength_eph), #actual map
+    geom_sf(aes(fill=percLength_eph), #map of % network length ephemeral
             color='black',
             size=0.5) +
     geom_sf(data=states,
@@ -584,10 +585,10 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
     scale_color_brewer(name='',
                        palette='Dark2',
                        guide='none')+
-    theme(axis.title = element_text(size=26, face='bold'),axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.title = element_text(size=26, face='bold'),axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(0.15, 0.1),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -599,6 +600,7 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
   length_map <- length_map + 
     patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
-  ggsave('cache/paper_figures/fig4.jpg', length_map, width=20, height=13)
-  return('see cache/paper_figures/fig4.jpg')
+  ggsave('cache/paper_figures/fig4.tiff', length_map, width=20, height=13)
+  ggsave('cache/paper_figures/fig4.png', length_map, width=20, height=13)
+  return('see cache/paper_figures/fig4.tiff')
 }

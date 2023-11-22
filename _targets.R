@@ -17,24 +17,23 @@ source('src/validation_ephemeral.R')
 source('src/verification_flowingDays.R')
 source('src/figures_additional.R')
 source('src/figures_paper.R')
-source('src/map.R')
 source('src/validation_wtd.R')
 source('src/uncertaintyAnalysis.R')
 
 plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
-tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr', 'patchwork', 'ggsflabel', 'ggspatial', 'ggrepel', 'captioner')) #set up packages to load in. Note that tidyr is specified manually throughout to avoid conflicts with dplyr
+tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr', 'patchwork', 'ggsflabel', 'ggspatial', 'ggrepel', 'captioner')) #set up packages to load in. Some packages are manually specified throughout
 
 #############USER INPUTS-------------------
 #meta parameters
 path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
 codes_huc02 <- c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18') #HUC2 regions to get gauge data.
 lookUpTable <- readr::read_csv('data/HUC4_lookup.csv') #basin routing lookup table (manually verified)
-usgs_eph_sites <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/usgs_gages_eph.csv')) #USGS gauges that are 'ephemeral' per USGS reports. Manual QAQC done to these to identify mis-classified rivers (see ~docs/README_usgs_eph_gages.md)
+usgs_eph_sites <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/usgs_gages_eph.csv')) #USGS gauges that are 'ephemeral' per USGS reports. Manual QAQC was done to these to identify mis-classified rivers (see ~docs/README_usgs_eph_gages.md)
 
 #ephemeral mapping parameters
 threshold <- -0.01 #[m] buffer of 1cm depth to capture the free surface
-error <- 0 #[NOT USED] if you wanted to add a bit of an error tolerance to ephemeral classification
+error <- 0 #[NOT USED] if you wanted to add a bit of an error tolerance to ephemeral classification. Not used in paper results.
 
 #ephemeral mapping validation parameters
 noFlowGageThresh <- 0.05 #[percent] maximum no flow fraction for streamgauges that are considered 'certainly not ephemeral'
@@ -48,12 +47,11 @@ runoffEffScalar_med_high <- 0.18
 runoffEffScalar_real <- 0
 
 runoffMemory_real <- 4 #[dys] bulk memory parameter that represents delayed arrival of streamflow (lumped to represent all mechanisms- Hortonian, Dunnian, and/or interflow). Informed by https://doi.org/10.1029/2021WR030186
-runoffThresh_scalar <- 2.5 #[mm/dy] the calibrated value (see flowingDaysCalibrate)
 
-#New England field sites data (most other data is accessed form within function calls FYI)
+#New England field sites data (most other data is accessed from within function calls FYI)
 field_dataset <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/new_england_fieldSites.csv')) #our in situ ephemeral classifications in northeastern US
 
-#for Monte Carlo dynmaic branching
+#for Monte Carlo dynamic branching uncertainty analysis
 set.seed(546)
 
 #### SETUP STATIC BRANCHING FOR PARALLEL ROUTING WITHIN PROCESSING LEVELS-----------------------------------------------------
@@ -75,15 +73,14 @@ mapped_lvl0 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -105,15 +102,14 @@ mapped_lvl1 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), # calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), # calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 2 downstream basins
@@ -134,15 +130,14 @@ mapped_lvl2 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 3 downstream basins
@@ -163,15 +158,14 @@ mapped_lvl3 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 4 downstream basins
@@ -192,15 +186,14 @@ mapped_lvl4 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 5 downstream basins
@@ -221,15 +214,14 @@ mapped_lvl5 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 6 downstream basins
@@ -250,15 +242,14 @@ mapped_lvl6 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 7 downstream basins
@@ -279,15 +270,14 @@ mapped_lvl7 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 8 downstream basins
@@ -308,15 +298,14 @@ mapped_lvl8 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -338,15 +327,14 @@ mapped_lvl9 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -368,15 +356,14 @@ mapped_lvl10 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -398,15 +385,14 @@ mapped_lvl11 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -428,15 +414,14 @@ mapped_lvl12 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -458,15 +443,14 @@ mapped_lvl13 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -488,15 +472,14 @@ mapped_lvl14 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -518,15 +501,14 @@ mapped_lvl15 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -548,15 +530,14 @@ mapped_lvl16 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -578,15 +559,14 @@ mapped_lvl17 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -608,15 +588,14 @@ mapped_lvl18 <- tar_map(
   tar_target(snappedValidation, snapValidateToNetwork(path_to_data, validationDF, USGS_data, nhdGages, rivNetFin, huc4, noFlowGageThresh)), #setup ephemeral validation reaches
   tar_target(hydroMap, hydrographyFigureSmall(path_to_data, shapefile_fin, rivNetFin, huc4)), #build hydrography map for the basin
   tar_target(runoffEff, calcRunoffEff(path_to_data, huc4)), #runoff efficiency calculation
-      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
-      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
-      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
-      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
-      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, runoffThresh_scalar, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
-  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)),
-  tar_target(written, exportResults(rivNetFin, huc4)),
-  tar_target(map, indvRiverMaps(rivNetFin, huc4))
+      tar_target(datesFlowingDays, calcDatesFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate mean flowing month
+      tar_target(numFlowingDays, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_real, runoffMemory_real)), #calculate number of flowing days
+      tar_target(numFlowingDays_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_low, runoffMemory_real)), #calculate number of flowing days under low runoff scenario
+      tar_target(numFlowingDays_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_high, runoffMemory_real)), #calculate number of flowing days under high runoff scenario
+      tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
+      tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
+  tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -633,18 +612,18 @@ list(
   
   ##DISCHARGE MODEL
   tar_target(nhdGages, getNHDGages(path_to_data, codes_huc02)), #find gauges joined to NHD-HR a priori (used for discharge validation)
-  tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculates mean observed flow 1970-2018 per gauge to validate discharge model
+  tar_target(USGS_data, getGageData(path_to_data, nhdGages, codes_huc02)), #calculate mean observed flow 1970-2018 per gauge to validate discharge model
   tar_target(ephemeralQDataset_all, wrangleUSGSephGages(usgs_eph_sites)), #get mean annual flow for USGS ephemeral gauges to validate discharge model
   tar_target(checkUSGSephHydrographs, ephemeralityChecker(usgs_eph_sites)), #builds hydrographs for USGS 'ephemeral' gauges to aid in manual QAQC of these data
   tar_target(ephemeralQDataset, setupEphemeralQValidation(path_to_data, walnutGulch$df, ephemeralQDataset_all, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305), deployment='main'), #gather and prep Nflw data from USGS ephemeral gauges 
 
   ##VALIDATE GROUNDWATER MODEL
-  tar_target(conus_wells, getWellDepths(codes_huc02)),
-  tar_target(gauge_wtds, getGaugewtd(USGS_data)),
-  tar_target(validated_wells, join_wtd(path_to_data, conus_wells, gauge_wtds)),
+  tar_target(conus_wells, getWellDepths(codes_huc02)), #get USGS NWIS well depths and summarize to mean monthly depths
+  tar_target(gauge_wtds, getGaugewtd(USGS_data)), #get permanently flowing gauges (i.e. wtd approximates 0)
+  tar_target(validated_wells, join_wtd(path_to_data, conus_wells, gauge_wtds)), #validated model and build figure
 
   ##VALIDATE BANKFULL DEPTH MODELS
-  tar_target(validated_Hb, validateHb()),
+  tar_target(validated_Hb, validateHb()), #validate bakfull depth models using in situ bankfull depth measurements
 
   #Nflw MODEL
   tar_target(flowingFieldData, wrangleFlowingFieldData(path_to_data, ephemeralQDataset_all)), #gather and prep Nflw data from 1) field studies and 2) USGS ephemeral gauges
@@ -653,7 +632,7 @@ list(
   
   #SNAPPING PARAMETER ANALYSIS
   tar_target(compareSnappingThreshs, snappingSensitivityWrapper(c(5,10,15,20,25,30,35,40,45,50), combined_validation, ourFieldData)), #test a range of snapping thresholds on ephemeral classification accuracy
-  tar_target(scalingModel, scalingFunc(validationResults)), #calculate how many additional ephemeral orders we should have (via Horton law scaling)
+  tar_target(scalingModel, scalingFunc(validationResults)), #calculate how many additional ephemeral orders we should have (via Hortonian scaling)
   
   ####PARALLEL MODEL RUNS WITHIN EACH PROCESSING LEVEL----------------------------
   #level 0
@@ -944,13 +923,13 @@ list(
   tar_target(val_shapefile_fin, saveValShapefile(path_to_data, codes_huc02, validationResults), deployment='main'), #validation results shapefile (HUC2 level)
 
   #UNCERTAINTY ANALYSIS--------------------------------------
-  tar_target(mc_samples, seq(1,1000,1)),
+  tar_target(mc_samples, seq(1,1000,1)), #setup 1000 monte carlo runs
   tar_target(mcUncertainty_0107, runMonteCarlo('0107', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Merrimack River basin
   tar_target(mcUncertainty_1703, runMonteCarlo('1703', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Yakima River basin
   tar_target(mcUncertainty_1402, runMonteCarlo('1402', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Gunnison River basin
   tar_target(mcUncertainty_0311, runMonteCarlo('0311', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Suwanee River basin
   tar_target(mcUncertainty_1504, runMonteCarlo('1504', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Upper Gila River basin
-  tar_target(mcUncertaintyResults, uncertaintyFigures(path_to_data, shapefile_fin, mcUncertainty_0107, mcUncertainty_1402, mcUncertainty_1703, mcUncertainty_0311, mcUncertainty_1504), deployment="main"), #uncertainty figures
+  tar_target(mcUncertaintyResults, uncertaintyFigures(path_to_data, shapefile_fin, mcUncertainty_0107, mcUncertainty_1402, mcUncertainty_1703, mcUncertainty_0311, mcUncertainty_1504), deployment="main"), #uncertainty figures and numbers
 
   #GENERATE MANUSCRIPT FIGURES--------------
   tar_target(fig1, mainFigureFunction(path_to_data, shapefile_fin, rivNetFin_0107, rivNetFin_0701, rivNetFin_1407, rivNetFin_1305), deployment='main'), #fig 1
@@ -958,7 +937,7 @@ list(
   tar_target(fig3, flowingFigureFunction(path_to_data, shapefile_fin, flowingDaysValidation), deployment='main'), #fig 3
   tar_target(fig4, lengthMapFunction(path_to_data, shapefile_fin), deployment='main'), #fig 4
 
-  #BUILD SUPPLEMENTRY FIGURES
+  #BUILD SUPPLEMENTRY FIGURES (exc. MC and groundwater plots, which were built above)
   tar_target(boxplotsClassification, boxPlots_classification(val_shapefile_fin)), #snapping threshold vs. classification accuracy
   tar_target(boxPlotsSensitivity, boxPlots_sensitivity(combined_numFlowingDays, combined_numFlowingDays_low, combined_numFlowingDays_high, combined_numFlowingDays_med_low, combined_numFlowingDays_med_high), deployment='main'), #Nflw sensitivity
   tar_target(snappingSensitivityFig, snappingSensitivityFigures(compareSnappingThreshs), deployment='main'), #snapping threshold vs Horton scaling
@@ -970,7 +949,7 @@ list(
   tar_target(drainageAreaMap, areaMapFunction(path_to_data, shapefile_fin), deployment='main'), #% ephemeral drainage area map
   tar_target(walnutGulch, walnutGulchQualitative(rivNetFin_1505, path_to_data), deployment='main'), #walnut gulch additional validation figure
   tar_target(meanFlowingMonth, flowingDatesFigureFunction(path_to_data, shapefile_fin), deployment='main'), #average flowing day of the year map
-  tar_target(streamOrderPlot_by_physiographicRegion, streamOrderPlotPhysiographic(path_to_data, shapefile_fin, combined_results_by_order, combined_results), deployment='main'),
+  tar_target(streamOrderPlot_by_physiographicRegion, streamOrderPlotPhysiographic(path_to_data, shapefile_fin, combined_results_by_order, combined_results), deployment='main'), #results by stream order and physiographic region
   tar_target(comboHydrographyMaps_1, comboHydroSmalls(hydroMap_0101, hydroMap_0102, hydroMap_0103, hydroMap_0104,
                                                      hydroMap_0105, hydroMap_0106, hydroMap_0107, hydroMap_0108,
                                                      hydroMap_0109, hydroMap_0110, hydroMap_0202, hydroMap_0203,
@@ -1026,14 +1005,6 @@ list(
 
   #GENERATE SOME DOCS
   tar_render(data_guide, "docs/data_guide.Rmd", deployment='main'), #data guide
-  tar_render(README_indiana, "docs/README_indiana.Rmd", deployment='main'), #data guide
-  tar_render(README_usgs_eph_gauges, "docs/README_usgs_eph_gauges.Rmd", deployment='main'), #data guide
-
-
-
-  #For job search
-  tar_combine(combined_rivermaps, list(mapped_lvl0$map, mapped_lvl1$map, mapped_lvl2$map, mapped_lvl3$map, mapped_lvl4$map, mapped_lvl5$map,
-                                            mapped_lvl6$map, mapped_lvl7$map, mapped_lvl8$map, mapped_lvl9$map, mapped_lvl10$map, mapped_lvl11$map,
-                                            mapped_lvl12$map, mapped_lvl13$map,mapped_lvl14$map, mapped_lvl15$map, mapped_lvl16$map, mapped_lvl17$map, mapped_lvl18$map), command = list(!!!.x), deployment='main'),
-  tar_target(figMainMap, mainMapFunction(combined_rivermaps,map_0107, map_0108,map_0109,map_0110,map_0106, map_0104, map_0430, map_0202))
+  tar_render(README_indiana, "docs/README_indiana.Rmd", deployment='main'), #guide to Indiana pre-processing
+  tar_render(README_usgs_eph_gauges, "docs/README_usgs_eph_gauges.Rmd", deployment='main') #Ephemeral gauges data guide
 )

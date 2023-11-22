@@ -1,6 +1,6 @@
 ## Craig Brinkerhoff
 ## Functions to validate ephemeral classification, routing, and discharge
-## Winter 2023
+## Fall 2023
 
 
 
@@ -170,7 +170,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
   #join usgs gauges to flesh out training set
   USGS_data <- dplyr::left_join(USGS_data, nhdGages, by=c('gageID'='GageIDMA'))
-  USGS_data <- dplyr::filter(USGS_data, no_flow_fraction < noFlowGageThresh & NHDPlusID %in% nhd_df$NHDPlusID) #if average year the river is flowing > 90% of the time, it's almost certainly non-ephemeral
+  USGS_data <- dplyr::filter(USGS_data, no_flow_fraction < noFlowGageThresh & NHDPlusID %in% nhd_df$NHDPlusID) #if average year the river is flowing > x% of the time, it's almost certainly non-ephemeral
   USGS_data <- dplyr::left_join(USGS_data, nhd_df, by='NHDPlusID')
   if(nrow(USGS_data) > 0){
     USGS_data$distinction <- 'non_ephemeral'
@@ -300,7 +300,7 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 
 
 
-#' Sets up ephemeral Q validation
+#' Sets up ephemeral Q validation by bringing together all sources of ephemeral discharge data used in this study
 #'
 #' @name setupEphemeralQValidation
 #'
@@ -328,7 +328,7 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 #' @import dataRetrieval
 #' @import dplyr
 #'
-#' @return ephemeral streams' in situ mean annual flow paired with model reach and model discharge
+#' @return df with ephemeral streams' in situ mean annual flow paired with model reach and model discharge
 setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDischarge, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305){
   ephemeralUSGSDischarge <- sf::st_as_sf(ephemeralUSGSDischarge, coords=c('lon', 'lat'))
   
@@ -360,7 +360,8 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
     out <- rbind(out, temp)
   }
   
-  #keep the one with the best matching drainage area (must also be within 20% of drainage area agreement)
+  #QAQC that the matched in situ data nd guages are actually in the right place
+    #keep the pair with the best matching drainage area between model and reported in situ drainage area (must also be within 20% of drainage area agreement regardless)
   out <- dplyr::group_by(out, gageID) %>%
     dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
     dplyr::filter(error < 0.20) %>%
@@ -376,7 +377,7 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
 
 
 
-#' Verifies our routing model can be anticipated by network theory (Tokunaga ratios). Ignores basins with foreign streams out of necessity...
+#' Verifies our routing model can be anticipated by network theory (Tokunaga ratios) (doesn't do basins with foreign streams out of necessity)
 #'
 #' @name tokunaga_eph
 #'

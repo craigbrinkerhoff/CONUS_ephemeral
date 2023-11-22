@@ -1,5 +1,5 @@
 ## Craig Brinkerhoff
-## Winter 2023
+## Fall 2023
 ## Functions to validate ephemeral flow frequency model
 
 
@@ -22,7 +22,7 @@ wrangleUSGSephGages <- function(other_sites){
   #loop through gauges and calculate Nflw from observed record
   out <- data.frame()
   for(i in other_sites$short_name){
-    gageQ <- dataRetrieval::readNWISdv(siteNumbers = i, #check if site mets our date requirements
+    gageQ <- dataRetrieval::readNWISdv(siteNumbers = i, #check if site mets our date requirements and are in our a priori site list
                         parameterCd = '00060') #discharge
     
     #get mean annual flow
@@ -34,7 +34,7 @@ wrangleUSGSephGages <- function(other_sites){
     Q_MA <- mean(gageQ$Q_cms, na.rm=T) #mean annual
     numFlow <- (sum(gageQ$Q_cms > 0, na.rm=T)/nrow(gageQ))*365
     
-    temp <- data.frame('gageID'=i, #take first row
+    temp <- data.frame('gageID'=i, #take first row of duplicates
                        'meas_runoff_m3_s'=Q_MA,
                        'num_flowing_dys'=numFlow,
                        'period_of_record_yrs'=nrow(gageQ)/365)
@@ -44,7 +44,7 @@ wrangleUSGSephGages <- function(other_sites){
 
   #prep output
   out <- out %>%
-    dplyr::left_join(other_sites, by=c('gageID'='short_name')) %>% #to get the gauge drainage area
+    dplyr::left_join(other_sites, by=c('gageID'='short_name')) %>% #get the gauge drainage area
     dplyr::select(c('gageID', 'huc4', 'reference','meas_runoff_m3_s', 'drainageArea_km2', 'num_flowing_dys', 'period_of_record_yrs', 'lon', 'lat')) %>%
     dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined
                                               '06313700',
@@ -89,15 +89,15 @@ wrangleUSGSephGages <- function(other_sites){
 #'    Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
 #'    Mohave and Yuma Basins, AZ: https://doi.org/10.1029/2018WR023714 (2-3 years data)
 #'    Reynold's Creek, ID: https://doi.org/10.1029/2001WR000413 (29 years of data) Ephemeral site identification within catchment uses https://doi.org/10.1029/2001WR000420
-#'    Santa Rita Basin, AZ: doi:10.1029/2006WR005733 (46 years of data)
-#'    Walnut Gulch Basin, AZ: doi:10.1029/2006WR005733 (45 years of data)
+#'    Santa Rita Basin, AZ: https://doi.org/10.1029/2006WR005733 (46 years of data)
+#'    Walnut Gulch Basin, AZ: https://doi.org/10.1029/2006WR005733 (45 years of data)
 #'    Montoyas Catchment near Albuquerque, NM:  https://doi.org/10.1016/j.ejrh.2022.101089 (6 years of data)
 #'    More Arizona data for various arid catchments https://doi.org/10.1016/j.jaridenv.2016.12.004 (2 years of data). This has additional data for Santa Rita basin that gets averaged into the Santa Rita dataset
 #'    Geulph Ontario data  https://doi.org/10.1002/hyp.10136 (1/3 year of data)
 #'    Gage data from Wyoming, Colorado, and New Mexico per ephemeral gages from USGS reports (data for a few years in the 1970s)
 #'
 #' @param path_to_data: data repo path directory
-#' @param ephemeralQDataset: df of USGS ephemeral streamgauges' in situ Nflw (to be joined to the other in situ data here)
+#' @param ephemeralQDataset: df of USGS ephemeral streamgauges' in situ Nflw
 #'
 #' @import readr
 #' @import dplyr
@@ -121,7 +121,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   colnames(mohaveYuma) <- c('site', 'drainage_area_km2', 'elevation_m', 'period_of_record', 'num_flowing_events', 'ma_num_flowing_events', 'reference')
   mohaveYuma$watershed <- substr(mohaveYuma$site, 1, 1)
   mohaveYuma$watershed <- ifelse(mohaveYuma$watershed == 'M', 'mohave', 'yuma')
-  mohaveYuma$period_of_record_yrs <- c(3, 2, 4, 2, 3, 1, 3, 2, 4, 1, 4, 2, 4, 1, 2, 4, 3, 2)
+  mohaveYuma$period_of_record_yrs <- c(3, 2, 4, 2, 3, 1, 3, 2, 4, 1, 4, 2, 4, 1, 2, 4, 3, 2) #(inputted here manually out of necessity)
   mohaveYuma$num_flowing_days <- ifelse(mohaveYuma$num_flowing_events < 1, 1, mohaveYuma$num_flowing_events)
   mohaveYuma$ma_num_flowing_days <- mohaveYuma$num_flowing_days/(mohaveYuma$period_of_record_yrs)
   mohaveYuma <- mohaveYuma %>%
@@ -140,7 +140,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                     num_flowing_days = sum(runoff_mm > runoff_thresh),
                     watershed=first(watershed),
                     reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #see source reference for these numbers
+    dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #see source reference for these numbers (inputted here manually out of necessity)
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='@stoneLongtermRunoffDatabase2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
@@ -158,7 +158,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               num_flowing_days = sum(runoff_mm > runoff_thresh),
               watershed=first(watershed),
               reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #see source reference for these numbers
+    dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #see source reference for these numbers (inputted here manually out of necessity)
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='@stoneLongtermRunoffDatabase2008') %>%
     dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
@@ -189,7 +189,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 
 
 
-  #wrangling Kentucky Robinson Forest (https://doi.org/10.1002/ecs2.2654)-----------
+  #wrangling Kentucky Robinson Forest (https://doi.org/10.1002/ecs2.2654)-------------------------
   kentucky$period_of_record_yrs <- kentucky$period_of_record_dys / 365
   kentucky$num_flowing_events <- kentucky$perc_record_w_flow*365
   kentucky$ma_num_flowing_days <- kentucky$num_flowing_events + 2 #field data in catchment only reports 1 or 2 flow events in the non-sampled months (see paper https://doi.org/10.1899/09-060.1)
@@ -204,7 +204,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                            'site'='a',
                            'period_of_record_yrs'=1,
                            'drainage_area_km2'=3.3*0.01,
-                           'ma_num_flowing_days'=(365*0.44), #see paper main text for these numbers
+                           'ma_num_flowing_days'=(365*0.44), #(inputted here manually out of necessity)
                            'reference'='@zimmerBidirectionalStreamGroundwater2017')
 
 
@@ -214,7 +214,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                          'site'='a',
                          'period_of_record_yrs'=7, #2008-2014
                          'drainage_area_km2'=142,
-                         'ma_num_flowing_days'=mean(c(2,0,1,0,0,5,2)), #See paper Table 1 for runoff events per year
+                         'ma_num_flowing_days'=mean(c(2,0,1,0,0,5,2)), #See paper Table 1 for runoff events per year (inputted here manually out of necessity)
                          'reference'='@schoenerImpactUrbanizationStormwater2022')
 
 
@@ -237,13 +237,13 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 
 
 
-  #add USGS ephemeral gage data (already calculated and red into function)-----------------------------
+  #add USGS ephemeral gage data (already calculated and read into function)-----------------------------
    ephemeralQDataset <- as.data.frame(ephemeralQDataset)
    ephemeralQDataset <- dplyr::filter(ephemeralQDataset, type == 'eph')#remove the ambiguous 'ephemeral/intermittent' rivers flagged in the setupEphemeralQValidation function and manually QAQC'd
   
 
 
-  #just pass along since I already got mean annual Nflw per site (in setupEphemeralQValidation function)
+  #just pass along since I already have mean annual Nflw per site (in setupEphemeralQValidation function)
   eph_gages <- data.frame('watershed'=ephemeralQDataset$huc4,
                           'site'=ephemeralQDataset$gageID,
                           'period_of_record_yrs'=ephemeralQDataset$period_of_record_yrs,
@@ -252,7 +252,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                           'reference'=ephemeralQDataset$reference)
 
 
-  #bring it allllllllll together--------------------------------------
+  #bring all these data together into single df--------------------------------------
   results_all <- rbind(walnutGulch, santaRita, reynoldsCreek, mohaveYuma, kentucky, dukeForest, more_arizona, montoyas, ontario, eph_gages)
 
   #wrangle into uniform format
@@ -264,8 +264,8 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                      drainage_area_km2 = mean(drainage_area_km2),
                      n_sites=n(),
                      reference=first(reference)) %>%
-    #Here we assign approximate lat/lons for the basins (so these can be mapped later in the paper figures)
-    #Unfortunately, these need to be hardcoded because I had to find most of these sites manually, but not all of them....
+    #Here we assign approximate lat/lons for the basins (so these can be mapped in the paper figures)
+    #Unfortunately, most of these need to be hardcoded because I had to find most of the sites manually
   dplyr::mutate(lat=c(43.436667,35.8933527,32.31537144,32.5886111,39.783585,36.64778269,36.1027488,35.24500556,33.69421054,33.72920456,36.00475278,36.021599, 43.54667, 32.711123, 31.540278, 33.3333333, 35.228431, 43.187, 37.47305556, 31.83341800, 31.66666667, 33.166667), #pulled from associated papers (general coords- Geulph long is moved ~15km east so it fits in model basin 0427)
                 long=c(-106.419722,-107.4167143,-106.7505587,-104.4213889,-108.189805,-108.1256268,-115.2077774,-115.2989889,-111.541802,-112.1198755,-115.6437917,-78.985034,-80.059, -112.831066, -110.334113, -114.50000000, -106.840627, -116.774, -83.14333333, -110.85286400 , -110.00000000, -114.50000000))
             #alphabetical list for data the lat/longs that are manually added
@@ -309,7 +309,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 #' @param path_to_data: data repo path directory
 #' @param codes_huc02: all HUC2 basin IDs
 #' @param combined_results: all HUC4 basin model results
-#' @param combined_runoffEff: df of basin-average runoff efficiencies
+#' @param combined_runoffEff: df of basin-average runoff coefficients
 #'
 #' @import sf
 #' @import dplyr
@@ -343,7 +343,7 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
 
 
 
-#' Calibrates an operational runoff threshold (i_min)
+#' Calibrates an operational runoff threshold using all of the in situ data (i_min in paper)
 #'
 #' @name flowingValidateSensitivityWrapper
 #'
@@ -352,7 +352,7 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
 #' @param runoffMemory_real: runoff memory parameter
 #' @param runoff_threshs: runoff thresholds to be tested
 #' @param path_to_data: data repo path directory
-#' @param combined_runoffEff: df of basin-average runoff efficiencies
+#' @param combined_runoffEff: df of basin-average runoff coefficients
 #'
 #' @import Metrics
 #' @import dplyr
@@ -378,12 +378,15 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
       rmse <- Metrics::rmse(temp$num_flowing_dys, temp$n_flw_d)
 
       temp2 <- data.frame('thresh'=i,
-                          'r2'=r2, na.rm=T,
-                          'mae'=mae, na.rm=T,
-                          'rmse'=rmse, na.rm=T)
+                          'r2'=r2,
+                          'mae'=mae,
+                          'rmse'=rmse)
 
       out <- rbind(out, temp2)
     }
 
-    return(out)
+    out2 <- list('thresh'=out[which.min(out$mae),]$thresh, #[mm/dy]
+                'df'=out) #all results
+
+    return(out2)
 }

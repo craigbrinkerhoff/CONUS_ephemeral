@@ -217,4 +217,4 @@ dependencies:
   - zeromq=4.3.4=h2531618_0
   - zlib=1.2.12=h7f8727e_2
   - zstd=1.5.2=ha4553b6_0
-prefix: /work/pi_cjgleason_umass_edu/.conda/envs/env-CONUS_ephemeral
+prefix: /home/cbrinkerhoff_umass_edu/.conda/envs/env-CONUS_ephemeral

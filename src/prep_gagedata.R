@@ -1,5 +1,5 @@
 ## Craig Brinkerhoff
-## Winter 2023
+## Fall 2023
 ## Functions for getting mean annual flow and flow frequency at USGS streamgauges along the NHD
 
 
@@ -40,6 +40,7 @@ getNHDGages <- function(path_to_data, codes_huc02){
     assessmentDF <- rbind(assessmentDF, temp)
   }
 
+  #convert to more useful units
   assessmentDF$QBMA <- assessmentDF$QBMA * 0.0283 #cfs to cms
   assessmentDF$QEMA <- assessmentDF$QEMA * 0.0283 #cfs to cms
   assessmentDF$GageQMA <- assessmentDF$GageQMA * 0.0283 #cfs to cms
@@ -69,8 +70,8 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
   for(m in codes_huc02){
     #NOTE::::: will be longer than the final sites b/c some of them don't have 20 yrs of data  within the bounds.
         #This function only finds gauges that intersect our time domain, but not necessarily 20 yrs of data within the domain.
-        #Further, some gauges have errors in data or are missing data and we throw them out later
-    if(!file.exists(paste0('cache/training/siteNos_', m, '.rds'))){ #only do HUC2 if it hasn't been done yet
+        #Further, some gauges have errors in data or are missing data. We throw them all of these cases out later
+    if(!file.exists(paste0('cache/training/siteNos_', m, '.rds'))){ #only run a HUC2 if it hasn't been ran yet
       #get usgs gages by
       sites_full <- whatNWISdata(huc=m,
                                  parameterCd ='00060',
@@ -130,7 +131,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
 
     write_rds(results, paste0('cache/training/trainingData_', m, '.rds'))
 
-    Sys.sleep(60) #wait 1 minute so that USGS doesn't get angry :)
+    Sys.sleep(60) #wait 1 minute so that USGS doesn't get pinged up the wazoo :)
    }
   }
 

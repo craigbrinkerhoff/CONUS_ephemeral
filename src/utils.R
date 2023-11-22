@@ -1,5 +1,5 @@
 ## Utility functions
-## Winter 2023
+## Fall 2023
 ## Craig Brinkerhoff
 
 
@@ -11,7 +11,7 @@
 #'
 #' @param wtd: vector of water table depths along a stream reach [m]
 #'
-#' @return out: summary stats for wtd pixels along a reach [m]
+#' @return summary stats for wtd pixels along a reach [m]
 summariseWTD <- function(wtd){
   median <- median(wtd, na.rm=T)
   mean <- mean(wtd, na.rm=T)
@@ -46,49 +46,6 @@ depth_func <- function(waterbody, lakeVol, lakeArea, physio_region, drainageArea
     output <- lakeVol/lakeArea #mean lake depth [m]
   }
   return(output)
-}
-
-
-
-
-
-#' Adds 'memory days' to number of flowing days timeseries given a memory parameter
-#' 
-#' @note This function specifically avoids double counting flowing days, by only adding memory flowing days if the day is not already tagged as flowing
-#'
-#' @name addingRunoffMemory
-#'
-#' @param precip: flowing on/off binary timeseries as a vector [0/1]
-#' @param memory: number of days memory that runoff is still being generated from a rain event [days]
-#' @param thresh: runoff threshold (expressed as precip using basin runoff efficiency) [m]
-#'
-#' @return updated flowing on/off binary timeseries (with lagged days now flagged as flowing too)
-addingRunoffMemory <- function(precip, memory, thresh){
-  precip <- precip[is.na(precip)==0]
-  if(length(precip)==0){return(NA)}
-  
-  #set up binary vectors
-  precip <- precip >= thresh
-  orig <- precip
-
-  if(memory == 0){
-    out <- sum(precip)
-  }
-  else{
-    #propagate memory for days following runoff events
-    for(i in 1:length(precip)){
-      if(precip[i] == 1 & orig[i] == 1){
-        for(k in seq(1+i,memory+i,1)){
-          precip[k] <- 1
-        }
-      }
-    }
-
-    #sum up flowing days
-    out <- sum(precip)
-  }
-
-  return(out)
 }
 
 
@@ -136,11 +93,11 @@ fixGeometries <- function(rivnet){
 
 
 
-#' Plots and saves mean annual hydrographs so we can manually verify that they are ephemeral and not intermittent
+#' Plots and saves mean annual hydrographs so we can manually verify whether they are ephemeral and not intermittent
 #'
 #' @name ephemeralityChecker
 #'
-#' @param other_sites: df with all the gauge IDs
+#' @param other_sites: df with all of the gauge IDs
 #' 
 #' @import ggplot2
 #' @import dplyr
@@ -156,16 +113,17 @@ ephemeralityChecker <- function(other_sites) {
                         parameterCd = '00060') #discharge
     
     #get mean annual flow
-    if(nrow(gageQ)==0){next} #some of these gauges don't have their data online...
+    if(nrow(gageQ)==0){next} #some of these gauges are empty because data isn't online....
     
     gageQ <- gageQ %>% 
-      dplyr::mutate(Q_cms = mean_va*0.0283)#cfs to cms with zero flow rounding protocol following:  https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794
+      dplyr::mutate(Q_cms = mean_va*0.0283)#cfs to cms
     
     gageQ$index <- 1:nrow(gageQ)
     
     end <- gageQ[1,]$end_yr
     begin <- gageQ[1,]$begin_yr
 
+    #PLOT-----------------------------------------
     plot <- ggplot(gageQ, aes(x=index, y=Q_cms)) +
       geom_line() +
       ggtitle(paste0(begin, '-', end)) +
@@ -185,7 +143,8 @@ ephemeralityChecker <- function(other_sites) {
 #'
 #' @name exportResults
 #'
-#' @param other_sites: df with all the gauge IDs
+#' @param rivNetFin: final model results table, with results per reach
+#' @param huc4: 4 digit basin ID
 #' 
 #' @import readr
 #' @import dplyr
@@ -193,7 +152,7 @@ ephemeralityChecker <- function(other_sites) {
 #' @return writes model results to file
 exportResults <- function(rivNetFin, huc4){
 
-  rivMetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'percQEph_reach'))
+  rivNetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'percQEph_reach'))
 
   readr::write_csv(rivNetFin, paste0('cache/results_written/results_', huc4, '.csv'))
 
@@ -204,7 +163,7 @@ exportResults <- function(rivNetFin, huc4){
 
 
 
-#' Build and validate the Hb~DA models using their paper's source data
+#' Build and validate the Hb~DA models using their paper's source data ( https://doi.org/10.1111/jawr.12282)
 #'
 #' @name validateHb
 #' 
@@ -225,6 +184,7 @@ validateHb <- function(){
 
   division <- toupper(sort(unique(dataset$DIVISION)))
 
+  #build models, grouped by physiographic region
   models <- dplyr::group_by(dataset, DIVISION) %>%
     dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>%
     dplyr::summarise(a = 10^(model$coef[1]),

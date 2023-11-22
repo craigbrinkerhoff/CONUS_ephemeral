@@ -1,5 +1,5 @@
 ## Craig Brinkerhoff
-## Winter 2023
+## Fall 2023
 ## Functions for supplementary figures.
 
 
@@ -20,7 +20,6 @@
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return combined Q validation df (written to file)
@@ -64,10 +63,10 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
                          limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(.2, 0.125),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -77,7 +76,7 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   
   
   #####TOKUNAGA ROUTING VERIFICATION---------------------------------------------------
-  #don't plot the great lakes (or basins with foreign streams) because the network scaling makes no sense
+  #don't plot the great lakes (or basins with foreign streams) because the network scaling makes no sense for those basins (this is why n points < 205)
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
@@ -111,9 +110,6 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   colnames(ephemeralQDataset) <- c('NHDPlusID', 'huc4', 'Q_MA', 'drainageArea_km2', 'QBMA', 'num_flowing_dys','ToTDASqKm', 'gageID', 'errorFlag')
   ephemeralQDataset <- dplyr::select(ephemeralQDataset, c('Q_MA', 'QBMA')) %>%
     dplyr::mutate(type = 'Ephemeral/Intermittent')
-
-  #now make plots!
-  theme_set(theme_classic())
   
   #add observed mean annual Q (1970-2018 calculated using gauge records) to the NHD-HR reaches for Q validation
   qma <- USGS_data
@@ -121,7 +117,7 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   assessmentDF <- dplyr::left_join(nhdGages, qma, by=c('GageIDMA' = 'gageID'))
   
   assessmentDF <- tidyr::drop_na(assessmentDF) %>%
-    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #distinction for non-perennial rivers: minimum 5 no-flow days a year
+    dplyr::mutate(type = ifelse(no_flow_fraction >= 5/365, 'Ephemeral/Intermittent', 'Perennial')) %>% #distinction for non-perennial rivers: minimum 5 no-flow days a year: 10.1088/1748-9326/ac14ec
     dplyr::select('Q_MA', 'QBMA', 'type')
   
   #join two datasets together
@@ -176,7 +172,7 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
 
 
 
-#' create stream order results figure (fig 2)
+#' create results per stream order per physiographic region figure
 #'
 #' @name streamOrderPlotPhysiographic
 #'
@@ -187,7 +183,6 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
 #'
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
@@ -195,10 +190,11 @@ streamOrderPlotPhysiographic <- function(path_to_data, shapefile, combined_resul
   theme_set(theme_classic())
   sf::sf_use_s2(FALSE)
 
-  #get physiographic regions
+  #get IDs
   combined_results_by_order$huc2 <- substr(combined_results_by_order$method, 18, 19)
   combined_results_by_order$huc4 <- substr(combined_results_by_order$method, 18, 21)
 
+  #get physiographic regions
   regions <- sf::st_read(paste0(path_to_data, '/other_shapefiles/physio.shp')) #physiographic regions
   
   regions <- fixGeometries(regions)
@@ -318,7 +314,6 @@ streamOrderPlotPhysiographic <- function(path_to_data, shapefile, combined_resul
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return main model validation figure (written to file)
@@ -360,10 +355,10 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
                          limits=c(0,1),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(.2, 0.125),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -381,10 +376,10 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
                          breaks=c(48,300,600,973),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='C')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(0.2, 0.125),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -416,7 +411,6 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #' @import patchwork
 #'
 #' @return main model validation figure (written to file)
@@ -455,14 +449,14 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
             size=1.25,
             alpha=0)+
     scale_fill_gradientn(name='Ephemeral Classification Sensitivity',
-                         colors =c("#d73027", 'white',"#4575b4"), #ffffbf
+                         colors =c("#d73027", 'white',"#4575b4"),
                          limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(0.2, 0.125),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -475,14 +469,14 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
     geom_sf(aes(fill=basinSpecificity), color='black', size=0.3) +
     geom_sf(data=states, color='black', size=1.5, alpha=0)+
     scale_fill_gradientn(name='Ephemeral Classification Specificity',
-                         colors =c("#d73027", 'white', "#4575b4"), #ffffbf
+                         colors =c("#d73027", 'white', "#4575b4"),
                          limits=c(0,100),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='B')+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = c(0.2, 0.125),
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 18),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -504,7 +498,7 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
 
 
 
-#' Makes boxplots summarizing classification results
+#' Makes boxplots figure that summarizes classification results
 #'
 #' @name boxPlots_classification
 #'
@@ -519,8 +513,10 @@ boxPlots_classification <- function(val_shapefile_fin){
 
   df <- val_shapefile_fin$shapefile
 
-  #discharge
+  #prep for plot
   forPlot <- tidyr::gather(df, key=key, value=value, c('basinAccuracy', 'basinTSS', 'basinSensitivity', 'basinSpecificity'))
+
+  #PLOT----------------------------------------------------
   boxplots <- ggplot(forPlot, aes(x=key, y=value, fill=key)) +
     geom_boxplot(color='black', size=1.25) +
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
@@ -574,6 +570,7 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
   forPlot$key <- as.factor(forPlot$key)
   levels(forPlot$key) <- c('High runoff 1','High runoff 2', 'Model', 'Low runoff 2', 'Low runoff 1')
 
+  #PLOT-------------------------------------
   boxplotsSens <- ggplot(forPlot, aes(x=key, y=value, fill=key)) +
     geom_boxplot(color='black', size=1.25) +
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
@@ -651,16 +648,17 @@ snappingSensitivityFigures <- function(out){
 #' @param calibResults: df of runoff threshold calibration results
 #'
 #' @import ggplot2
-#' @import patchwork
 #'
 #' @return ggplot showing calibration (written to file)
 runoffThreshCalibPlot <- function(calibResults){
   theme_set(theme_classic())
+
+  calibResults <- calibResults$df
   
   calibResults$r2 <- calibResults$r2 * 100
   forPlot <- tidyr::gather(calibResults, key=key, value=value, c('r2', 'mae', 'rmse'))
   
-  
+  #PLOT-----------------------------------------------
   plot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
     geom_line(linetype='dashed', size=1.2) +
     geom_point(size=8) +
@@ -684,16 +682,17 @@ runoffThreshCalibPlot <- function(calibResults){
 
 
 
-#' create figure for Horton scaling model
+#' create figure for Horton scaling results
 #'
 #' @name buildScalingModelFig
 #'
-#' @param scalingModel: Horton law ephemeral scaling model object
+#' @param scalingModel: Horton law ephemeral scaling model/results object
 #'
 #' @return figure of Horton scaling model (written to file)
 buildScalingModelFig <- function(scalingModel){
   theme_set(theme_classic())
   
+  #PREP---------------------------------------------------
   scalingModel$ephMinOrder <- round(scalingModel$ephMinOrder,0)
   
   df <- scalingModel$df
@@ -704,6 +703,7 @@ buildScalingModelFig <- function(scalingModel){
                     'label'='Field data off hydrography')
   df <- rbind(df, df2)
   
+  #PLOT-------------------------------------
   plot <- ggplot(df, aes(x=StreamOrde-1, y=n, color=label)) +
     geom_point(size=10)+
     scale_x_continuous(limits = c(0, 6), breaks = c(0,1,2,3,4,5,6)) +
@@ -736,9 +736,8 @@ buildScalingModelFig <- function(scalingModel){
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
 #'
-#' @return land use results figure (written to file)
+#' @return ephemeral contributing drainage area figure (written to file)
 areaMapFunction <- function(path_to_data, shapefile_fin) {
   theme_set(theme_classic())
   
@@ -767,8 +766,8 @@ areaMapFunction <- function(path_to_data, shapefile_fin) {
     xlab('% ephemeral drainage area')+
     ylab('Probability')+
     theme(axis.title = element_text(size=20),
-          axis.text = element_text(family="Futura-Medium", size=18))+ #axis text settings
-    theme(legend.position = 'none') #legend position settings
+          axis.text = element_text(family="Futura-Medium", size=18))+
+    theme(legend.position = 'none')
 
   #MAIN MAP-------------------------------------------------
   results_map <- ggplot(results) +
@@ -796,7 +795,7 @@ areaMapFunction <- function(path_to_data, shapefile_fin) {
     xlab('')+
     ylab('')
   
-  results_map <- results_map + inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
+  results_map <- results_map + patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ggsave('cache/drainageAreaMap.jpg', results_map, width=20, height=15)
   return('see cache/drainageAreaMap.jpg')
@@ -819,8 +818,10 @@ areaMapFunction <- function(path_to_data, shapefile_fin) {
 #' @import ggplot2
 #' @import patchwork
 #' @import dplyr
+#' @import readr
+#' @import tidyr
 #'
-#' @return validation plots of Walnut gulch hydrography and discharge model (written to file)
+#' @return Walnut gulch validation of hydrography and discharge models (written to file)
 walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   theme_set(theme_classic())
   
@@ -929,9 +930,9 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
 
 
 
-#' create ephemeral flow frequency paper figure (fig 3)
+#' create map of mean flowing month for ephemeral streams (per model)
 #'
-#' @name flowingFigureFunction
+#' @name flowingDatesFigureFunction
 #'
 #' @param path_to_data: data repo directory path
 #' @param shapefile_fin: final sf object with model results
@@ -939,8 +940,6 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
-#' @import patchwork
 #'
 #' @return flowing days figure (also writes figure to file)
 flowingDatesFigureFunction <- function(path_to_data, shapefile_fin) {
@@ -986,10 +985,10 @@ flowingDatesFigureFunction <- function(path_to_data, shapefile_fin) {
             color='black',
             size=1.0,
             alpha=0)+
-    theme(axis.text = element_text(family="Futura-Medium", size=20))+ #axis text settings
+    theme(axis.text = element_text(family="Futura-Medium", size=20))+
     theme(legend.position = 'bottom',
-          legend.key.size = unit(2, 'cm'))+ #legend position settings
-    theme(text = element_text(family = "Futura-Medium"), #legend text settings
+          legend.key.size = unit(2, 'cm'))+
+    theme(text = element_text(family = "Futura-Medium"),
           legend.title = element_text(face = "bold", size = 20),
           legend.text = element_text(family = "Futura-Medium", size = 18),
           plot.tag = element_text(size=26,
@@ -1009,11 +1008,11 @@ flowingDatesFigureFunction <- function(path_to_data, shapefile_fin) {
 
 
 
-#' Create ephemeral hydrography map per basin
+#' Create ephemeral hydrography map per basin (small maps for later combination plots)
 #'
 #' @name hydrographyFigureSmall
 #'
-#' @param path_to_data: data repo directorypath
+#' @param path_to_data: data repo directory path
 #' @param shapefile_fin: sf object of final model results
 #' @param net_results: river network results for basin
 #' @param huc4: huc4 basin id 
@@ -1021,7 +1020,7 @@ flowingDatesFigureFunction <- function(path_to_data, shapefile_fin) {
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
-#' @import cowplot
+#' @import stringr
 #'
 #' @return ggplot object of hydrography map
 hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc4){
@@ -1046,7 +1045,7 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
   net$perenniality <- ifelse(net$perenniality == 'foreign', 'non_ephemeral', net$perenniality)
   
   #make plot name that is line-aware using stringr
-  exported_number <- signif(exported_abs*86400*365*1e-9,2)#ifelse(round(exported_abs*86400*365*1e-9,1) == 0, signif(exported_abs*86400*365*1e-9,2), round(exported_abs*86400*365*1e-9,1)) #round using significant digits if less than 0 km3/yr
+  exported_number <- signif(exported_abs*86400*365*1e-9,2)
   plotName <- paste0(name,': ', exported_number, ' km3/yr (', round(exported_perc*100,0), '%)')
   plotName <- stringr::str_wrap(plotName, 20) #wrap to twenty characters, seems to fit nicely
 
@@ -1079,7 +1078,7 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
 
 
 
-#' combines 16 hydrography ggplots into single patchwork plot and write to file
+#' combines 16 hydrography ggplot objects into single patchwork plot and write to file
 #'
 #' @name comboHydroSmalls
 #'
@@ -1104,6 +1103,7 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
+#' @import patchwork
 #' @import cowplot
 #'
 #' @return writes patchwork plot to file
@@ -1156,7 +1156,7 @@ comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
 
 
 
-#' Combines 13 hydrography ggplots into single patchwork plot and writes to file
+#' Combines 13 hydrography ggplot objects into single patchwork plot and writes to file
 #'
 #' @name comboHydroSmalls
 #'
@@ -1178,6 +1178,7 @@ comboHydroSmalls <- function(hydroMap_1, hydroMap_2, hydroMap_3, hydroMap_4,
 #' @import sf
 #' @import dplyr
 #' @import ggplot2
+#' @import patchwork
 #' @import cowplot
 #'
 #' @return writes patchwork plot to file

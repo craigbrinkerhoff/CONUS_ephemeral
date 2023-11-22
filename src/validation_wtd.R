@@ -1,6 +1,6 @@
 ## Craig Brinkerhoff
 ## Fall 2023
-## Using NWIS sites to validate our groundwater model
+## Functions that use USGS NWIS sites to validate our groundwater model
 
 
 
@@ -27,6 +27,7 @@ getWellDepths <- function(codes_huc2){
                               startDate = '1970-10-01', #water year
                               endDate = '2018-09-30')
 
+        #filter for at least 20 years of data
         sites <- dplyr::filter(sites, count_nu/365 >= 20) %>%
             dplyr::select(c('site_no', 'dec_lat_va', 'dec_long_va', 'count_nu'))
 
@@ -42,7 +43,6 @@ getWellDepths <- function(codes_huc2){
             if(!('month_nu' %in% colnames(dtw))){next}
             
             dtw <- dtw %>%
-               # dplyr::filter(mean_va > 0) %>% #only keep well depths less than the land surface... sometimes there are negatives which I believe are errors, i.e. implies the water level is above the well itself...
                 dplyr::group_by(month_nu) %>%
                 dplyr::summarise(dtw_ft = mean(mean_va, na.rm=T)) %>%
                 dplyr::mutate(dtw_m = dtw_ft * 0.3048) %>% #ft to meter
@@ -59,7 +59,7 @@ getWellDepths <- function(codes_huc2){
             out <- rbind(out, temp)
         }
         readr::write_rds(out, 'cache/training/groundwater_well_depths.rds')        
-        Sys.sleep(60) #wait 1 minute so that USGS doesn't get angry :)
+        Sys.sleep(60) #wait 1 minute so that USGS doesn't get pinged up the wazoo :)
     }
     readr::write_rds(out, 'cache/training/groundwater_well_depths.rds')
 
@@ -96,7 +96,7 @@ getGaugewtd <- function(USGS_data){
         if(nrow(sites)==0){next} #if less than 20 years of data
         
         sites$month <- NA
-        sites$dtw_m <- 0 #stream gauges whould have a water table depth of nothing. SUrface water baby!
+        sites$dtw_m <- 0 #stream gauges in perennial rivers have a water table depth of approximately zero
 
         colnames(sites) <- c('site_no', 'lat', 'long', 'month', 'dtw_m')
         
@@ -110,12 +110,11 @@ getGaugewtd <- function(USGS_data){
 
 
 
-#' Extract 'groundwater depths' from USGS streamgauges in perrenial rivers
+#' Sptially extracts groundwater model values at each of the in situ well depths
 #'
 #' @name join_wtd
 #'
 #' @param path_to_data: data repo path directory
-#' @param USGS_data: huc2 regional codes to get NWIS wells
 #' @param conus_well_depths: df of well depths
 #' @param gauge_wtds: df of perennial river groundwater depths
 #' 
@@ -126,7 +125,7 @@ getGaugewtd <- function(USGS_data){
 #'
 #' @return df of mean monthly groundwater depths at perennial rivers
 join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
-    #these have already been filtered for only gages that flow 100% of the time, i.e. perennial rivers where the water table will be 0m year round (so just assign the 0m to all 12 months)
+    #these have already been filtered for only gages that flow 100% of the time, i.e. perennial rivers where the water table will be ~0m year round (so just assign the 0m to all 12 months)
     gauge_wtds$month <- 1
 
     gauge_wtds_2 <- gauge_wtds
@@ -162,12 +161,13 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     gauge_wtds_12 <- gauge_wtds
     gauge_wtds_12$month <- 12
 
+    #bring all in situ data together
     for_shape <- rbind(conus_well_depths, gauge_wtds, gauge_wtds_2, gauge_wtds_3, gauge_wtds_4, gauge_wtds_5, gauge_wtds_6, gauge_wtds_7, gauge_wtds_8, gauge_wtds_9, gauge_wtds_10, gauge_wtds_11, gauge_wtds_12)
 
-    #make wells shapefile
+    #make shapefile of wells and their depths
     shape <- sf::st_as_sf(for_shape, coords = c("long","lat"), crs = st_crs(4326))
 
-    #read in the model
+    #read in the groundwater model
     wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))   #monthly averages of hourly model runs for 2004-2014 at 1km resolution
 
     #extract mean monthly water table depths at each well point (by month)
@@ -243,15 +243,17 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     wtd_model_12 <- terra::extract(wtd$WTD_12, shape_12)
     wtd_12$wtd_model_m <- as.numeric(wtd_model_12$WTD_12 * -1)
 
+    #bring model moths togheter
     out <- rbind(wtd_01, wtd_02, wtd_03, wtd_04, wtd_05, wtd_06, wtd_07, wtd_08, wtd_09, wtd_10, wtd_11, wtd_12)
 
     out$log10_dtw_m <- ifelse(out$dtw_m < 1e-10, 0, log10(out$dtw_m))
     out$log10_wtd_model_m <- ifelse(out$wtd_model_m < 1e-10, 0, log10(out$wtd_model_m)) #force this boundary condition to be zero...
 
+    #claculate error between model and reality
     out$residual <- (out$log10_wtd_model_m - out$log10_dtw_m)
    
 
-    #MAKE RESIDUAL PLOT
+    #MAKE VALIDATION PLOT------------------------------------
     theme_set(theme_classic())
 
     gw_validation <- ggplot(out, aes(x=residual)) +
@@ -283,7 +285,7 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
                                                     'Hawaii'))) #remove non CONUS states/territories
     states <- sf::st_union(states)
 
-    #actual plot
+    #make inset map of well locations----------------------------------
     forMap <- dplyr::filter(shape, month==1)
     insetMap <- ggplot(forMap) +
         geom_sf(aes(color=dtw_m), #actual map

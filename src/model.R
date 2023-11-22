@@ -1,12 +1,12 @@
 ## Primary model functions that are leveraged throughout the ~/src/analysis.R functions (that facilitate the actual analysis)
 ## Craig Brinkerhoff
-## Fall 2022
+## Fall 2023
 
 
 
 
 
-#' Calculates river ephemerality using Fan et al 2017 monthly WTD (accounting for non-CONUS streams)
+#' Calculates intial classification of river ephemerality using Fan et al 2017 monthly WTD (accounting for non-CONUS streams)
 #'
 #' @name perenniality_func_fan
 #'
@@ -22,14 +22,14 @@
 #' @param wtd_m_10: Water table depth- October [m]
 #' @param wtd_m_11: Water table depth- November [m]
 #' @param wtd_m_12: Water table depth- December [m]
-#' @param depth: depth from hydraulic scaling [m]
+#' @param depth: bankfull depth from hydraulic scaling [m]
 #' @param thresh: water table depth threshold for 'perennial' [m]
-#' @param err: error tolerance for threshold (not actually used)
+#' @param err: error tolerance for threshold (not actually used in paper)
 #' @param conus: flag for foreign or not [0/1]
 #' @param lakeAreaSqKm: fractional lake surface area per reach [km2]
 #' @param FCode_riv: river code from NHD-HR
 #'
-#' @return status: perennial, intermittent, or ephemeral
+#' @return status: ephemeral || non_ephemeral
 perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12, depth, thresh, err, conus, lakeAreaSqKm, FCode_riv){
   if(conus == 0){ #foreign stream handling
     return('foreign')
@@ -75,11 +75,11 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
 perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniality_vec, order_vec, curr_Q, Q_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
 
-  #scenario where incoming foreign reach is likely not ephemeral, i.e. a not-headwater (1st order) stream
+  #scenario where incoming foreign reach is likely not ephemeral (operationally defined as > 1st order stream)
   foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1)
 
   out <- curr_perr #otherwise, leave as is
-  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #assumption: once a river turns non-ephemeral, it stays that way downstream
+  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #Once a river turns non-ephemeral, it stays that way downstream (some amount of water will always be exported from that river downstream, turning it 'non ephemeral')
     out <- 'non_ephemeral'
   }
   else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers flowing in from Canada/Mexico
@@ -164,18 +164,19 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   #set either discharge or drainage area
   lateralProperty <- ifelse(property == 'discharge', curr_dQ, curr_dArea)
 
+  #calculate upstream value
   upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)
 
-  #if non-ephemeral losing stream has no upstream ephemeral value, set flag back to zero
+  #Set ephhemeral flag
   Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
   
-  #if losing stream, set the weight to zero as it's not contributing anything to the stream
+  #if losing stream, set the weight to zero as it's not contributing anything to the stream channel
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)
   
   #weighted mean of the discharge contributions (lateral + n upstream contributions, weighted by discharge)
   out <- weighted.mean(c(upstream_percEphs, Ephflag), c(upstreamProperties, lateralProperty))
   
-  #handle 0 drainage areas creating infinite values (only a handful)
+  #handle 0 drainage areas creating infinite values (only a handful across conus)
   out <- ifelse(!(is.finite(out)), 0, out)
 
   return(out)
