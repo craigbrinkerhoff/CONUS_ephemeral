@@ -5,14 +5,14 @@ date: "`r Sys.Date()`"
 author: 'Craig Brinkerhoff'
 ---
 
-## Info on the USGS gages used for ephemeral stream validations (Fall 2022)
-There are some inconsistencies in the use of the term 'ephemeral' in USGS reports that list ephemeral streamgauges, so we used mean annual hydrographs and google maps to verify whether streams are more likely intermittent than ephemeral and flag them as 'eph/int'. These rivers are still used in the discharge model validation, but not in the 'ephemeral number days flowing' validation. Potential reasons these are intermittent rather than ephemeral:
+## Info on the USGS gages used for ephemeral stream validations (work done Fall 2022)
+There are some inconsistencies in definitions used for the term 'ephemeral' in USGS reports that list ephemeral streamgauges, so we used mean annual hydrographs and google maps to verify whether streams are more likely intermittent than ephemeral and flag them as 'eph/int'. These rivers are still used in the discharge model validation, but not in the 'ephemeral number days flowing' validation. Potential reasons these are intermittent rather than ephemeral:
 
 - Persistent baseflow revealed by the mean annual hydrographs. Usually this goes away in the dry season as the river drys up, but even some of these have a perennial baseflow signal.
 - Clear visual signs of persistent near-surface water table (as defined [here](https://doi.org/10.1016/B978-0-12-805091-0.00014-1)): riparian zones flush with rooty vegetation, persistent waterlogging, etc. All signs of an intermittently available water table. The hydrographs generally corroborated these visual assessments (small, but persistent, baseflow).
 - The saved hydrographs are saved to `cache/check_usgs_eph_hydrographs`.
 
-### USGS ephemeral gages as defined by:
+### USGS ephemeral gages from the following reports:
 - Rankl, J. G. (2004). Relations between total-sediment load and peak discharge for rainstorm runoff on five ephemeral streams in Wyoming. https://doi.org/10.3133/wri024150
 - Heijl, Jr., H. R. (1980). PRELIMINARY APPRAISAL OF EPHEMERAL-STREAMFLOW CHARACTERISTICS AS RELATED TO DRAINAGE AREA, ACTIVE-CHANNEL WIDTH, AND SOILS IN NORTHWESTERN NEW MEXICO. https://doi.org/10.3133/ofr8164
  DeLong, L. L., & Wells, D. K. (1988). Estimating average dissolved-solids yield from basins drained by ephemeral and intermittent streams — Green River basin, Wyoming. https://doi.org/10.3133/wri874222
@@ -35,12 +35,12 @@ There are some inconsistencies in the use of the term 'ephemeral' in USGS report
 - **09222300** listed in report as eph/int in report
 - **09222400** listed in report as eph/int in report
 - **09235300** listed in report as eph/int in report
-- **09306235** distinct intermittent-style hydrograph with significant baseflow in non-summer and downstream of a spring. Arguably perennila baseflow in the mean annual hydrograph...
+- **09306235** distinct intermittent-style hydrograph with significant baseflow in non-summer and downstream of a spring. Arguably perrenial baseflow in the mean annual hydrograph...
 - **09306240** distinct intermittent-style hydrograph with significant baseflow in non-summer
 - **09508300** distinct intermittent-style hydrograph with significant baseflow in non-summer. Clear signs of persistant near-surface water table and saturation (riparian greenery)
 - **09510200** distinct intermittent-style hydrograph with significant baseflow in non-summer.
-- **09512450** distinct intermittent-style hydrograph with significant baseflow in non-summer. Arguably perennila baseflow in the mean annual hydrograph...
+- **09512450** distinct intermittent-style hydrograph with significant baseflow in non-summer. Arguably perrenial baseflow in the mean annual hydrograph...
 - **09512600** distinct intermittent-style hydrograph with significant baseflow in non-summer.
 - **09512830** distinct intermittent-style hydrograph with significant baseflow in non-summer.
 - **09512860** distinct intermittent-style hydrograph with significant baseflow in non-summer.
-- **10250800** ephemeral stream BUT it's directly downstream of perrenial waterfall/pool "Devil's Falls"
+- **10250800** ephemeral stream BUT it's directly downstream of perrenial waterfall/pool "Devil's Falls".

@@ -22,11 +22,11 @@ source('src/uncertaintyAnalysis.R')
 
 plan(batchtools_slurm, template = "slurm_future.tmpl") #for parallelization via futures transient workers
 #options(clustermq.scheduler = 'slurm', clustermq.template = "slurm_clustermq.tmpl") #for parallelization via clustermq persistent workers
-tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr', 'patchwork', 'ggsflabel', 'ggspatial', 'ggrepel', 'captioner')) #set up packages to load in. Some packages are manually specified throughout
+tar_option_set(packages = c('terra', 'sf', 'dplyr', 'readr', 'ggplot2', 'cowplot', 'dataRetrieval', 'clustermq', 'scales', 'tidyr', 'patchwork', 'ggsflabel', 'ggspatial', 'ggrepel', 'captioner')) #set up packages to load in. Some packages are manually specified throughout and don't rely on this list...
 
 #############USER INPUTS-------------------
 #meta parameters
-path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #path to data repo (separate from code repo)
+path_to_data <- '/nas/cee-water/cjgleason/craig/CONUS_ephemeral_data' #master path to data repo (separate from code repo and needs to be manually set)
 codes_huc02 <- c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18') #HUC2 regions to get gauge data.
 lookUpTable <- readr::read_csv('data/HUC4_lookup.csv') #basin routing lookup table (manually verified)
 usgs_eph_sites <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/usgs_gages_eph.csv')) #USGS gauges that are 'ephemeral' per USGS reports. Manual QAQC was done to these to identify mis-classified rivers (see ~docs/README_usgs_eph_gages.md)
@@ -40,7 +40,7 @@ noFlowGageThresh <- 0.05 #[percent] maximum no flow fraction for streamgauges th
 snappingThresh <- 10 #[m] see compareSnappingThreshs() for output that informs this parameter setting
 
 #flowing days parameters
-runoffEffScalar_low <- -0.33 #runoffEffScalar_x [percent] sensitivity parameter to use to perturb Nflw sensitivity to runoff efficiency: % of runoff ratio to add or subtract
+runoffEffScalar_low <- -0.33 #runoffEffScalar_x [percent] sensitivity parameter to use for Nflw sensitivity analysis, i.e. the % of runoff ratio to add or subtract to the runoff ratio
 runoffEffScalar_med_low <- -0.18
 runoffEffScalar_high <- 0.33
 runoffEffScalar_med_high <- 0.18
@@ -55,7 +55,10 @@ field_dataset <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/ne
 set.seed(546)
 
 #### SETUP STATIC BRANCHING FOR PARALLEL ROUTING WITHIN PROCESSING LEVELS-----------------------------------------------------
-#Headwater basins that export into the next level of basins
+    ## Each processing level is specified manually out of necessity. The only difference is that 'exported_percEph_lvlX' is fed to each sucessive processing level
+
+
+#Headwater basins that export into the next level of basins (no 'exported_percEph_lvlX')
 mapped_lvl0 <- tar_map(
   unlist=FALSE,
   values = tibble(
@@ -923,7 +926,7 @@ list(
   tar_target(val_shapefile_fin, saveValShapefile(path_to_data, codes_huc02, validationResults), deployment='main'), #validation results shapefile (HUC2 level)
 
   #UNCERTAINTY ANALYSIS--------------------------------------
-  tar_target(mc_samples, seq(1,1000,1)), #setup 1000 monte carlo runs
+  tar_target(mc_samples, seq(1,1000,1)), #setup 1000 monte carlo runs for uncertainty analysis
   tar_target(mcUncertainty_0107, runMonteCarlo('0107', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Merrimack River basin
   tar_target(mcUncertainty_1703, runMonteCarlo('1703', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Yakima River basin
   tar_target(mcUncertainty_1402, runMonteCarlo('1402', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Gunnison River basin
@@ -932,7 +935,7 @@ list(
   tar_target(mcUncertaintyResults, uncertaintyFigures(path_to_data, shapefile_fin, mcUncertainty_0107, mcUncertainty_1402, mcUncertainty_1703, mcUncertainty_0311, mcUncertainty_1504), deployment="main"), #uncertainty figures and numbers
 
   #GENERATE MANUSCRIPT FIGURES--------------
-  tar_target(fig1, mainFigureFunction(path_to_data, shapefile_fin, rivNetFin_0107, rivNetFin_0701, rivNetFin_1407, rivNetFin_1305), deployment='main'), #fig 1
+  tar_target(fig1, mainFigureFunction(path_to_data, shapefile_fin, rivNetFin_0107, rivNetFin_0701, rivNetFin_1406, rivNetFin_1305), deployment='main'), #fig 1
   tar_target(fig2, streamOrderPlot(combined_results_by_order, combined_results), deployment='main'), #fig 2
   tar_target(fig3, flowingFigureFunction(path_to_data, shapefile_fin, flowingDaysValidation), deployment='main'), #fig 3
   tar_target(fig4, lengthMapFunction(path_to_data, shapefile_fin), deployment='main'), #fig 4

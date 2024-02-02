@@ -182,11 +182,11 @@ validateHb <- function(){
 
   dataset <- tidyr::drop_na(dataset)
 
-  division <- toupper(sort(unique(dataset$DIVISION)))
+  division <- toupper(sort(unique(dataset$DIVISION))) #make lowercase and sort
 
   #build models, grouped by physiographic region
   models <- dplyr::group_by(dataset, DIVISION) %>%
-    dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>%
+    dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>% #fit models per physiographic regions
     dplyr::summarise(a = 10^(model$coef[1]),
                      b = model$coef[2],
                      r2 = summary(model)$r.squared,

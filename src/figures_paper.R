@@ -12,7 +12,7 @@
 #' @param shapefile_fin: final sf object with model results
 #' @param net_0107_results: final river network results for basin 0107
 #' @param net_0701_results: final river network results for basin 0701
-#' @param net_1407_results: final river network results for basin 1407
+#' @param net_1406_results: final river network results for basin 1406
 #' @param net_1305_results: final river network results for basin 1305
 #'
 #' @import sf
@@ -24,7 +24,7 @@
 #' @import patchwork
 #'
 #' @return print statement where main results figure is written to file
-mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, net_0701_results, net_1407_results, net_1305_results) {
+mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, net_0701_results, net_1406_results, net_1305_results) {
   theme_set(theme_classic())
 
   ##GET DATA
@@ -48,7 +48,7 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
 
   #labels for basins with subplots in the figure
   results$ids_west <- ifelse(results$huc4 == '1305', 'B',
-                                ifelse(results$huc4 == '1407', 'C',NA))
+                                ifelse(results$huc4 == '1406', 'C',NA))
   results$ids_east <- ifelse(results$huc4 == '0107', 'D',NA)
   results$ids_gl <- ifelse(results$huc4 == '0701', 'E',NA)
   
@@ -115,11 +115,13 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
   ##RIVER NETWORK MAP 0107-------------------------------------------------------------------------------------
-  net_0107 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_01/NHDPLUS_H_0107_HU4_GDB/NHDPLUS_H_0107_HU4_GDB.gdb'), layer='NHDFlowline')
-  net_0107 <- dplyr::left_join(net_0107, net_0107_results, 'NHDPlusID')
-  net_0107 <- dplyr::filter(net_0107, is.na(perenniality)==0)
+  huc4 <- '0107'
+  net <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', substr(huc4,1,2), '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  net <- dplyr::left_join(net, net_0107_results, 'NHDPlusID')
+  net <- dplyr::filter(net, is.na(perenniality)==0)
+  name <- results[results$huc4 == huc4,]$name
 
-  hydrography_0107 <- ggplot(net_0107, aes(color=perenniality, size=Q_cms)) +
+  hydrography_0107 <- ggplot(net, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='Stream Type',
@@ -138,14 +140,16 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Merrimack River:\n', round(results[results$huc4 == '0107',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0107',]$percQ_eph,0), '%)'))
+    ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
 
-  ##RIVER NETWORK MAP 1407-------------------------------------------------------------------------------------------
-  net_1407 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_14/NHDPLUS_H_1407_HU4_GDB/NHDPLUS_H_1407_HU4_GDB.gdb'), layer='NHDFlowline')
-  net_1407 <- dplyr::left_join(net_1407, net_1407_results, 'NHDPlusID')
-  net_1407 <- dplyr::filter(net_1407, is.na(perenniality)==0)
+  ##RIVER NETWORK MAP 1406-------------------------------------------------------------------------------------------
+  huc4 <- '1406'
+  net <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', substr(huc4,1,2), '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  net <- dplyr::left_join(net, net_1406_results, 'NHDPlusID')
+  net <- dplyr::filter(net, is.na(perenniality)==0)
+  name <- results[results$huc4 == huc4,]$name
 
-  hydrography_1407 <- ggplot(net_1407, aes(color=perenniality, size=Q_cms)) +
+  hydrography_1406 <- ggplot(net, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='',
@@ -165,14 +169,16 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Lower Green River:\n', round(results[results$huc4 == '1407',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1407',]$percQ_eph,0), '%)'))
+    ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 0701---------------------------------------------------------------------------
-  net_0701 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_07/NHDPLUS_H_0701_HU4_GDB/NHDPLUS_H_0701_HU4_GDB.gdb'), layer='NHDFlowline')
-  net_0701 <- dplyr::left_join(net_0701, net_0701_results, 'NHDPlusID')
-  net_0701 <- dplyr::filter(net_0701, is.na(perenniality)==0)
+  huc4 <- '0701'
+  net <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', substr(huc4,1,2), '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  net <- dplyr::left_join(net, net_0701_results, 'NHDPlusID')
+  net <- dplyr::filter(net, is.na(perenniality)==0)
+  name <- results[results$huc4 == huc4,]$name
 
-  hydrography_0701 <- ggplot(net_0701, aes(color=perenniality, size=Q_cms)) +
+  hydrography_0701 <- ggplot(net, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='',
@@ -192,14 +198,16 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                face='bold'))+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Mississippi Headwaters:\n', round(results[results$huc4 == '0701',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '0701',]$percQ_eph,0), '%)'))
+    ggtitle(paste0(name, ':\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
   
 ##RIVER NETWORK MAP 1305-----------------------------------------------------------
-  net_1305 <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_13/NHDPLUS_H_1305_HU4_GDB/NHDPLUS_H_1305_HU4_GDB.gdb'), layer='NHDFlowline')
-  net_1305 <- dplyr::left_join(net_1305, net_1305_results, 'NHDPlusID')
-  net_1305 <- dplyr::filter(net_1305, is.na(perenniality)==0)
+  huc4 <- '1305'
+  net <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_', substr(huc4,1,2), '/NHDPLUS_H_', huc4, '_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+  net <- dplyr::left_join(net, net_1305_results, 'NHDPlusID')
+  net <- dplyr::filter(net, is.na(perenniality)==0)
+  name <- substr(results[results$huc4 == huc4,]$name,1,10)
 
-  hydrography_1305 <- ggplot(net_1305, aes(color=perenniality, size=Q_cms)) +
+  hydrography_1305 <- ggplot(net, aes(color=perenniality, size=Q_cms)) +
     geom_sf()+
     coord_sf(datum = NA)+
     scale_color_manual(name='Stream Type',
@@ -219,7 +227,7 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0('Rio Grande Endorheic:\n', round(results[results$huc4 == '1305',]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == '1305',]$percQ_eph,0), '%)'))
+    ggtitle(paste0(name, ' Endorheic:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
   
     ##EXTRACT SHARED LEGEND-----------------
     hydrography_legend <- cowplot::get_legend(hydrography_0107 +
@@ -245,10 +253,9 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     BCDE
     FFFF
     "
-    comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1407, D=hydrography_0107+theme(legend.position='none'), E=hydrography_0701, F=hydrography_legend, design=design)
+    comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1406, D=hydrography_0107+theme(legend.position='none'), E=hydrography_0701, F=hydrography_legend, design=design)
 
-   ggsave('cache/paper_figures/fig1.tiff', comboPlot, width=20, height=20)
-   ggsave('cache/paper_figures/fig1.png', comboPlot, width=20, height=20)
+   ggsave('cache/paper_figures/fig1.tiff', comboPlot, width=20, height=20, compression = "lzw", dpi=300)
    return('see cache/paper_figures/fig1.tiff')
 }
 
@@ -289,10 +296,12 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
   
   combined_results_by_order$region <- ifelse(combined_results_by_order$huc4 %in% east, 'East of Mississippi River','West of Mississippi River')
   
+  #remove great lakes and foreign basins
   keepHUCs <- combined_results[is.na(combined_results$num_flowing_dys)==0,]$huc4
   combined_results_by_order <- dplyr::filter(combined_results_by_order, huc4 %in% keepHUCs)
   
   ####SUMMARY STATS-------------------
+  #summarise by stream order
   forPlot <- dplyr::group_by(combined_results_by_order, region, StreamOrde) %>%
     dplyr::summarise(percLength_eph_order = sum(LengthEph)/sum(LengthTotal))
 
@@ -307,7 +316,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
                       values=c('#2b3a67', '#b56b45'))+
     scale_color_manual(name='',
                        values=c('#2b3a67', '#b56b45'))+
-    ylim(0,100)+
+    coord_cartesian(ylim=c(0,100))+
     labs(tag='A')+
     theme(axis.title = element_text(size=26, face='bold'),
           axis.text = element_text(size=24,face='bold'),
@@ -327,7 +336,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
                       values=c('#2b3a67', '#b56b45'))+
     scale_color_manual(name='',
                        values=c('#2b3a67', '#b56b45'))+
-    ylim(0,100)+
+    coord_cartesian(ylim=c(0,100))+
     labs(tag='B')+
     theme(axis.title = element_text(size=26, face='bold'),
           axis.text = element_text(size=24,face='bold'),
@@ -344,7 +353,7 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
     ylab('% ephemeral streams by length')+
     scale_color_manual(name='',
                        values=c('#2b3a67', '#b56b45'))+
-    ylim(0,100)+
+    coord_cartesian(ylim=c(0,100))+
     labs(tag='C')+
     theme(axis.title = element_text(size=26, face='bold'),
           axis.text = element_text(size=24,face='bold'),
@@ -362,9 +371,8 @@ streamOrderPlot <- function(combined_results_by_order, combined_results){
 
   comboPlot <- patchwork::wrap_plots(A=plotQ, B=plotArea, C=plotN, design=design)
   
-  
-  ggsave('cache/paper_figures/fig2.tiff', comboPlot, width=20, height=20)
-  ggsave('cache/paper_figures/fig2.png', comboPlot, width=20, height=20)  
+  ggsave('cache/paper_figures/fig2.png', comboPlot, width=20, height=20)
+  ggsave('cache/paper_figures/fig2.tiff', comboPlot, width=20, height=20, compression = "lzw", dpi=300)
   return('see cache/paper_figures/fig2.tiff')
 }
 
@@ -464,8 +472,7 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
     annotate('text', label=paste0('n = ', nrow(joinedData), ' catchments'), x=250, y=50, size=9, color='black')+
     xlab('In situ days/yr')+
     ylab('Modeled days/yr')+
-    ylim(0,365)+
-    xlim(0,365)+
+    coord_cartesian(ylim=c(0,365), xlim=c(0,365))+
     theme(axis.title = element_text(size=20),
       axis.text = element_text(family="Futura-Medium", size=18),
       legend.position = 'none')+
@@ -512,8 +519,8 @@ flowingFigureFunction <- function(path_to_data, shapefile_fin, joinedData) {
     patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)  
   comboPlot <- patchwork::wrap_plots(A=flowingDaysFig, B=flowingDaysVerifyFig, C=flowingDaysCDF, design=design)
 
-  ggsave('cache/paper_figures/fig3.tiff', comboPlot, width=20, height=20)
   ggsave('cache/paper_figures/fig3.png', comboPlot, width=20, height=20)
+  ggsave('cache/paper_figures/fig3.tiff', comboPlot, width=20, height=20, compression = "lzw", dpi=300)
   return('see cache/paper_figures/fig3.tiff')
 }
 
@@ -600,7 +607,7 @@ lengthMapFunction <- function(path_to_data, shapefile_fin) {
   length_map <- length_map + 
     patchwork::inset_element(cdf_inset, right = 0.975, bottom = 0.001, left = 0.775, top = 0.35)
 
-  ggsave('cache/paper_figures/fig4.tiff', length_map, width=20, height=13)
   ggsave('cache/paper_figures/fig4.png', length_map, width=20, height=13)
+  ggsave('cache/paper_figures/fig4.tiff', length_map, width=20, height=13, compression = "lzw", dpi=300)
   return('see cache/paper_figures/fig4.tiff')
 }

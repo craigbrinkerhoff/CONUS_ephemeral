@@ -4,7 +4,7 @@
 
 
 
-#' Returns set of USGS gauges that are joined to the NHD-HR a priori (that meet USGS QA/QC requirements)
+#' Returns set of USGS gauges that are joined to the NHD-HR a priori (that also meet USGS QA/QC requirements)
 #'
 #' @name getNHDGages
 #'
@@ -65,12 +65,13 @@ getNHDGages <- function(path_to_data, codes_huc02){
 #' @import readr
 #' @import dplyr
 #'
-#' @return df of USGS gaueg IDs + long term mean annual flow data + % of annual record with no flow (river runs dry)
+#' @return df of USGS gaueg IDs + long term mean annual flow data + % of annual record with no recorded flow
 getGageData <- function(path_to_data, nhdGages, codes_huc02){
   for(m in codes_huc02){
     #NOTE::::: will be longer than the final sites b/c some of them don't have 20 yrs of data  within the bounds.
         #This function only finds gauges that intersect our time domain, but not necessarily 20 yrs of data within the domain.
-        #Further, some gauges have errors in data or are missing data. We throw them all of these cases out later
+        #Further, some gauges have errors in data or are missing data. We throw out all of these cases later
+
     if(!file.exists(paste0('cache/training/siteNos_', m, '.rds'))){ #only run a HUC2 if it hasn't been ran yet
       #get usgs gages by
       sites_full <- whatNWISdata(huc=m,
@@ -110,7 +111,7 @@ getGageData <- function(path_to_data, nhdGages, codes_huc02){
         if(nrow(gageQ)!= 366){next} #needs data for every day of the year
 
         gageQ$Q_cms <- gageQ$mean_va*0.0283 #cfs to cms
-        gageQ$Q_cms <- round(gageQ$Q_cms, 3) #round to 1 decimal to handle low-flow errors following Zipper et al 2021
+        gageQ$Q_cms <- round(gageQ$Q_cms, 3) #round to 3 decimals to reduce noise near zero flow (simmilar to https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794 but in cms instead of cfs)
 
         #ACTUALLY CALCULATE MEAN ANNUAL FLOW
         gageQ <- select(gageQ, c('site_no', 'Q_cms', 'month_nu')) %>%

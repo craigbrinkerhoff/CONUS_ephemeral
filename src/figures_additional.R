@@ -76,15 +76,14 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   
   
   #####TOKUNAGA ROUTING VERIFICATION---------------------------------------------------
-  #don't plot the great lakes (or basins with foreign streams) because the network scaling makes no sense for those basins (this is why n points < 205)
+  #don't plot the great lakes (or basins with foreign streams) because the network scaling makes no sense for those basins (this is why number points < 205)
   forPlot <- dplyr::filter(tokunaga_df, !is.na(export))
   
   tokunagaPlot <- ggplot(forPlot, aes(x=export*100, y=percQEph_exported*100)) + 
     geom_abline(linetype='dashed', size=2, color='darkgrey') +
     geom_point(size=7, color='#335c67') +
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
-    xlim(0,100)+
-    ylim(0,100)+
+    coord_cartesian(xlim=c(0,100), ylim=c(0,100))+
     ylab('% Discharge ephemeral\n(via routing model)') +
     xlab('% Upstream network ephemeral\n(via scaling theory)') +
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(percQEph_exported~export, data=forPlot))$r.squared,2)), x=10, y=75, size=9)+
@@ -197,13 +196,15 @@ streamOrderPlotPhysiographic <- function(path_to_data, shapefile, combined_resul
   #get physiographic regions
   regions <- sf::st_read(paste0(path_to_data, '/other_shapefiles/physio.shp')) #physiographic regions
   
-  regions <- fixGeometries(regions)
+  regions <- fixGeometries(regions) #~src/utils.R
   shapefile <- sf::st_join(shapefile$shapefile, regions, largest=TRUE) #take the physiogrpahic region that the basin is mostly in (dominant intersection)
   region_df <- data.frame('huc4'=shapefile$huc4,
                           'province'=shapefile$DIVISION)
 
+  #join physiographic region to results df
   combined_results_by_order <- dplyr::left_join(combined_results_by_order, region_df, by='huc4')
 
+  #remove foreign and great lake basins
   keepHUCs <- combined_results[is.na(combined_results$num_flowing_dys)==0,]$huc4
   combined_results_by_order <- dplyr::filter(combined_results_by_order, huc4 %in% keepHUCs)
   
@@ -266,7 +267,7 @@ streamOrderPlotPhysiographic <- function(path_to_data, shapefile, combined_resul
           legend.position='bottom',
           legend.text = element_text(size=26))
 
-
+  ###INSET MAP----------------------------
   insetMap <- ggplot(regions) +
     geom_sf(aes(fill=DIVISION), #actual map
             color='black',
@@ -351,7 +352,7 @@ mappingValidationFigure <- function(path_to_data, val_shapefile_fin){
             size=1.25,
             alpha=0)+
     scale_fill_gradientn(name='Ephemeral TSS Score',
-                         colors =c("#d73027", 'white', "#4575b4"), #ffffbf
+                         colors =c("#d73027", 'white', "#4575b4"),
                          limits=c(0,1),
                          guide = guide_colorbar(direction = "horizontal",title.position = "top"))+
     labs(tag='A')+
@@ -498,7 +499,7 @@ mappingValidationFigure2 <- function(path_to_data, val_shapefile_fin){
 
 
 
-#' Makes boxplots figure that summarizes classification results
+#' Makes boxplots that summarize classification results
 #'
 #' @name boxPlots_classification
 #'
@@ -522,7 +523,7 @@ boxPlots_classification <- function(val_shapefile_fin){
     stat_summary(fun = mean, geom = "point", col = "darkred", size=8) +
     annotate('text', label=paste0('n = ', nrow(df), ' basins'), x=as.factor('basinSpecificity'), y=0.20, size=7)+
     scale_fill_brewer(palette='Set2') +
-    scale_y_continuous(limits=c(0,1), breaks=c(0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))+
+    scale_y_continuous(limits=c(0,1), breaks=c(0,0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1))+ #manually specifiy y axis
     scale_x_discrete('', labels=c('Accuracy', 'Sensitivity', 'Specificity', 'TSS'))+
     ylab('Value') +
     theme(axis.text=element_text(size=20),
@@ -539,7 +540,7 @@ boxPlots_classification <- function(val_shapefile_fin){
 
 
 
-#' Makes boxplots summarizing sensitivity results for number flowing days calculation
+#' Makes boxplots summarizing sensitivity results for number flowing days model
 #'
 #' @name boxPlots_sensitivity
 #'
@@ -557,6 +558,7 @@ boxPlots_classification <- function(val_shapefile_fin){
 boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDays_low, combined_numFlowingDays_high, combined_numFlowingDays_med_low, combined_numFlowingDays_med_high){
   theme_set(theme_classic())
 
+  #build combined results df with forced alphabetic order
   combined_results <- data.frame('numFlowingDays'=combined_numFlowingDays,
                                  'znumFlowingDays_low'=combined_numFlowingDays_low,
                                  'anumFlowingDays_high'=combined_numFlowingDays_high,
@@ -567,8 +569,8 @@ boxPlots_sensitivity <- function(combined_numFlowingDays, combined_numFlowingDay
   
   #gather results
   forPlot <- tidyr::gather(combined_results, key=key, value=value, c('numFlowingDays', 'znumFlowingDays_low', 'ynumFlowingDays_med_low', 'anumFlowingDays_high', 'bnumFlowingDays_med_high'))
-  forPlot$key <- as.factor(forPlot$key)
-  levels(forPlot$key) <- c('High runoff 1','High runoff 2', 'Model', 'Low runoff 2', 'Low runoff 1')
+  forPlot$key <- as.factor(forPlot$key) #save as levels with forced alphabetic ordering
+  levels(forPlot$key) <- c('High runoff 1','High runoff 2', 'Model', 'Low runoff 2', 'Low runoff 1') #rename levels
 
   #PLOT-------------------------------------
   boxplotsSens <- ggplot(forPlot, aes(x=key, y=value, fill=key)) +
@@ -608,7 +610,11 @@ snappingSensitivityFigures <- function(out){
 
   #trade off plot between performance of Horton laws and snapping thresholds
   forPlot <- dplyr::distinct(out, mae, .keep_all=TRUE) #drop duplicate rows that are needed to plot accuracy (below)
+
+  #gather results
   forPlot <- tidyr::gather(forPlot, key=key, value=value, c('mae', 'rmse'))
+
+  #plot
   tradeOffPlot <- ggplot(forPlot, aes(x=thresh, y=value, color=key)) +
         geom_point(size=10) +
         geom_line(linetype='dashed', size=1) +
@@ -697,7 +703,7 @@ buildScalingModelFig <- function(scalingModel){
   
   df <- scalingModel$df
   df$label <- 'Field data on hydrography'
-  df$StreamOrde <- df$StreamOrde + (1-scalingModel$ephMinOrder)
+  df$StreamOrde <- df$StreamOrde + (1-scalingModel$ephMinOrder) #shift all orders over by ephMinOrders
   df2 <- data.frame('StreamOrde'=1-scalingModel$ephMinOrder, #add on that we are scaling to
                     'n'=scalingModel$desiredFreq,
                     'label'='Field data off hydrography')
@@ -833,7 +839,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   walnutGulch <- walnutGulch %>%
     dplyr::mutate(year = lubridate::year(date)) %>%
     dplyr::group_by(site) %>% #get no flow stats per sub watershed
-    dplyr::summarise(runoff_m_s = mean(runoff_mm, na.rm=T)*0.001/86400) %>% #m/s
+    dplyr::summarise(runoff_m_s = mean(runoff_mm, na.rm=T)*0.001/86400) %>% #mm/dy to m/s
     dplyr::mutate(site = substr(site, 7, nchar(site)))
 
   #setup flume locations----------------------------
@@ -842,7 +848,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
     dplyr::mutate(flume = as.character(flume)) %>%
     dplyr::left_join(walnutGulch, by=c('flume'='site')) %>%
     sf::st_as_sf(coords=c('easting', 'northing')) %>%
-    dplyr::mutate(meas_runoff_m3_s = runoff_m_s*drainageArea_km2*1e6) #m3/s
+    dplyr::mutate(meas_runoff_m3_s = runoff_m_s*drainageArea_km2*1e6) #convert runoff to m3/s
   
   sf::st_crs(flume_sites) <- sf::st_crs('epsg:26912')
 
@@ -852,7 +858,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   
   #map ephemeral classification----------------------
   network <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_15/NHDPLUS_H_1505_HU4_GDB/NHDPLUS_H_1505_HU4_GDB.gdb'), layer='NHDFlowline')
-  network<- sf::st_zm(network)
+  network <- sf::st_zm(network)
   network <- sf::st_transform(network, 'epsg:26912')
   network <- sf::st_intersection(network, basin)
   
@@ -891,8 +897,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
     geom_point(size=8) +
     geom_smooth(method='lm', size=1.5, color='black', se=F)+
     labs(tag='B')+
-    xlim(0,0.1)+
-    ylim(0,0.1)+
+    coord_cartesian(xlim=c(0,0.1), ylim=c(0,0.1))+
     annotate('text', label=expr(r^2: ~ !!round(summary(lm(Q_cms~meas_runoff_m3_s, data=flume_sites2))$r.squared,2)), x=10, y=75, size=9)+
     annotate('text', label=paste0('n = ', nrow(flume_sites2), ' basins'), x=75, y=15, size=7, color='black')+
     ylab(expr(bold('Model Discharge ['~frac(m^3,s)~']')))+
@@ -1033,11 +1038,15 @@ hydrographyFigureSmall <- function(path_to_data, shapefile_fin, net_results, huc
   exported_abs <- results[results$huc4 == huc4,]$QEph_exported_cms
   exported_perc <- results[results$huc4 == huc4,]$percQEph_exported
 
+  #read in shapefile
   net <- sf::st_read(dsn = paste0(path_to_data,'/HUC2_',huc2,'/NHDPLUS_H_',huc4,'_HU4_GDB/NHDPLUS_H_', huc4, '_HU4_GDB.gdb'), layer='NHDFlowline')
+
+  #plotting functions can't handle the few streamlines saved as multicurve....
   if('MULTICURVE' %in% sf::st_geometry_type(net)){
-    net <- sf::st_cast(net, 'MULTILINESTRING') #plotting functions can't handle the few streamlines saved as multicurve....
+    net <- sf::st_cast(net, 'MULTILINESTRING')
   }
 
+  #filter for flowlines within our model
   net <- dplyr::left_join(net, net_results, 'NHDPlusID')
   net <- dplyr::filter(net, is.na(perenniality)==0)
   

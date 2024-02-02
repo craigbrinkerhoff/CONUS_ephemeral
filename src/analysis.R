@@ -33,7 +33,7 @@ extractData <- function(path_to_data, huc4, Hbmodel){
   regions <- sf::st_read(paste0(path_to_data, '/other_shapefiles/physio.shp')) #physiographic regions
   regions <- fixGeometries(regions)
 
-  shapefile <- sf::st_join(shapefile, regions, largest=TRUE) #take the physiographic region that the basin is mostly in (dominant intersection)
+  shapefile <- sf::st_join(shapefile, regions, largest=TRUE) #take the physiographic region that the basin is mostly in (dominant spatial intersection)
   physio_region <- shapefile$DIVISION
 
   # setup CONUS shapefile
@@ -50,7 +50,7 @@ extractData <- function(path_to_data, huc4, Hbmodel){
 
   ########PULL IN DATA
   #Fan et al 2017 water table depth model
-  wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))   #monthly averages of hourly model runs for 2004-2014 at 1km resolution
+  wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc')) #monthly averages of hourly model runs for 2004-2014 at 1km resolution
 
   #HUC4 basin at hand
   basins <- terra::vect(paste0(path_to_data, '/HUC2_', huc2, '/WBD_', huc2, '_HU2_Shape/Shape/WBDHU4.shp')) #basin polygon
@@ -93,10 +93,10 @@ extractData <- function(path_to_data, huc4, Hbmodel){
   NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
   NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
 
-  #some manual rewriting b/c this columns get doubled from previous joins where data was needed for specific GIS tasks...
+  #some manual rewriting b/c these columns get doubled from previous joins where data was needed for specific GIS tasks...
   if(huc4 %in% indiana_hucs){
     colnames(nhd)[17] <- 'NHDPlusID'
-    nhd$NHDPlusID <- round(nhd$NHDPlusID, 0) #remove erronous decimals
+    nhd$NHDPlusID <- round(nhd$NHDPlusID, 0) #remove erronous decimals from QGIS preprocessing
     colnames(nhd)[12] <- 'FCode_riv'
     colnames(nhd)[31] <- 'FCode_waterbody'
   }
@@ -113,7 +113,7 @@ extractData <- function(path_to_data, huc4, Hbmodel){
   #Convert to more useful units
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
   nhd$Q_cms <- nhd$QBMA * 0.0283 #USGS discharge model
-  nhd$Q_cms_adj <- nhd$QEMA*0.0283
+  nhd$Q_cms_adj <- nhd$QEMA*0.0283 #USGS discharge model adjusted to better match gauges. BUT, this can create 'jumps' in the streamflow simulation, so we don't use it here
   
   #handle Indiana-effected basin stream orders
   if(huc4 %in% indiana_hucs){
@@ -125,7 +125,7 @@ extractData <- function(path_to_data, huc4, Hbmodel){
   #assign waterbody type for depth modeling
   nhd$waterbody <- ifelse(is.na(nhd$WBArea_Permanent_Identifier)==0 & is.na(nhd$LakeAreaSqKm) == 0 & nhd$LakeAreaSqKm > 0, 'Lake/Reservoir', 'River')
 
-  #fix erronous IDs for matching basins for routing (manually identified in the version of NHD-HR used in this study- all data downloaded Spring 2022)
+  #fix erronous IDs for matching basins for inter-basin routing (manually identified in the version of NHD-HR used in this study- all data downloaded Spring 2022, see ~docs/data_guide.html)
   if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100384878,]$StreamOrde <- 8}   #fix erroneous 'divergent' reach in the Ohio mainstem (matching Indiana file upstream)
   if(huc4 == '0514'){nhd[nhd$NHDPlusID == 24000100569580,]$ToNode <- 22000100085737} #from/to node ID typo (from Ohio River to Missouri River) so I manually fix it
   if(huc4 == '0706'){nhd[nhd$NHDPlusID == 22000400022387,]$StreamOrde <- 7} #error in stream order calculation because reach is miss-assigned as stream order 0 (on divergent path) which isn't true. Easiest to just skip over the reach because it's just a connector into the Mississippi River (from Wisconsin river)
@@ -253,8 +253,8 @@ extractData <- function(path_to_data, huc4, Hbmodel){
 #' 
 #' @param nhd_df: basin routing table
 #' @param huc4: huc basin level 4 code
-#' @param thresh: threshold for 'persistent surface groundwater'
-#' @param err: error tolerance for calculation (if desired- not used in paper)
+#' @param thresh: water table depth threshold for 'perennial' (see _targets.R)
+#' @param err: error tolerance for calculation (if desired- not used in paper results)
 #' @param upstreamDF: data frame of 'exporting Q reaches' for basins from previous level (see _targets.R)
 #'
 #' @import dplyr
@@ -270,7 +270,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, upstreamDF){
   nhd_df$perenniality <- mapply(perenniality_func_fan, nhd_df$wtd_m_median_01,  nhd_df$wtd_m_median_02,  nhd_df$wtd_m_median_03,  nhd_df$wtd_m_median_04,  nhd_df$wtd_m_median_05,  nhd_df$wtd_m_median_06,  nhd_df$wtd_m_median_07,  nhd_df$wtd_m_median_08,  nhd_df$wtd_m_median_09,  nhd_df$wtd_m_median_10,  nhd_df$wtd_m_median_11,  nhd_df$wtd_m_median_12, nhd_df$depth_m, thresh, err, nhd_df$conus, nhd_df$LakeAreaSqKm, nhd_df$FCode_riv)
 
   #some streams that are adjacent to swamps/marshes are tagged as artificial paths (i.e. lakes) even though they are streams.
-      #We can use the FCOde waterbody tag to remap these back to streams, i.e. 460
+      #We can use the FCOde waterbody tag to remap these back to streams, i.e. FCode 460
   nhd_df$FCode_riv <- ifelse(substr(nhd_df$FCode_riv,1,3) == '558' & nhd_df$waterbody == 'River', '46000', nhd_df$FCode_riv)
 
   #####ROUTING
@@ -302,10 +302,10 @@ routeModel <- function(nhd_df, huc4, thresh, err, upstreamDF){
     perenniality_vec <- c(perenniality_vec, upstreamDF$exported_perenniality)
   }
 
-  #run vectorized models (functions from ~src/model.R)
+  #run vectorized models (functions from ~src/model.R). Also, see manuscript Supplementary Materials S1 for these models
   for (i in 1:nrow(nhd_df)) {
     perenniality_vec[i] <- perenniality_func_update(fromNode_vec[i], toNode_vec, perenniality_vec[i], perenniality_vec, order_vec, Q_vec[i], Q_vec) #update perenniality given the upstream classification
-    dQ_vec[i] <- getdQ(fromNode_vec[i], toNode_vec, Q_vec[i], Q_vec) #calculate lateral discharge / new water / catchment's contribution to discharge
+    dQ_vec[i] <- getdQ(fromNode_vec[i], toNode_vec, Q_vec[i], Q_vec) #calculate lateral discharge / 'new' stream water / catchment's contribution to discharge
     Area_vec[i] <- getTotDA(fromNode_vec[i], toNode_vec, dArea_vec[i], Area_vec) #calculate accumulated drainage area
     percQEph_vec[i] <- getPercEph(fromNode_vec[i], toNode_vec, perenniality_vec[i], dQ_vec[i], dArea_vec[i], Q_vec[i], Q_vec, percQEph_vec, 'discharge') #calculate percent water volume ephemeral
     percAreaEph_vec[i] <- getPercEph(fromNode_vec[i], toNode_vec, perenniality_vec[i], dQ_vec[i], dArea_vec[i], Area_vec[i], Area_vec, percAreaEph_vec, 'drainageArea') #calculate percent drainage area ephemeral
@@ -425,7 +425,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
 #' @param runoff_eff: calculated runoff ratio per HUC4 basin
 #' @param runoff_thresh: [mm] operational runoff threshold for ephemeral streamflow
 #' @param runoffEffScalar: [percent] sensitivity parameter to use to perturb model sensitivity to runoff efficiency
-#' @param memory: bulk 'runoff memory' parameter for Nflw model
+#' @param memory: bulk 'runoff memory' parameter for Nflw model. See Supplementary Materials S1
 #'
 #' @import sf
 #' @import raster
@@ -472,8 +472,7 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 
     # add watershed memory
      if(memory == 0){
-       out <- sum(df)
-       return(mean(out, na.rm=T))
+       next
      }
      else{
        #propagate memory for days following runoff events
@@ -504,7 +503,7 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 
 
 
-#' Calculates a first-order average month for 'ephemeral flowing days' per HUC4 basin
+#' Calculates a first-order average month for 'ephemeral flowing days' per HUC4 basin using the model described in Supplementary Materials S1
 #'
 #' @name calcDatesFlowingDays
 #'
@@ -520,7 +519,7 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 #' @import terra
 #' @import dplyr
 #'
-#' @return mean month that ephemeeral flowing days occur ( for a given HUC4 basin)
+#' @return mean month that ephemeeral flowing days occur (for a given HUC4 basin)
 calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runoffEffScalar, memory){
   if(is.na(runoff_eff[runoff_eff$huc4 == huc4,]$runoff_eff)){ #great lakes handling
     return(NA)
@@ -560,8 +559,7 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
 
     # add watershed memory
      if(memory == 0){
-       out <- sum(df)
-       return(mean(out, na.rm=T))
+      next
      }
      else{
        #propagate memory for days following runoff events
@@ -589,25 +587,26 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
 
 
 
-#' Fits Horton scaling laws to ephemeral data and calculates number of additional stream orders needed to re-produce the in situ data
+#' Fits Horton scaling laws to ephemeral data and calculates number of additional stream orders needed to re-produce the in situ data distribution
 #'
 #' @name scalingFunc
 #'
-#' @param validationResults: complete snapped and cleaned in situ ephemeral classification df
+#' @param validationResults: complete snapped and cleaned in situ ephemeral classification df (see _targets.R for source)
 #'
 #' @import dplyr
 #'
 #' @return list of properties obtained from Horton fitting
 scalingFunc <- function(validationResults){
-  desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, i.e. the number we are trying to scale to
+  desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, given a snapping threshold, i.e. the number we are trying to scale to
   
   df <- validationResults$validation_fin
   df <- dplyr::filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #only use ephemeral rivers for ephemeral scaling
   
+  #obtain number streams per stream order
   df <- dplyr::group_by(df, StreamOrde) %>%
     dplyr::summarise(n=n())
   
-  #fit model for Horton number of streams per order
+  #fit model for Horton number of streams per stream order
   lm <- lm(log(n)~StreamOrde, data=df)
   Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
   ephMinOrder <- round((log(desiredFreq) - log(df[df$StreamOrde == max(df$StreamOrde),]$n) - max(df$StreamOrde)*log(Rb))/(-1*log(Rb)),0) #algebraically solve for smallest order in the system
@@ -626,7 +625,7 @@ scalingFunc <- function(validationResults){
 
 
 
-#' Analyze the sensitivity of snapping threshold for field data to NHD-HR
+#' Analyze the sensitivity of snapping threshold for field data to NHD-HR. Test whether different snapping thresholds produce bad/good validation, and whether they produce the expected Horton law distributions
 #'
 #' @name snappingSensitivityWrapper
 #'
@@ -642,6 +641,8 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 
   out <- data.frame()
   for(i in threshs){
+    #test validation given a snapping threshold-----------------------------------------------------------
+
     validationResults <- validateModel(combined_validation, ourFieldData, i) #~src/validation_ephemeral.R
 
     #validation test per HUC2 region
@@ -653,23 +654,27 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
              FN = ifelse(distinction == 'ephemeral' & perenniality == 'non_ephemeral', 1, 0)) %>% #false negative rate
       dplyr::summarise(basinAccuracy = round((sum(TP, na.rm=T) + sum(TN, na.rm=T))/(sum(TP, na.rm=T) + sum(TN, na.rm=T) + sum(FN, na.rm=T) + sum(FP, na.rm=T)),2)) #overall accuracy
 
-    #scaling test across CONUS
+    #scaling test across CONUS-------------------------------------------------------------------------------
     desiredFreq <- validationResults$eph_features_off_nhd_tot #ephemeral features not on the NHD, eventual number we want to scale too
 
     #refit Horton model given i snapping threshold
     df <- validationResults$validation_fin
     df <- dplyr::filter(df, is.na(StreamOrde)==0 & distinction == 'ephemeral') #remove USGS gauges, which are always perennial anyway
 
+    #obtain number streams per stream order
     df <- dplyr::group_by(df, StreamOrde) %>%
       dplyr::summarise(n=n())
 
-    #fit model for Horton number of streams per order
+    #fit model for Horton number of streams per stream order
     lm <- lm(log(n)~StreamOrde, data=df)
     Rb <- 1/exp(lm$coefficient[2]) #Horton law parameter
 
+    #get accuracy scores for matching the horton scaled estimates
     predN <- df[df$StreamOrde == max(df$StreamOrde),]$n*Rb^(max(df$StreamOrde) - df$StreamOrde)
     maeN <- Metrics::mae(log(df$n), log(predN))
     rmseN <- Metrics::rmse(log(df$n), log(predN))
+
+    #Summerize results
     temp <- data.frame('thresh'=i,
                        'mae'=maeN,
                        'rmse'=rmseN,
@@ -692,7 +697,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 
 
 
-#' Calculate ephemeral contribution to a basin's exported discharge (as well as other main results of model for a given basin)
+#' Calculate ephemeral contribution to a basin's exported discharge (as well as other main results of model for a given basin).
 #'
 #' @name getResultsExported
 #'
@@ -703,7 +708,7 @@ snappingSensitivityWrapper <- function(threshs, combined_validation, ourFieldDat
 #' 
 #' @import dplyr
 #'
-#' @return main results of model (per basin)
+#' @return main results of model (per basin export)
 getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
   #water volume ephemeral fraction at outlets
   exportDF <- dplyr::group_by(nhd_df, TerminalPa) %>%
@@ -711,12 +716,13 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
     dplyr::slice(1) %>% #only keep reach with max Q, i.e. the outlet per terminal network
     dplyr::ungroup()
 
-  percQEph_exported <- sum(exportDF$Q_cms*exportDF$percQEph_reach)/sum(exportDF$Q_cms)
-  percAreaEph_exported <- sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach)/sum(exportDF$TotDASqKm)
-  n_total <- nrow(nhd_df)
-  n_eph <- sum(nhd_df$perenniality == 'ephemeral')
-  median_eph_DA_km <- median(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$TotDASqKm  > 0,]$TotDASqKm, na.rm=T)
-  perc_length_eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T)/sum(nhd_df$LengthKM, na.rm=T)
+  #summarise results
+  percQEph_exported <- sum(exportDF$Q_cms*exportDF$percQEph_reach)/sum(exportDF$Q_cms) #[%]
+  percAreaEph_exported <- sum(exportDF$TotDASqKm*exportDF$percAreaEph_reach)/sum(exportDF$TotDASqKm) #[%]
+  n_total <- nrow(nhd_df) #[n]
+  n_eph <- sum(nhd_df$perenniality == 'ephemeral') #[n]
+  median_eph_DA_km <- median(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$TotDASqKm  > 0,]$TotDASqKm, na.rm=T) #[km2]
+  perc_length_eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral',]$LengthKM, na.rm=T)/sum(nhd_df$LengthKM, na.rm=T) #[km]
   
   #prep output
   out <- data.frame('percQEph_exported'=percQEph_exported,
@@ -743,7 +749,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
 #' @param nhd_df: basin routing table + results
 #' @param huc4: huc basin level 4 code
 #'
-#' @return mean reach length for basin
+#' @return mean reach length for basin [km]
 getMeanReachLen <- function(nhd_df, huc4){
   return(mean(nhd_df$LengthKM, na.rm=T))
 }
@@ -772,7 +778,8 @@ getResultsByOrder <- function(nhd_df, huc4){
     dplyr::group_by(StreamOrde) %>%
     dplyr::summarise(percQEph_reach_mean = mean(percQEph_reach),
                      percQEph_reach_median = median(percQEph_reach),
-                     percQEph_reach_sd = sd(percQEph_reach))
+                     percQEph_reach_sd = sd(percQEph_reach),
+                     Q_exported_cms = max(Q_cms, na.rm=T))
 
   #drainage area
   results_by_order_Area <- nhd_df %>%
@@ -812,15 +819,16 @@ getResultsByOrder <- function(nhd_df, huc4){
 #' @return df containing number and % of headwater reaches that are classified ephemeral, per basin
 ephemeralFirstOrder <- function(nhd_df, huc4) {
   #river source calculation
-  eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM) #if these are equal, then they are the headwater subset of 1st order streams...
-  total <- sum(nhd_df[nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM)
-  res <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #percent headwater reaches that are ephemeral
+  eph <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM) #get total length of the ephemeral 'source' network, i.e. no reaches upstream
+  total <- sum(nhd_df[nhd_df$dQ_cms == nhd_df$Q_cms,]$LengthKM) #get total reach length of all 'source' network, i.e. no reaches upstream
+  res <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph/total) #calculate percent headwater network that is ephemeral
   
   #first order ('headwater') calculation
-  eph2 <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$StreamOrde == 1,]$LengthKM) #if these are equal, then they are the headwater subset of 1st order streams...
-  total2 <- sum(nhd_df[nhd_df$StreamOrde == 1,]$LengthKM)
-  res2 <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph2/total2) #percent headwater reaches that are ephemeral
+  eph2 <- sum(nhd_df[nhd_df$perenniality == 'ephemeral' & nhd_df$StreamOrde == 1,]$LengthKM) #get total length of the ephemeral 1st order network
+  total2 <- sum(nhd_df[nhd_df$StreamOrde == 1,]$LengthKM) #get total length of the ephemeral 1st order network
+  res2 <- ifelse(huc4 %in% c('0418', '0419', '0424', '0426', '0428'), NA, eph2/total2) #percent 1st order network that is ephemeral
 
+  #summarise results
   out <- data.frame('huc4'=huc4,
                     'percEph_firstOrder'=res2,
                     'lenKM_eph_firstOrder'=eph2,
@@ -841,7 +849,7 @@ ephemeralFirstOrder <- function(nhd_df, huc4) {
 
 
 
-#' Finds model properties for reaches that connect to basins downstream (i.e. the exported values from the upstream basin)
+#' Find model properties for reaches that connect to basins downstream. Basically, get all the model information required to export to the next downstream basin
 #'
 #' @name getExportedQ
 #'
@@ -854,8 +862,11 @@ ephemeralFirstOrder <- function(nhd_df, huc4) {
 #'
 #' @return list with 'exported properties' from reaches that connect to basins downstream. List includes reach fromNode ID to enable routing to downstream basin
 getExportedQ <- function(model, huc4, lookUpTable) {
+  #grab the downstream basin, the 'toBasin'
   lookUpTable <- dplyr::filter(lookUpTable, HUC4 == huc4)
   downstreamBasins <- lookUpTable$toBasin #downstream basin ID
+
+  #if terminal, return NA
   if(is.na(downstreamBasins)) {
     out <- data.frame('downstreamBasin'=NA,
                       'exported_ToNode'=NA,
@@ -869,6 +880,8 @@ getExportedQ <- function(model, huc4, lookUpTable) {
   
   indiana_hucs <- c('0508', '0509', '0514', '0512', '0712', '0404', '0405', '0410') #Indiana-effected basins
   
+  #build exporting df of all the information to be passed to the next downstream basin (loop through if you flow into multiple basins- this sometimes happens)
+  #some of this code is duplicated form ~src/analysis.R out of necessity for the downstream basin that is being read in, i.e. targets won't let me query a type of target they need to be hardcoded
   out <- data.frame()
   for(downstreamBasin in downstreamBasins){
     #grab and prep downstream river network (to then grab the right routing ID for lookup)
@@ -878,7 +891,7 @@ getExportedQ <- function(model, huc4, lookUpTable) {
       nhd_d <- sf::st_read(paste0(path_to_data, '/HUC2_', huc2, '/indiana/indiana_fixed_', downstreamBasin, '.shp'))
       nhd_d <- sf::st_zm(nhd_d)
       colnames(nhd_d)[10] <- 'WBArea_Permanent_Identifier'
-      nhd_d$NHDPlusID <- round(nhd_d$NHDPlusID, 0) #remove erronous decimals
+      nhd_d$NHDPlusID <- round(nhd_d$NHDPlusID, 0) #remove erronous decimals from QGIS preprocessing
     }
     else{
       nhd_d <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
@@ -886,14 +899,17 @@ getExportedQ <- function(model, huc4, lookUpTable) {
       nhd_d <- fixGeometries(nhd_d) #~src/utils.R
     }
     
+    #add attributes and discharge simulation
     NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
     NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
-    
+
+    #join everything into a single shapefile for basin hydrography
     nhd_d <- dplyr::left_join(nhd_d, NHD_HR_VAA)
     nhd_d <- dplyr::left_join(nhd_d, NHD_HR_EROM)
     
+    #Convert to more useful units
     nhd_d$StreamOrde <- nhd_d$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
-    nhd_d$Q_cms <- nhd_d$QEMA * 0.0283 #cfs to cms
+    nhd_d$Q_cms <- nhd_d$QBMA * 0.0283 #cfs to cms
     nhd_d <- dplyr::filter(nhd_d, Q_cms > 0) #remove streams with no flow
     nhd_d <- dplyr::filter(nhd_d, StreamOrde > 0 & is.na(HydroSeq)==0 & FlowDir == 1)
     

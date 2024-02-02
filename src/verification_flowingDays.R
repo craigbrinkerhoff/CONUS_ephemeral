@@ -29,7 +29,8 @@ wrangleUSGSephGages <- function(other_sites){
     if(nrow(gageQ)==0){next} #some go these gages don't have their data online (in local USGS offices only.....)
     
     gageQ <- gageQ %>% 
-      dplyr::mutate(Q_cms = round(X_00060_00003,1)*0.0283) #cfs to cms with zero flow rounding protocol following:  https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794
+      dplyr::mutate(Q_cms = round(X_00060_00003*0.0283,3))#round to 3 decimals to reduce noise near zero flow (simmilar to https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794 but in cms instead of cfs)
+      #this is also equivalent to what we do in the discharge model validation
     
     Q_MA <- mean(gageQ$Q_cms, na.rm=T) #mean annual
     numFlow <- (sum(gageQ$Q_cms > 0, na.rm=T)/nrow(gageQ))*365
@@ -106,7 +107,7 @@ wrangleUSGSephGages <- function(other_sites){
 #'
 #' @return df of all wrangled field data in uniform form and with # flowing days for ephemeral streams calculated
 wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
-  runoff_thresh <- 0
+  runoff_thresh <- 0 #It is difficult to get flow thresholds (as well as flow rounding protocols) to be consistent across these datasets, so I don't bother and instead highlight that results are highly uncertain and should be further explored in future work
 
   #read in data--------------------------------------------------------
   walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv'))
@@ -116,6 +117,8 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   kentucky <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/Kentucky.csv'))
   more_arizona <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/stromberg_etal_2017.csv'))
   geulph <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ontario.csv'))
+
+
 
   #wrangling Mohave Yuma (https://doi.org/10.1029/2018WR023714)-------------------------------
   colnames(mohaveYuma) <- c('site', 'drainage_area_km2', 'elevation_m', 'period_of_record', 'num_flowing_events', 'ma_num_flowing_events', 'reference')
@@ -316,7 +319,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
 #'
 #' @return df of all wrangled field data spatially joined to HUC4 basin shapefiles
 flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_results, combined_runoffEff){
-  #read in all HUC4 basins
+  #read in all HUC4 basins and make combined shapefile
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% select(c('huc4', 'name'))
   for(i in codes_huc02[-1]){
     basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% 

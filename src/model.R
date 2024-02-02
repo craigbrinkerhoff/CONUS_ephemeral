@@ -40,11 +40,11 @@ perenniality_func_fan <- function(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_
   } else if(is.na(sum(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12)) > 0) { #there are some NA WTDs for very short reaches that consist only of 'perennial boundary conditions' in the water table model, i.e. ocean or great lakes
       return('non_ephemeral')
   } else if(any(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){
-      if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all twelve months the water table must not intersect river
-        if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following https://doi.org/10.1029/2019GL083937
+      if(all(c(wtd_m_01, wtd_m_02, wtd_m_03, wtd_m_04, wtd_m_05, wtd_m_06, wtd_m_07, wtd_m_08, wtd_m_09, wtd_m_10, wtd_m_11, wtd_m_12) < (thresh+err+(-1*depth)))){ #all twelve months to be ephemeral
+        if(!(is.na(lakeAreaSqKm)) & lakeAreaSqKm >= 0.01){ #main ponded water following https://doi.org/10.1029/2019GL083937. See Supplementary Materials S1 for more.
           return('non_ephemeral')
         } else{
-          return('ephemeral') 
+          return('ephemeral') #if not a main ponded water, then this is ephemeral!
         }
       } else{
         return('non_ephemeral')
@@ -79,7 +79,7 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
   foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1)
 
   out <- curr_perr #otherwise, leave as is
-  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #Once a river turns non-ephemeral, it stays that way downstream (some amount of water will always be exported from that river downstream, turning it 'non ephemeral')
+  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #Once a river turns non-ephemeral, it stays that way downstream. See Supplementary Materials S1 for more on this.
     out <- 'non_ephemeral'
   }
   else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers flowing in from Canada/Mexico
@@ -93,7 +93,7 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
 
 
 
-#' Calculates lateral discharge / runoff contribution for an individual reach's catchment
+#' Calculate lateral discharge / runoff contribution for an individual reach's catchment
 #'
 #' @name getdQ
 #'
@@ -147,8 +147,8 @@ getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
 #' @param curr_perr: current perenniality status
 #' @param curr_dQ: reach lateral runoff [m3/s]
 #' @param curr_dArea: reach catchment area [km2]
-#' @param curr_Property: reach accumulated property [m3/s] or [km2]
-#' @param Property_vec: full network vector of accumulated property [m3/s] or [km2]
+#' @param curr_Property: reach accumulated property [m3/s] or [km2]. This is a flag for which property gets run.
+#' @param Property_vec: full network vector of accumulated property [m3/s] or [km2]. This is updated online while routing.
 #' @param percEph_vec: full network vector of percent property [%]
 #' @param property: 'discharge' or 'drainageArea'
 #'
@@ -170,7 +170,7 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   #Set ephhemeral flag
   Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
   
-  #if losing stream, set the weight to zero as it's not contributing anything to the stream channel
+  #if net losing stream (i.e. dQ < 0), set the weight to zero as it's not contributing anything to the stream channel
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)
   
   #weighted mean of the discharge contributions (lateral + n upstream contributions, weighted by discharge)

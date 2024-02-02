@@ -40,7 +40,7 @@ prepValDF <- function(path_to_data){
   `%notin%` <- Negate(`%in%`)
 
   #load in validation dataset: we queried the "Clean Water Act Approved Jurisdictional Determinations" database on 06/20/2022 for all JDs requested by landowners.
-    #filter for decisions made under the NWPR (post 2020) because these ones explicitly distinguish ephemeral features as their own class
+    #filter for desicions made under the NWPR (post 2020) because these ones explicitly distinguish ephemeral features as their own class
   validationDF <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
   validationDF <- dplyr::filter(validationDF, `JD Basis` == 'NWPR')
 
@@ -51,7 +51,7 @@ prepValDF <- function(path_to_data){
   colnames(validationDF) <- c('JD_ID', 'resource_type', 'project_id', 'long', 'lat', 'wotus_class', 'huc8')
   validationDF$huc4 <- substr(validationDF$huc8, 1, 4)
 
-  #recast as ephemeral/not ephemeral.
+  #recast as ephemeral/not ephemeral based on the above codes
   validationDF$distinction <- ifelse(substr(validationDF$resource_type, 1, 2) == 'B3' | substr(validationDF$resource_type, 1, 5) == 'RHAB3', 'ephemeral', 'non_ephemeral')
 
   return(validationDF)
@@ -70,7 +70,7 @@ prepValDF <- function(path_to_data){
 #' @name snapValidateToNetwork
 #'
 #' @param path_to_data: data repo directory path
-#' @param validationDF: WOTUS Jurisdictional distinction dataset (already cleaned and prepped)
+#' @param validationDF: WOTUS Jurisdictional determinations dataset (already cleaned and prepped)
 #' @param USGS_data: USGS gauge IDs and 'no flow fractions'
 #' @param nhdGages: lookup table linking USGS gauges to NHD-HR reach ids
 #' @param nhd_df: basin routing table + results
@@ -123,10 +123,10 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
   else{
     nhd <- sf::st_read(dsn=dsnPath, layer='NHDFlowline', quiet=TRUE)
     nhd <- sf::st_zm(nhd)
-    nhd <- fixGeometries(nhd)
+    nhd <- fixGeometries(nhd) #~src/utils.R
   }
 
-  #set up stream order and Q for filtering that identical to actual model (~/src/analysis.R)
+  #set up stream order and Q for filtering that are identical to actual model (see ~/src/analysis.R)
   NHD_HR_EROM <- sf::st_read(dsn = dsnPath, layer = "NHDPlusEROMMA", quiet=TRUE) #mean annual flow table
   NHD_HR_VAA <- sf::st_read(dsn = dsnPath, layer = "NHDPlusFlowlineVAA", quiet=TRUE) #additional 'value-added' attributes
   nhd <- dplyr::left_join(nhd, NHD_HR_EROM, by='NHDPlusID')
@@ -153,7 +153,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
   #snap each point to nearest river
   nearestIndex <- sf::st_nearest_feature(validationDF, nhd)
 
-  #Get the actual snapping distance
+  #Get the actual distance between point (x in func) and nearest river (y in func)
   distance <- sf::st_distance(validationDF, nhd[nearestIndex,], by_element = TRUE)
 
   #build snapped validation set
@@ -199,7 +199,7 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
 
 
-#' Joins our in situ river classifications from the Northeast US to NHD-HR hydrography
+#' Join the in situ river classifications from the Northeast US to NHD-HR hydrography
 #'
 #' @name addOurFieldData
 #'
@@ -247,7 +247,7 @@ addOurFieldData <- function(rivNetFin_0106, rivNetFin_0108, path_to_data, field_
 
 
 
-#' Validates the ephemeral mapping model using all three validation datasets
+#' Validate the ephemeral mapping model using all three validation datasets
 #'
 #' @name validateModel
 #'
@@ -267,19 +267,19 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
   verifyDF <- tidyr::drop_na(combined_validation, 'NHDPlusID')
   verifyDF$snap_distance_m <- as.numeric(verifyDF$snap_distance_m)
 
-  #all ephemeral-classed rivers, regardless of NHD river presence
+  #all ephemeral streams, regardless of NHD flowline presence
   totNHD_tot <- nrow(verifyDF[!duplicated(verifyDF$NHDPlusID) & verifyDF$distinction == 'ephemeral',])
 
-  #filter for sites on the NHD (via some snapping threshold)
+  #filter for sites on the NHD (via some snapping threshold defined a priori)
   verifyDF <- dplyr::filter(verifyDF, snap_distance_m < snappingThresh)
 
-  #take most frequent perenniality classification along the reach (if its a tie, throw it out as lacking a consensus)
+  #take most frequent perenniality classification along the NHD flowline reach (if its a tie, throw it out as lacking a consensus)
   verifyDFfin <- verifyDF %>%
-    dplyr::group_by(NHDPlusID, distinction) %>%
+    dplyr::group_by(NHDPlusID, distinction) %>% #handle ties
     dplyr::mutate(num = n()) %>%
     dplyr::slice_max(num, with_ties=TRUE) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(NHDPlusID) %>%
+    dplyr::group_by(NHDPlusID) %>% #remove those reaches lacking a consensus (i.e. theres a tie and thus number duplictaes > 1)
     dplyr::mutate(dups = n()) %>%
     dplyr::filter(dups == 1)
 
@@ -330,11 +330,12 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 #'
 #' @return df with ephemeral streams' in situ mean annual flow paired with model reach and model discharge
 setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDischarge, rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305){
+  #make shapefile of USGS ephemeral streamflow measurement locations
   ephemeralUSGSDischarge <- sf::st_as_sf(ephemeralUSGSDischarge, coords=c('lon', 'lat'))
   
   sf::st_crs(ephemeralUSGSDischarge) <- sf::st_crs('epsg:4269')
   
-  #this is a biiiiiig thing to hold in memory...
+  #build network of rivers in the basins with in situ validation data
   rivNetFin <- rbind(rivNetFin_1008, rivNetFin_1009, rivNetFin_1012, rivNetFin_1404, rivNetFin_1408, rivNetFin_1405, rivNetFin_1507, rivNetFin_1506,rivNetFin_1809, rivNetFin_1501,rivNetFin_1503,rivNetFin_1606,rivNetFin_1302,rivNetFin_1306,rivNetFin_1303,rivNetFin_1305)
   
   #join to networks iteratively to handle memory overloading...
@@ -360,7 +361,7 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
     out <- rbind(out, temp)
   }
   
-  #QAQC that the matched in situ data nd guages are actually in the right place
+  #QAQC that the matched in situ data and guages are actually in the right place
     #keep the pair with the best matching drainage area between model and reported in situ drainage area (must also be within 20% of drainage area agreement regardless)
   out <- dplyr::group_by(out, gageID) %>%
     dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
@@ -396,14 +397,15 @@ tokunaga_eph <- function(nhd_df, results, huc4){
   #calculate tokunaga ratios using length instead of number
   out <- nhd_df %>%
     dplyr::group_by(StreamOrde) %>%
-    dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')),
-                     length = sum(LengthKM))%>%
-    dplyr::mutate(length_up_eph = cumsum(length_eph),
-                  length_up = cumsum(length)) %>%
-    dplyr::mutate(Tk_eph = NA,
+    dplyr::summarise(length_eph = sum(LengthKM*(perenniality == 'ephemeral')), #sum of ephemeral network length by order
+                     length = sum(LengthKM))%>% #sum of total network length by order
+    dplyr::mutate(length_up_eph = cumsum(length_eph), #cumulative network length of all ephemerals stream orders smaller than present order
+                  length_up = cumsum(length)) %>% #cumulative network length of all stream orders smaller than present order
+    dplyr::mutate(Tk_eph = NA, #tokunaga ratios intialize
                   Tk_all = NA) %>%
-    dplyr::mutate(r2 = summary(lm(log(length)~StreamOrde, data=.))$r.squared)
+    dplyr::mutate(r2 = summary(lm(log(length)~StreamOrde, data=.))$r.squared) #strength of fit for network length vs. stream order
   
+  #calculate Tokunaga ratio (Tk), iterting by stream order
   for(i in 2:nrow(out)){
     out[i,]$Tk_eph <- out[i-1,]$length_up_eph / out[i,]$length
     out[i,]$Tk_all <- out[i-1,]$length_up / out[i,]$length

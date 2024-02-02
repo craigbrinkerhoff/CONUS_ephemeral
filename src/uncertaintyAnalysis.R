@@ -1,4 +1,4 @@
-# Functions for MMonte Carlo uncertainty analysis in test watersheds
+# Functions for Monte Carlo uncertainty analysis in test watersheds
 # Craig Brinkerhoff
 # Fall 2023
 
@@ -10,17 +10,17 @@
 #'
 #' @param huc4: huc4 basin id
 #' @param threshold: threshold for initial water table classification
-#' @param error: error buffer (set to 0)
-#' @param gw_error_model: residuals distribution for gw model
-#' @param Hb_error_model: residuals distribution for bankfull depth model
-#' @param seedID: random seed ID for specific MC instance
+#' @param error: error buffer (here if desired, but set to 0 for the paper results)
+#' @param gw_error_model: residuals distribution for gw model (see _targets.R)
+#' @param Hb_error_model: residuals distribution for bankfull depth model (see _targets.R)
+#' @param seedID: random seed ID for specific MC instance (set using dynamic branching in_targets.R)
 #'
 #' @return percent water volume ephemeral per reach (for a given MC instance)
 runMonteCarlo <- function(huc4, threshold, error, gw_error_model, Hb_error_model, seedID){
   #run model
-  extracted <- extractDataMC(path_to_data, huc4, gw_error_model, Hb_error_model)
-  model <- routeModel(extracted, huc4, threshold, error, NA)
-  results <- getResultsExported(model, huc4, NA, NA) #just set num flowing days to NA for this uncertianty exercise
+  extracted <- extractDataMC(path_to_data, huc4, gw_error_model, Hb_error_model) #~src/uncertaintyAnalysis.R
+  model <- routeModel(extracted, huc4, threshold, error, NA) #~src/analysis.R
+  results <- getResultsExported(model, huc4, NA, NA) #~src/analysis.R #just set num flowing days to NA for this uncertianty exercise
 
   return(results$percQEph_exported)
 }
@@ -129,10 +129,10 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd <- dplyr::left_join(nhd, NHD_HR_EROM, by='NHDPlusID')
   nhd <- dplyr::left_join(nhd, NHD_HR_VAA, by='NHDPlusID')
 
-  #Convert to more useful values
+  #Convert to more useful units
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
   nhd$Q_cms <- nhd$QBMA * 0.0283 #USGS discharge model
-  nhd$Q_cms_adj <- nhd$QEMA*0.0283
+  nhd$Q_cms_adj <- nhd$QEMA*0.0283 #USGS discharge model adjusted to better match gauges. BUT, this can create 'jumps' in the streamflow simulation, so we don't use it here
   
   #handle Indiana-effected basin stream orders
   if(huc4 %in% indiana_hucs){
@@ -164,7 +164,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd$frac_lakeVol_m3 <- nhd$lakeVol_m3 * nhd$lakePercent
   nhd$frac_lakeSurfaceArea_m2 <- nhd$LakeAreaSqKm * nhd$lakePercent * 1e6
 
-  #get river width and depth using hydraulic scaling
+  #get river bankfull depth using hydraulic scaling. Stored in ~/data and available at https://doi.org/10.1111/jawr.12282
   a <- Hb_error_model[Hb_error_model$division == physio_region,]$a
   b <- Hb_error_model[Hb_error_model$division == physio_region,]$b
   nhd$depth_m <- mapply(depth_func, nhd$waterbody, nhd$frac_lakeVol_m3, nhd$frac_lakeSurfaceArea_m2*1e6, physio_region, nhd$TotDASqKm, a, b)
@@ -220,7 +220,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd_df$wtd_t_median_11 <- as.numeric(nhd_wtd_11$WTD_11.median)*-1
   nhd_df$wtd_t_median_12 <- as.numeric(nhd_wtd_12$WTD_12.median)*-1
 
-  #setup GW errors over time and space (12 months, n reaches)
+  #setup GW errors over time and space (12 months, n reaches). See ge_error_model as specificed in _targets.R
   error <- rnorm(n=nrow(nhd_df), mean=gw_error_model$mean, sd=gw_error_model$sd)
   nhd_df$error <- error
 
@@ -258,7 +258,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
 
 
 
-#' Preps hydrography shapefiles into lightweight routing tables. Also extracts monthly water table depth per streamline
+#' Builds figure summarizing MC analysis
 #'
 #' @name uncertaintyFigures
 #'

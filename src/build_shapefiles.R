@@ -17,7 +17,7 @@
 #'
 #' @return print statement + the sf object
 saveShapefile <- function(path_to_data, codes_huc02, combined_results){
-  #read in all HUC4 basins
+  #read in all HUC4 basins and make a single shapefile
   basins_overall <- sf::st_read(paste0(path_to_data, '/HUC2_', codes_huc02[1], '/WBD_', codes_huc02[1], '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name'))
   for(i in codes_huc02[-1]){
     basins <- sf::st_read(paste0(path_to_data, '/HUC2_', i, '/WBD_', i, '_HU2_Shape/Shape/WBDHU4.shp')) %>% dplyr::select(c('huc4', 'name')) #basin polygons
@@ -27,7 +27,7 @@ saveShapefile <- function(path_to_data, codes_huc02, combined_results){
   #join model results
   basins_overall <- dplyr::left_join(basins_overall, combined_results, by='huc4')
 
-  #round for mapping
+  #prep for return
   basins_overall <- dplyr::select(basins_overall, c('huc4', 'name', 'num_flowing_dys', 'mean_date_flowing', 'percQEph_exported', 'percAreaEph_exported', 'perc_length_eph', 'QEph_exported_cms', 'AreaEph_exported_km2', 'geometry'))
   basins_overall <- dplyr::filter(basins_overall, is.na(percQEph_exported)==0) #remove international basins that don't flow into US at all
   
@@ -66,7 +66,7 @@ saveValShapefile <- function(path_to_data, codes_huc02, validationResults){
   }
 
   #join validation results
-    #distinction == ground truth, perenniality == model prediction
+    #distinction == in situ ground truth, perenniality == model prediction
   out <- validationResults$validation_fin
   out$TP <- ifelse(out$distinction == 'ephemeral' & out$perenniality == 'ephemeral', 1, 0)
   out$FP <- ifelse(out$distinction == 'non_ephemeral' & out$perenniality == 'ephemeral', 1, 0)

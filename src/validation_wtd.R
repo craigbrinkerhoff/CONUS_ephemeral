@@ -71,7 +71,7 @@ getWellDepths <- function(codes_huc2){
 
 
 
-#' Extract 'groundwater depths' from USGS streamgauges in perrenial rivers
+#' Extract 'groundwater depths' from USGS streamgauges in perennial rivers (i.e. depth of ~0m)
 #'
 #' @name getGaugewtd
 #'
@@ -110,7 +110,7 @@ getGaugewtd <- function(USGS_data){
 
 
 
-#' Sptially extracts groundwater model values at each of the in situ well depths
+#' Does three things: (1) sptially extracts groundwater model values at each of the in situ well depths, (2) fits the log error model, and (3) creates the validation figures
 #'
 #' @name join_wtd
 #'
@@ -175,7 +175,7 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     shape_01 <- dplyr::filter(shape, month==1)
     shape_01 <- terra::vect(shape_01)
     wtd_model_01 <- terra::extract(wtd$WTD_1, shape_01)
-    wtd_01$wtd_model_m <- as.numeric(wtd_model_01$WTD_1 * -1)
+    wtd_01$wtd_model_m <- as.numeric(wtd_model_01$WTD_1 * -1) #flip to match orientation of the model
 
     wtd_02 <- dplyr::filter(for_shape, month==2)
     shape_02 <- dplyr::filter(shape, month==2)
@@ -246,10 +246,9 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     #bring model moths togheter
     out <- rbind(wtd_01, wtd_02, wtd_03, wtd_04, wtd_05, wtd_06, wtd_07, wtd_08, wtd_09, wtd_10, wtd_11, wtd_12)
 
-    out$log10_dtw_m <- ifelse(out$dtw_m < 1e-10, 0, log10(out$dtw_m))
+    #Calculate the log error model
+    out$log10_dtw_m <- ifelse(out$dtw_m < 1e-10, 0, log10(out$dtw_m)) #set lower significance limit to 1e-10 meters
     out$log10_wtd_model_m <- ifelse(out$wtd_model_m < 1e-10, 0, log10(out$wtd_model_m)) #force this boundary condition to be zero...
-
-    #claculate error between model and reality
     out$residual <- (out$log10_wtd_model_m - out$log10_dtw_m)
    
 
@@ -307,6 +306,7 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     
     ggsave('cache/gw_validation.jpg', gw_validation, width=10, height=10)
 
+    #return the log error model (for downstream MC analysis)
     return(list('mean'=round(mean(out$residual, na.rm=T),3),
                 'sd'=round(sd(out$residual, na.rm=T),3),
                 'df'=out))
