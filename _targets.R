@@ -1,6 +1,7 @@
 # _targets.R file
 ## Craig Brinkerhoff
-## This is the master pipeline
+## This is the master pipeline. See README.md
+## Spring 2024
 
 library(targets)
 library(tarchetypes)
@@ -55,7 +56,7 @@ field_dataset <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/ne
 set.seed(546)
 
 #### SETUP STATIC BRANCHING FOR PARALLEL ROUTING WITHIN PROCESSING LEVELS-----------------------------------------------------
-    ## Each processing level is specified manually out of necessity. The only difference is that 'exported_percEph_lvlX' is fed to each sucessive processing level
+    ## Each processing level is specified manually out of necessity (see README). The only difference is that 'exported_percEph_lvlX' is fed to each sucessive processing level.
 
 
 #Headwater basins that export into the next level of basins (no 'exported_percEph_lvlX')

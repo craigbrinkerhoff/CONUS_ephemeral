@@ -1,6 +1,6 @@
 ## Craig Brinkerhoff
 ## Functions to validate ephemeral classification, routing, and discharge
-## Fall 2023
+## Spring 2024
 
 
 
@@ -44,10 +44,11 @@ prepValDF <- function(path_to_data){
   validationDF <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/jds202206201319.csv'))
   validationDF <- dplyr::filter(validationDF, `JD Basis` == 'NWPR')
 
-  #Filter dataset to include features directly connected to drainage network (see function documentation)
+  #Filter dataset to include features directly connected to drainage network (see function documentation above)
   validationDF <- dplyr::filter(validationDF, substr(`Resource Types`, 1, 2) %in% c('A1', 'A2', 'A3', 'B3', 'B4', 'B5', 'B7', 'B8', 'B10') | substr(`Resource Types`, 1, 4) == 'RHAB') %>%
-      select(`JD ID`, `Resource Types`, `Project ID`, Longitude, Latitude, `Water of the U.S.`, HUC8)
+      dplyr::select(`JD ID`, `Resource Types`, `Project ID`, Longitude, Latitude, `Water of the U.S.`, HUC8)
 
+  #manually set column names
   colnames(validationDF) <- c('JD_ID', 'resource_type', 'project_id', 'long', 'lat', 'wotus_class', 'huc8')
   validationDF$huc4 <- substr(validationDF$huc8, 1, 4)
 
@@ -143,20 +144,20 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 
   #extract coords from river network
   coords <- sf::st_coordinates(sf::st_centroid(nhd$Shape)) #get each line centroid
-  utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude (~/src/utils.R)
+  utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean longitude of river network (~/src/utils.R)
 
   #project to given UTM zone for distance calcs
   epsg <- as.numeric(paste0('326', as.character(utm_zone)))
   validationDF <- sf::st_transform(validationDF, epsg)
   nhd <- sf::st_transform(nhd, epsg)
 
-  #snap each point to nearest river
+  #snap each jurisdictional determination to nearest river (NHD-HR reach)
   nearestIndex <- sf::st_nearest_feature(validationDF, nhd)
 
-  #Get the actual distance between point (x in func) and nearest river (y in func)
+  #Get the actual distance between point (x in func) and nearest NHD-HR reach (y in func)
   distance <- sf::st_distance(validationDF, nhd[nearestIndex,], by_element = TRUE)
 
-  #build snapped validation set
+  #build snapped validation set, containing the NHD-HR reach that is closet to the jurisdictional determination
   out <- data.frame('NHDPlusID'=nhd[nearestIndex,]$NHDPlusID,
                     'dataset'='EPA',
                     'snap_distance_m'=sf::st_distance(validationDF, nhd[nearestIndex,], by_element = TRUE),
@@ -203,8 +204,8 @@ snapValidateToNetwork <- function(path_to_data, validationDF, USGS_data, nhdGage
 #'
 #' @name addOurFieldData
 #'
-#' @param rivNetFin_0106: 0106 river network, needed to pair in situ data in 0106 with model results
-#' @param rivNetFin_0108: 0108 river network, needed to pair in situ data in 0108 with model results
+#' @param rivNetFin_0106: 0106 river network, needed to pair in situ data in 0106 with model results (basins are identified a priori)
+#' @param rivNetFin_0108: 0108 river network, needed to pair in situ data in 0108 with model results (basins are identified a priori)
 #' @param path_to_data: data repo directory path
 #' @param field_dataset our in situ river ephemerality classifications in New England (summer 2022)
 #'
@@ -300,7 +301,7 @@ validateModel <- function(combined_validation, ourFieldData, snappingThresh){
 
 
 
-#' Sets up ephemeral Q validation by bringing together all sources of ephemeral discharge data used in this study
+#' Sets up ephemeral Q validation df by bringing together all sources of ephemeral discharge data used in this study. When necessary, snaps ephemeral sites to NHD-HR following the approach used for jurisdictional determinations
 #'
 #' @name setupEphemeralQValidation
 #'
@@ -349,15 +350,17 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
     
     coords <- sf::st_coordinates(sf::st_centroid(network$Shape)) #get each line centroid
     utm_zone <- long2UTM(mean(coords[,1]))#get appropriate UTM zone using mean network longitude (~src/utils.R)
-    epsg <- as.numeric(paste0('326', as.character(utm_zone)))
+    epsg <- as.numeric(paste0('326', as.character(utm_zone))) #get pepsg projection code
     
+    #reproject to correct UTM zone
     validationDF <- sf::st_transform(ephemeralUSGSDischarge, epsg)
     network <- sf::st_transform(network, epsg)
     
+    ##join to NHD-HR
     network <- dplyr::left_join(network, rivNetFin, 'NHDPlusID')
     network <- dplyr::filter(network, is.na(perenniality)==0)
     
-    temp <- sf::st_join(ephemeralUSGSDischarge, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point
+    temp <- sf::st_join(ephemeralUSGSDischarge, network, join=st_is_within_distance, dist=2500) #search within 2.5 km of the point (just an upper limit for pragmaticism, these sites are ovbiously closer to NHD-HR reaches than 2.5 km)
     out <- rbind(out, temp)
   }
   
@@ -365,7 +368,7 @@ setupEphemeralQValidation <- function(path_to_data, walnutGulch, ephemeralUSGSDi
     #keep the pair with the best matching drainage area between model and reported in situ drainage area (must also be within 20% of drainage area agreement regardless)
   out <- dplyr::group_by(out, gageID) %>%
     dplyr::mutate(error = abs(drainageArea_km2 - TotDASqKm)/TotDASqKm) %>%
-    dplyr::filter(error < 0.20) %>%
+    dplyr::filter(error < 0.20) %>% #matches Walnut Gulch QAQC procedure (see SI FIgure captions)
     dplyr::slice_min(error, with_ties=FALSE, n=1) %>% #ties are pretty much never going to happen, but still need something so it takes the first option
     dplyr::select(c('NHDPlusID', 'huc4', 'meas_runoff_m3_s', 'drainageArea_km2', 'Q_cms', 'num_flowing_dys','TotDASqKm', 'gageID', 'period_of_record_yrs'))
  
@@ -405,17 +408,18 @@ tokunaga_eph <- function(nhd_df, results, huc4){
                   Tk_all = NA) %>%
     dplyr::mutate(r2 = summary(lm(log(length)~StreamOrde, data=.))$r.squared) #strength of fit for network length vs. stream order
   
-  #calculate Tokunaga ratio (Tk), iterting by stream order
+  #calculate Tokunaga ratio (Tk), iterting by stream order. Tk = the avg. number of reaches that flow into the average reach per stream order see: 10.1029/2012JF002392 and 10.1111/j.1752-1688.2007.00005.x
+  #here we use netowkr length rather than number of reaches because of the short artifical paths that maintain lake/reservoir connectivity to the network. See manuscript.
   for(i in 2:nrow(out)){
-    out[i,]$Tk_eph <- out[i-1,]$length_up_eph / out[i,]$length
-    out[i,]$Tk_all <- out[i-1,]$length_up / out[i,]$length
+    out[i,]$Tk_eph <- out[i-1,]$length_up_eph / out[i,]$length #using orders i-1 / order i --> see: 10.1029/2012JF002392
+    out[i,]$Tk_all <- out[i-1,]$length_up / out[i,]$length #using orders i-1 / order i --> see: 10.1029/2012JF002392
   }
 
   #join model results and prep output
   out <- out %>%
-    dplyr::mutate(percEphemeralStreamInfluence_mean = Tk_eph / Tk_all) %>%
+    dplyr::mutate(percEphemeralStreamInfluence_mean = Tk_eph / Tk_all) %>% #to get the "percent ephemeral contribution", we compare the cumulative upstream ephemeral number (Tk_eph) to the cumulative upstream whole-network value (TK_all). This is akin to eq S1.
     dplyr::left_join(results, by='StreamOrde') %>%
-    dplyr::slice_max(StreamOrde) %>% #exported value comes from the max stream order
+    dplyr::slice_max(StreamOrde) %>% #"basin-exported value" would be the max stream order (see manuscript)
     dplyr::mutate(export = ifelse((huc4 %in% c('0418', '0419', '0424', '0426', '0428')) |  #remove scenarios that won't work with this scaling: great lakes and foreign basins
                                     any(nhd_df$perenniality == 'foreign'), NA, percEphemeralStreamInfluence_mean),
                  huc4 = huc4) %>%

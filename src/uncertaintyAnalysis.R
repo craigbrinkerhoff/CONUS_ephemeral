@@ -1,6 +1,6 @@
 # Functions for Monte Carlo uncertainty analysis in test watersheds
 # Craig Brinkerhoff
-# Fall 2023
+# Spring 2024
 
 
 
@@ -225,7 +225,7 @@ extractDataMC <- function(path_to_data, huc4, gw_error_model, Hb_error_model){
   nhd_df$error <- error
 
   #randomly sample and apply groundwater model uncertainty
-  nhd_df$wtd_k_median_01 <- ifelse(nhd_df$wtd_t_median_01 < 1e-10, 0, log10(nhd_df$wtd_t_median_01)) - nhd_df$error #errors are inverted to match the correct direction
+  nhd_df$wtd_k_median_01 <- ifelse(nhd_df$wtd_t_median_01 < 1e-10, 0, log10(nhd_df$wtd_t_median_01)) - nhd_df$error #errors are inverted to match the correct orientation of the water table depths
   nhd_df$wtd_k_median_02 <- ifelse(nhd_df$wtd_t_median_02 < 1e-10, 0, log10(nhd_df$wtd_t_median_02)) - nhd_df$error
   nhd_df$wtd_k_median_03 <- ifelse(nhd_df$wtd_t_median_03 < 1e-10, 0, log10(nhd_df$wtd_t_median_03)) - nhd_df$error
   nhd_df$wtd_k_median_04 <- ifelse(nhd_df$wtd_t_median_04 < 1e-10, 0, log10(nhd_df$wtd_t_median_04)) - nhd_df$error

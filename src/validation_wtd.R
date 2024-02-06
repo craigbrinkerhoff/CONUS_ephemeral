@@ -1,7 +1,6 @@
 ## Craig Brinkerhoff
-## Fall 2023
-## Functions that use USGS NWIS sites to validate our groundwater model
-
+## Functions that use USGS NWIS sites to validate the groundwater model used in this study
+## Spring 2024
 
 
 
@@ -31,6 +30,7 @@ getWellDepths <- function(codes_huc2){
         sites <- dplyr::filter(sites, count_nu/365 >= 20) %>%
             dplyr::select(c('site_no', 'dec_lat_va', 'dec_long_va', 'count_nu'))
 
+        #loop through sites and query NWIS for data
         for(k in 1:nrow(sites)){
             dtw <-   tryCatch(readNWISstat(siteNumbers = sites[k,]$site_no, #check if site meets our date requirements
                                   parameterCd = '72019', #depth to water table, feet below land surface
@@ -46,7 +46,7 @@ getWellDepths <- function(codes_huc2){
                 dplyr::group_by(month_nu) %>%
                 dplyr::summarise(dtw_ft = mean(mean_va, na.rm=T)) %>%
                 dplyr::mutate(dtw_m = dtw_ft * 0.3048) %>% #ft to meter
-                dplyr::filter(dtw_m < 100) #filter for wells less than 100m deep. To avoid validating in deeper aquifers that this model doesn't reflect (Following Fan et al. 2013 and Jashecko et al. 2021)
+                dplyr::filter(dtw_m < 100) #filter for wells less than 100m deep. To avoid validating in deeper aquifers that this model doesn't reflect (Following 10.1126/science.1229881 and 10.1038/s41586-021-03311-x)
             
             if(nrow(dtw) == 0){next}
             
@@ -110,7 +110,10 @@ getGaugewtd <- function(USGS_data){
 
 
 
-#' Does three things: (1) sptially extracts groundwater model values at each of the in situ well depths, (2) fits the log error model, and (3) creates the validation figures
+#' Does three things
+#'  (1) sptially extracts the gridded groundwater model values at each of the in situ wells
+#'  (2) fits the log error model
+#'  (3) creates the groundwater model validation figures
 #'
 #' @name join_wtd
 #'
@@ -171,73 +174,73 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     wtd <- terra::rast(paste0(path_to_data, '/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc'))   #monthly averages of hourly model runs for 2004-2014 at 1km resolution
 
     #extract mean monthly water table depths at each well point (by month)
-    wtd_01 <- dplyr::filter(for_shape, month==1)
+    wtd_01 <- dplyr::filter(for_shape, month==1) #jan
     shape_01 <- dplyr::filter(shape, month==1)
     shape_01 <- terra::vect(shape_01)
     wtd_model_01 <- terra::extract(wtd$WTD_1, shape_01)
     wtd_01$wtd_model_m <- as.numeric(wtd_model_01$WTD_1 * -1) #flip to match orientation of the model
 
-    wtd_02 <- dplyr::filter(for_shape, month==2)
+    wtd_02 <- dplyr::filter(for_shape, month==2) #feb
     shape_02 <- dplyr::filter(shape, month==2)
     shape_02 <- terra::vect(shape_02)
     wtd_model_02 <- terra::extract(wtd$WTD_2, shape_02)
     wtd_02$wtd_model_m <- as.numeric(wtd_model_02$WTD_2 * -1)
 
-    wtd_03 <- dplyr::filter(for_shape, month==3)
+    wtd_03 <- dplyr::filter(for_shape, month==3) #mar
     shape_03 <- dplyr::filter(shape, month==3)
     shape_03 <- terra::vect(shape_03)
     wtd_model_03 <- terra::extract(wtd$WTD_3, shape_03)
     wtd_03$wtd_model_m <- as.numeric(wtd_model_03$WTD_3 * -1)
 
-    wtd_04 <- dplyr::filter(for_shape, month==4)
+    wtd_04 <- dplyr::filter(for_shape, month==4) #apr
     shape_04 <- dplyr::filter(shape, month==4)
     shape_04 <- terra::vect(shape_04)
     wtd_model_04 <- terra::extract(wtd$WTD_4, shape_04)
     wtd_04$wtd_model_m <- as.numeric(wtd_model_04$WTD_4 * -1)
 
-    wtd_05 <- dplyr::filter(for_shape, month==5)
+    wtd_05 <- dplyr::filter(for_shape, month==5) #may
     shape_05 <- dplyr::filter(shape, month==5)
     shape_05 <- terra::vect(shape_05)
     wtd_model_05 <- terra::extract(wtd$WTD_5, shape_05)
     wtd_05$wtd_model_m <- as.numeric(wtd_model_05$WTD_5 * -1)
 
-    wtd_06 <- dplyr::filter(for_shape, month==6)
+    wtd_06 <- dplyr::filter(for_shape, month==6) #jun
     shape_06 <- dplyr::filter(shape, month==6)
     shape_06 <- terra::vect(shape_06)
     wtd_model_06 <- terra::extract(wtd$WTD_6, shape_06)
     wtd_06$wtd_model_m <- as.numeric(wtd_model_06$WTD_6 * -1)
 
-    wtd_07 <- dplyr::filter(for_shape, month==7)
+    wtd_07 <- dplyr::filter(for_shape, month==7) #jul
     shape_07 <- dplyr::filter(shape, month==7)
     shape_07 <- terra::vect(shape_07)
     wtd_model_07 <- terra::extract(wtd$WTD_7, shape_07)
     wtd_07$wtd_model_m <- as.numeric(wtd_model_07$WTD_7 * -1)
 
-    wtd_08 <- dplyr::filter(for_shape, month==8)
+    wtd_08 <- dplyr::filter(for_shape, month==8) #aug
     shape_08 <- dplyr::filter(shape, month==8)
     shape_08 <- terra::vect(shape_08)
     wtd_model_08 <- terra::extract(wtd$WTD_8, shape_08)
     wtd_08$wtd_model_m <- as.numeric(wtd_model_08$WTD_8 * -1)
 
-    wtd_09 <- dplyr::filter(for_shape, month==9)
+    wtd_09 <- dplyr::filter(for_shape, month==9) #sep
     shape_09 <- dplyr::filter(shape, month==9)
     shape_09 <- terra::vect(shape_09)
     wtd_model_09 <- terra::extract(wtd$WTD_9, shape_09)
     wtd_09$wtd_model_m <- as.numeric(wtd_model_09$WTD_9 * -1)
 
-    wtd_10 <- dplyr::filter(for_shape, month==10)
+    wtd_10 <- dplyr::filter(for_shape, month==10) #oct
     shape_10 <- dplyr::filter(shape, month==10)
     shape_10 <- terra::vect(shape_10)
     wtd_model_10 <- terra::extract(wtd$WTD_10, shape_10)
     wtd_10$wtd_model_m <- as.numeric(wtd_model_10$WTD_10 * -1)
 
-    wtd_11 <- dplyr::filter(for_shape, month==11)
+    wtd_11 <- dplyr::filter(for_shape, month==11) #nov
     shape_11 <- dplyr::filter(shape, month==11)
     shape_11 <- terra::vect(shape_11)
     wtd_model_11 <- terra::extract(wtd$WTD_11, shape_11)
     wtd_11$wtd_model_m <- as.numeric(wtd_model_11$WTD_11 * -1)
 
-    wtd_12 <- dplyr::filter(for_shape, month==12)
+    wtd_12 <- dplyr::filter(for_shape, month==12) #dec
     shape_12 <- dplyr::filter(shape, month==12)
     shape_12 <- terra::vect(shape_12)
     wtd_model_12 <- terra::extract(wtd$WTD_12, shape_12)
@@ -246,9 +249,9 @@ join_wtd <- function(path_to_data, conus_well_depths, gauge_wtds){
     #bring model moths togheter
     out <- rbind(wtd_01, wtd_02, wtd_03, wtd_04, wtd_05, wtd_06, wtd_07, wtd_08, wtd_09, wtd_10, wtd_11, wtd_12)
 
-    #Calculate the log error model
+    #Calculate the log error model-----------------------------------------------------------------
     out$log10_dtw_m <- ifelse(out$dtw_m < 1e-10, 0, log10(out$dtw_m)) #set lower significance limit to 1e-10 meters
-    out$log10_wtd_model_m <- ifelse(out$wtd_model_m < 1e-10, 0, log10(out$wtd_model_m)) #force this boundary condition to be zero...
+    out$log10_wtd_model_m <- ifelse(out$wtd_model_m < 1e-10, 0, log10(out$wtd_model_m)) #force this boundary condition to just equal zero for log diffs
     out$residual <- (out$log10_wtd_model_m - out$log10_dtw_m)
    
 

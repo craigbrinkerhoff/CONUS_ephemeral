@@ -1,6 +1,6 @@
 ## Primary model functions that are leveraged throughout the ~/src/analysis.R functions (that facilitate the actual analysis)
 ## Craig Brinkerhoff
-## Fall 2023
+## Spring 2024
 
 
 
@@ -79,10 +79,10 @@ perenniality_func_update <- function(fromNode, toNode_vec, curr_perr, perenniali
   foreignBig <- sum(perenniality_vec[upstream_reaches] == 'foreign' & order_vec[upstream_reaches] > 1)
 
   out <- curr_perr #otherwise, leave as is
-  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #Once a river turns non-ephemeral, it stays that way downstream. See Supplementary Materials S1 for more on this.
+  if(any(perenniality_vec[upstream_reaches] == 'non_ephemeral')) { #Once a river turns "non-ephemeral" (per our definitions), it stays that way downstream. See Supplementary Materials S1 for more on this.
     out <- 'non_ephemeral'
   }
-  else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers flowing in from Canada/Mexico
+  else if(foreignBig > 0 & curr_perr != 'foreign') { #account for perennial rivers flowing in from Canada/Mexico- if international river is > stream order 1, we conservatively assume it is non-ephemeral and thus influences the downstream domestic reaches
     out <- 'non_ephemeral'
   }
 
@@ -128,7 +128,7 @@ getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
   upstream_reaches <- which(toNode_vec == fromNode)
   upstreamA <- sum(A_vec[upstream_reaches], na.rm=T)
 
-  out <- upstreamA + curr_A
+  out <- upstreamA + curr_A #combine upstream drainage areas with current reach's unit catchment area
 
   return(out)
 }
@@ -138,7 +138,7 @@ getTotDA <- function(fromNode, toNode_vec, curr_A, A_vec){
 
 
 
-#' Calculate % ephemeral contribution for discharge or drainage area for a given reach in the network.
+#' Calculate % ephemeral contribution for discharge or drainage area for a given reach in the network. See manuscript eqs S1-S2
 #'
 #' @name getPercEph
 #'
@@ -164,16 +164,13 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   #set either discharge or drainage area
   lateralProperty <- ifelse(property == 'discharge', curr_dQ, curr_dArea)
 
-  #calculate upstream value
-  upstream_value <- sum(upstreamProperties * upstream_percEphs, na.rm = T)
-
   #Set ephhemeral flag
   Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
   
   #if net losing stream (i.e. dQ < 0), set the weight to zero as it's not contributing anything to the stream channel
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)
   
-  #weighted mean of the discharge contributions (lateral + n upstream contributions, weighted by discharge)
+  #weighted mean of the discharge contributions (lateral + n upstream contributions, weighted by discharge) (Eq. S1-S2 in manuscript)
   out <- weighted.mean(c(upstream_percEphs, Ephflag), c(upstreamProperties, lateralProperty))
   
   #handle 0 drainage areas creating infinite values (only a handful across conus)

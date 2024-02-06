@@ -103,12 +103,12 @@ validationPlot <- function(path_to_data, tokunaga_df, USGS_data, nhdGages, ephem
   walnutGulch <- walnutGulch$df #grab data frame from list
   colnames(walnutGulch) <- c('NHDPlusID', 'Q_MA', 'drainageArea_km2', 'QBMA','ToTDASqKm')
   walnutGulch <- dplyr::select(as.data.frame(walnutGulch), c('Q_MA', 'QBMA')) %>%
-    dplyr::mutate(type = 'Ephemeral/Intermittent')
+    dplyr::mutate(type = 'Ephemeral/Intermittent') #all walnut gulch streams are non-perennnial, so cast them all as so
   
   #rename ephemeral discharge columns to match this df
   colnames(ephemeralQDataset) <- c('NHDPlusID', 'huc4', 'Q_MA', 'drainageArea_km2', 'QBMA', 'num_flowing_dys','ToTDASqKm', 'gageID', 'errorFlag')
   ephemeralQDataset <- dplyr::select(ephemeralQDataset, c('Q_MA', 'QBMA')) %>%
-    dplyr::mutate(type = 'Ephemeral/Intermittent')
+    dplyr::mutate(type = 'Ephemeral/Intermittent') #all of these ephemeral sites (determined ephemeral a priori) are cast as such
   
   #add observed mean annual Q (1970-2018 calculated using gauge records) to the NHD-HR reaches for Q validation
   qma <- USGS_data
@@ -842,7 +842,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
     dplyr::summarise(runoff_m_s = mean(runoff_mm, na.rm=T)*0.001/86400) %>% #mm/dy to m/s
     dplyr::mutate(site = substr(site, 7, nchar(site)))
 
-  #setup flume locations----------------------------
+  #setup flume locations and convert to discharge----------------------------
   flume_sites <- read.csv(paste0(path_to_data, '/exp_catchments/walnut_gulch/walnut_gulch_flumes.csv'))
   flume_sites <- dplyr::filter(flume_sites, !is.na(drainageArea_km2)) %>%
     dplyr::mutate(flume = as.character(flume)) %>%
@@ -856,7 +856,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   basin <- sf::st_read(paste0(path_to_data,'/exp_catchments/walnut_gulch/boundary.shp'))
   basin <- sf::st_transform(basin, 'epsg:26912')
   
-  #map ephemeral classification----------------------
+  #map ephemeral classification (HUC4 basin 1505 is where Walnut Gulch is located----------------------
   network <- sf::st_read(dsn = paste0(path_to_data, '/HUC2_15/NHDPLUS_H_1505_HU4_GDB/NHDPLUS_H_1505_HU4_GDB.gdb'), layer='NHDFlowline')
   network <- sf::st_zm(network)
   network <- sf::st_transform(network, 'epsg:26912')
@@ -869,7 +869,7 @@ walnutGulchQualitative <- function(rivNetFin_1505, path_to_data) {
   nearestIndex <- sf::st_nearest_feature(flume_sites, network)
   flume_sites$NHDPlusID <- network[nearestIndex,]$NHDPlusID
   flume_sites2 <- dplyr::left_join(as.data.frame(flume_sites), network, by='NHDPlusID') %>%
-    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 20% of one another
+    dplyr::filter(abs((drainageArea_km2-TotDASqKm)/TotDASqKm) <= 0.20) #to ensure accuracy, drainage areas must be within 20% of one another. Matches overall ephemeral Q validation QAQC procedure (see SI FIgure captions)
   
   #basin map----------------------------------
   map <- ggplot(network, aes(color=perenniality)) +

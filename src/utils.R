@@ -1,6 +1,6 @@
 ## Utility functions
-## Fall 2023
 ## Craig Brinkerhoff
+## Spring 2024
 
 
 
@@ -130,6 +130,7 @@ ephemeralityChecker <- function(other_sites) {
       xlab('Date') +
       ylab('Q [cms]')
     
+    #write to file for manual assessment. See ~/docs/README_usgs_eph_gauges.Rmd for more
     ggsave(paste0('cache/check_usgs_eph_hydrographs/', i, '.jpg'),plot, width=15, height=7)
     
   }
@@ -156,7 +157,7 @@ exportResults <- function(rivNetFin, huc4){
 
   readr::write_csv(rivNetFin, paste0('cache/results_written/results_', huc4, '.csv'))
 
-  return('written to file')
+  return('written to file at ~/cache/results_written')
 }
 
 
@@ -173,7 +174,7 @@ exportResults <- function(rivNetFin, huc4){
 #' @return suite of models by physiographic region
 validateHb <- function(){
   dataset <- readr::read_csv('data/bhg_us_database_bieger_2015.csv') %>% #available by searching for paper at https://swat.tamu.edu/search
-    dplyr::select(c('Physiographic Division', '...9', '...15'))
+    dplyr::select(c('Physiographic Division', '...9', '...15')) #some necessary manual munging for colnames from dataset
   
   colnames(dataset) <- c('DIVISION', 'DA_km2', 'Hb_m')
 
@@ -186,17 +187,17 @@ validateHb <- function(){
 
   #build models, grouped by physiographic region
   models <- dplyr::group_by(dataset, DIVISION) %>%
-    dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>% #fit models per physiographic regions
-    dplyr::summarise(a = 10^(model$coef[1]),
-                     b = model$coef[2],
-                     r2 = summary(model)$r.squared,
+    dplyr::do(model = lm(log10(Hb_m)~log10(DA_km2), data=.)) %>% #fit models by physiographic regions
+    dplyr::summarise(a = 10^(model$coef[1]), #model intercept
+                     b = model$coef[2], #model exponent
+                     r2 = summary(model)$r.squared, #model performance
                      mean_residual = mean(model$residuals, na.rm=T),
                      sd_residual = sd(model$residuals, na.rm=T),
                      see = sd(model$residuals, na.rm=T)) %>%
     dplyr::mutate(division = division)
 
 
-  models[models$division == "INTERMONTANE PLATEAU",]$division <- "INTERMONTANE PLATEAUS"
+  models[models$division == "INTERMONTANE PLATEAU",]$division <- "INTERMONTANE PLATEAUS" #make sure names line up
   
   return(models)
 }

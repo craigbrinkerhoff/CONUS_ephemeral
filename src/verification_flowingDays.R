@@ -1,7 +1,6 @@
 ## Craig Brinkerhoff
-## Fall 2023
 ## Functions to validate ephemeral flow frequency model
-
+## Spring 2024
 
 
 
@@ -30,7 +29,7 @@ wrangleUSGSephGages <- function(other_sites){
     
     gageQ <- gageQ %>% 
       dplyr::mutate(Q_cms = round(X_00060_00003*0.0283,3))#round to 3 decimals to reduce noise near zero flow (simmilar to https://doi.org/10.1029/2021GL093298,  https://doi.org/10.1029/2020GL090794 but in cms instead of cfs)
-      #this is also equivalent to what we do in the discharge model validation
+      #this is also equivalent to what we do in the discharge model validation (~/src/prep_gagedata.R)
     
     Q_MA <- mean(gageQ$Q_cms, na.rm=T) #mean annual
     numFlow <- (sum(gageQ$Q_cms > 0, na.rm=T)/nrow(gageQ))*365
@@ -47,7 +46,7 @@ wrangleUSGSephGages <- function(other_sites){
   out <- out %>%
     dplyr::left_join(other_sites, by=c('gageID'='short_name')) %>% #get the gauge drainage area
     dplyr::select(c('gageID', 'huc4', 'reference','meas_runoff_m3_s', 'drainageArea_km2', 'num_flowing_dys', 'period_of_record_yrs', 'lon', 'lat')) %>%
-    dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined
+    dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined. These are the results of that analysis, inputted here manually out of necessity
                                               '06313700',
                                               '06425750',
                                               '06425780',
@@ -82,7 +81,8 @@ wrangleUSGSephGages <- function(other_sites){
 
 
 
-#' Wrangles existing (published) ephemeral field data to calculate in situ Nflw
+#' Wrangles existing (published) ephemeral field data into a single copacetic df to calculate in situ Nflw (and compare against our model). Note that there are many numbers manually hardcoded here that were pulled from these studies.
+#' When more appropriate, these data re stored in csvs in the data repo. See README and below for structure
 #'
 #' @name wrangleFlowingFieldData
 #' @note data comes from the following field studies (some are hardcoded into this function, but most are saved in the data repo):
@@ -107,7 +107,11 @@ wrangleUSGSephGages <- function(other_sites){
 #'
 #' @return df of all wrangled field data in uniform form and with # flowing days for ephemeral streams calculated
 wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
-  runoff_thresh <- 0 #It is difficult to get flow thresholds (as well as flow rounding protocols) to be consistent across these datasets, so I don't bother and instead highlight that results are highly uncertain and should be further explored in future work
+  #It is difficult to get flow thresholds (as well as flow rounding protocols) to be consistent across these datasets given what is availble in the literature.
+    #Here, we assume it is zero if the data requires a threshold to calculate , otherwise we use the definitions implicit in the published data.
+    #The operational runoff threshold used in our model is one way to be robust against these differences in operational definitons: by fitting a global-scope threshold, we somewhat remove the influence of individual study thresholds on overall results.
+    #See manuscript for more on this.
+  runoff_thresh <- 0
 
   #read in data--------------------------------------------------------
   walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv'))
@@ -171,9 +175,9 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   #wrangling reynolds creek (https://doi.org/10.1029/2001WR000413)------------------
   reynoldsCreek$date <- paste0(reynoldsCreek$year, '-', reynoldsCreek$month, '-', reynoldsCreek$day)
   reynoldsCreek$date <- lubridate::as_date(reynoldsCreek$date)
-  reynoldsCreek$drainage_area_km2 <- ifelse(reynoldsCreek$site == 'summitWash', 83*0.01, #km2
-                                            ifelse(reynoldsCreek$site == 'flats', 0.9*0.01, #km2
-                                                   ifelse(reynoldsCreek$site == 'nancy_gulch',1.3*0.01, 13.4*0.01))) #Km2
+  reynoldsCreek$drainage_area_km2 <- ifelse(reynoldsCreek$site == 'summitWash', 83*0.01, #km2 (done manually from reference out of necessity)
+                                            ifelse(reynoldsCreek$site == 'flats', 0.9*0.01, #km2 (done manually from reference out of necessity)
+                                                   ifelse(reynoldsCreek$site == 'nancy_gulch',1.3*0.01, 13.4*0.01))) #Km2 (done manually from reference out of necessity)
 
   reynoldsCreek <- dplyr::group_by(reynoldsCreek, site, date) %>% #hourly to mean daily flow
     dplyr::summarise(watershed=first(watershed),
@@ -246,7 +250,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   
 
 
-  #just pass along since I already have mean annual Nflw per site (in setupEphemeralQValidation function)
+  #just pass along since I already have mean annual Nflw per site (in setupEphemeralQValidation() function)
   eph_gages <- data.frame('watershed'=ephemeralQDataset$huc4,
                           'site'=ephemeralQDataset$gageID,
                           'period_of_record_yrs'=ephemeralQDataset$period_of_record_yrs,
@@ -268,7 +272,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                      n_sites=n(),
                      reference=first(reference)) %>%
     #Here we assign approximate lat/lons for the basins (so these can be mapped in the paper figures)
-    #Unfortunately, most of these need to be hardcoded because I had to find most of the sites manually
+    #Unfortunately, most of these need to be hardcoded because I had to find them manually
   dplyr::mutate(lat=c(43.436667,35.8933527,32.31537144,32.5886111,39.783585,36.64778269,36.1027488,35.24500556,33.69421054,33.72920456,36.00475278,36.021599, 43.54667, 32.711123, 31.540278, 33.3333333, 35.228431, 43.187, 37.47305556, 31.83341800, 31.66666667, 33.166667), #pulled from associated papers (general coords- Geulph long is moved ~15km east so it fits in model basin 0427)
                 long=c(-106.419722,-107.4167143,-106.7505587,-104.4213889,-108.189805,-108.1256268,-115.2077774,-115.2989889,-111.541802,-112.1198755,-115.6437917,-78.985034,-80.059, -112.831066, -110.334113, -114.50000000, -106.840627, -116.774, -83.14333333, -110.85286400 , -110.00000000, -114.50000000))
             #alphabetical list for data the lat/longs that are manually added
@@ -365,6 +369,7 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
     #basins with field data (must be hardcoded)
     huc4s = c('1009', '1302', '1303', '1306', '1405', '1408', '1501', '1503', '1506', '1507', '1606','0302', '0427', '1507', '1505', '1503', '1302', '1705', '0510', '1505', '1505', '1503')
 
+    #loop through global-scope operational flow thresholds and validate
     out <- data.frame()
     num_flowing_dys <- rep(NA, length(huc4s))
     for(i in runoff_threshs){
@@ -376,6 +381,7 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
                          'num_flowing_dys'=num_flowing_dys)
       temp <- dplyr::left_join(flowingFieldData, temp, by='watershed')
 
+      #calculate strength-of-fit
       r2 <- summary(lm(num_flowing_dys ~ n_flw_d, data=temp))$r.squared
       mae <- Metrics::mae(temp$num_flowing_dys, temp$n_flw_d)
       rmse <- Metrics::rmse(temp$num_flowing_dys, temp$n_flw_d)
@@ -388,7 +394,7 @@ flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_
       out <- rbind(out, temp2)
     }
 
-    out2 <- list('thresh'=out[which.min(out$mae),]$thresh, #[mm/dy]
+    out2 <- list('thresh'=out[which.min(out$mae),]$thresh, #[mm/dy] use mae to automatically determine operational threshold (conditional on these specific data). 
                 'df'=out) #all results
 
     return(out2)

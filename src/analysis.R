@@ -1,6 +1,6 @@
 ## Main functions for running the analysis.
 ## Craig Brinkerhoff
-## Fall 2023
+## Spring 2024
 
 
 #' Preps hydrography shapefiles into lightweight routing tables. Also extracts monthly water table depths per streamline and estimates bankfull depth for each streamline.
@@ -113,7 +113,7 @@ extractData <- function(path_to_data, huc4, Hbmodel){
   #Convert to more useful units
   nhd$StreamOrde <- nhd$StreamCalc #stream calc handles divergent streams correctly: https://pubs.usgs.gov/of/2019/1096/ofr20191096.pdf
   nhd$Q_cms <- nhd$QBMA * 0.0283 #USGS discharge model
-  nhd$Q_cms_adj <- nhd$QEMA*0.0283 #USGS discharge model adjusted to better match gauges. BUT, this can create 'jumps' in the streamflow simulation, so we don't use it here
+  nhd$Q_cms_adj <- nhd$QEMA*0.0283 #USGS discharge model adjusted to better match gauges. BUT, this can create 'jumps' in the streamflow simulation, so we don't use it in this analysis
   
   #handle Indiana-effected basin stream orders
   if(huc4 %in% indiana_hucs){
@@ -302,7 +302,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, upstreamDF){
     perenniality_vec <- c(perenniality_vec, upstreamDF$exported_perenniality)
   }
 
-  #run vectorized models (functions from ~src/model.R). Also, see manuscript Supplementary Materials S1 for these models
+  #run vectorized models (functions from ~src/model.R), updating each reach's results online. Also, see manuscript Supplementary Materials S1 for these models
   for (i in 1:nrow(nhd_df)) {
     perenniality_vec[i] <- perenniality_func_update(fromNode_vec[i], toNode_vec, perenniality_vec[i], perenniality_vec, order_vec, Q_vec[i], Q_vec) #update perenniality given the upstream classification
     dQ_vec[i] <- getdQ(fromNode_vec[i], toNode_vec, Q_vec[i], Q_vec) #calculate lateral discharge / 'new' stream water / catchment's contribution to discharge
@@ -327,7 +327,7 @@ routeModel <- function(nhd_df, huc4, thresh, err, upstreamDF){
   nhd_df$percAreaEph_reach <- percAreaEph_vec
   nhd_df$TotDASqKm <- Area_vec
   
-  #retroactively re-set small ponds and canals/ditches to non_ephemeral (classed differently above to not affect the downstream routing)
+  #retroactively re-set small ponds and canals/ditches to non_ephemeral (classed differently above to not affect the downstream routing- see manuscript)
   nhd_df$perenniality <- ifelse(nhd_df$perenniality %in% c('canal_ditch', 'small_pond'), 'non_ephemeral', nhd_df$perenniality)
 
   out <- nhd_df %>%
@@ -378,7 +378,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
   for(i in seq(1980,2006,1)){
     precip <- raster::stack(paste0(path_to_data, '/for_ephemeral_project/precip_model/precip.V1.0.',i,'.nc'))
     precip <- terra::rotate(precip) #convert 0-360 lon to -180-180 lon
-    precip <- terra::crop(precip, basin)
+    precip <- terra::crop(precip, basin) #crop to basin
 
     #convert to terra to df
     precip <- terra::rast(precip)
@@ -396,7 +396,7 @@ calcRunoffEff <- function(path_to_data, huc4_c){
   #get long term average precip/yr
   basin$precip_ma_mm_yr <- mean(precip_vec, na.rm=T) #mean annual mm precip / yr
 
-  #Some basins have no USGS gauges and therefore no USGS runoff data. I manually set their annual runoff timeseries to adjacent basins.
+  #Some basins have no USGS gauges and therefore no USGS runoff data. So, we manually set their annual runoff timeseries to adjacent basins.
   basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0904', 17.40769, basin$runoff_ma_mm_yr) #m3/s to mm/yr using HUC4 1005
   basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0420', 412.7192, basin$runoff_ma_mm_yr) #m3/s to mm/yr using HUC4 0402
   basin$runoff_ma_mm_yr <- ifelse(basin$huc4 == '0427', 426.2077, basin$runoff_ma_mm_yr) #m3/s to mm/yr using HUC4 0413
@@ -455,7 +455,7 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
   for(i in seq(1980,2006,1)){
     precip <- raster::stack(paste0(path_to_data, '/for_ephemeral_project/precip_model/precip.V1.0.',i,'.nc'))
     precip <- terra::rotate(precip) #convert 0-360 lon to -180-180 lon
-    precip <- terra::crop(precip, basin)
+    precip <- terra::crop(precip, basin) #crop to basin of focus
 
     #convert to terra to df
     precip <- terra::rast(precip)
@@ -475,7 +475,7 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
        next
      }
      else{
-       #propagate memory for days following runoff events
+       #propagate memory for days following runoff events (see manuscript)
        for(m in 1:length(orig)){
           if(df[m] == 1 & orig[m] == 1){
             for(j in seq(1+m,memory+m,1)){
@@ -541,7 +541,7 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
   for(i in seq(1980,2006,1)){
     precip <- raster::stack(paste0(path_to_data, '/for_ephemeral_project/precip_model/precip.V1.0.',i,'.nc'))
     precip <- terra::rotate(precip) #convert 0-360 lon to -180-180 lon
-    precip <- terra::crop(precip, basin)
+    precip <- terra::crop(precip, basin) #crop to basin of interest
 
     #convert to terra to df
     precip <- terra::rast(precip)
@@ -562,7 +562,7 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
       next
      }
      else{
-       #propagate memory for days following runoff events
+       #propagate memory for days following runoff events (see manuscript)
        for(m in 1:length(orig)){
           if(df[m] == 1 & orig[m] == 1){
             for(j in seq(1+m,memory+m,1)){
@@ -574,7 +574,7 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
     }
 
     flowing_dates <- as.numeric(substr(names(df[df == 1]), 7,8)) #extract months from flowing days
-    mean_flowing_month <- mean(flowing_dates, na.rm=T)
+    mean_flowing_month <- mean(flowing_dates, na.rm=T) #get mean month across all flowing days
     daysFlowingDays[k] <- mean_flowing_month
 
     k <- k + 1
@@ -713,7 +713,7 @@ getResultsExported <- function(nhd_df, huc4, numFlowingDays, datesFlowingDays){
   #water volume ephemeral fraction at outlets
   exportDF <- dplyr::group_by(nhd_df, TerminalPa) %>%
     dplyr::arrange(desc(Q_cms)) %>% 
-    dplyr::slice(1) %>% #only keep reach with max Q, i.e. the outlet per terminal network
+    dplyr::slice(1) %>% #only keep reach with max Q, i.e. the assumed outlet per terminal network. Due to coastal and endorheic reaches, there will be more than one, though often this flow is dominated by one (or sometimes two) mainstems.
     dplyr::ungroup()
 
   #summarise results
