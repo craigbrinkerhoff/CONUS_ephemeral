@@ -282,7 +282,7 @@ We thank Y. Fan Reinfelder, the USGS, the EPA, and many field workers for making
 Authors declare that they have no competing interests.
 
 ### Data and materials availability
-All data sources are available in the manuscript or the supplementary materials. Code used to run our analysis and build our figures is available at https://github.com/craigbrinkerhoff/CONUS_ephemeral and archived at **xxxxxxx**. Model results are archived at **xxxxx**. Note that continental-scale models prioritize capturing broad patterns across large domains, so we caution against over-interpreting results for individual river reaches.
+All data sources are available in the manuscript or the supplementary materials. Code used to run our analysis and build our figures is available at https://github.com/craigbrinkerhoff/CONUS_ephemeral and archived at **xxxx**. Model results are archived at **xxxx**. Note that continental-scale models prioritize capturing broad patterns across large domains, so we caution against over-interpreting results for individual river reaches.
 
 ## Supplementary Materials
 
