@@ -929,10 +929,10 @@ list(
   #UNCERTAINTY ANALYSIS--------------------------------------
   tar_target(mc_samples, seq(1,1000,1)), #setup 1000 monte carlo runs for uncertainty analysis
   tar_target(mcUncertainty_0107, runMonteCarlo('0107', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Merrimack River basin
-  tar_target(mcUncertainty_1703, runMonteCarlo('1703', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Yakima River basin
+  tar_target(mcUncertainty_1703, runMonteCarlo('1703', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Yakima River basin
   tar_target(mcUncertainty_1402, runMonteCarlo('1402', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Gunnison River basin
-  tar_target(mcUncertainty_0311, runMonteCarlo('0311', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Suwanee River basin
-  tar_target(mcUncertainty_1504, runMonteCarlo('1504', threshold, error, validated_wells,validated_Hb, mc_samples), pattern=mc_samples), #Upper Gila River basin
+  tar_target(mcUncertainty_0311, runMonteCarlo('0311', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Suwanee River basin
+  tar_target(mcUncertainty_1504, runMonteCarlo('1504', threshold, error, validated_wells, validated_Hb, mc_samples), pattern=mc_samples), #Upper Gila River basin
   tar_target(mcUncertaintyResults, uncertaintyFigures(path_to_data, shapefile_fin, mcUncertainty_0107, mcUncertainty_1402, mcUncertainty_1703, mcUncertainty_0311, mcUncertainty_1504), deployment="main"), #uncertainty figures and numbers
 
   #GENERATE MANUSCRIPT FIGURES--------------

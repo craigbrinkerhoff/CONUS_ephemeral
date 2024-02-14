@@ -42,35 +42,14 @@ wrangleUSGSephGages <- function(other_sites){
     out <- rbind(out, temp)
   }
 
+  #prep lookup table
+  not_eph_gauges <- readr::read_csv('docs/usgs_skip_gauges.csv') #lookup for gauges that have been manually identified as not 'strictly' ephemeral (and their associated huc4 basins). See ~/docs/README_usgs_eph_gauges.Rmd for this process and notes.
+
   #prep output
   out <- out %>%
     dplyr::left_join(other_sites, by=c('gageID'='short_name')) %>% #get the gauge drainage area
     dplyr::select(c('gageID', 'huc4', 'reference','meas_runoff_m3_s', 'drainageArea_km2', 'num_flowing_dys', 'period_of_record_yrs', 'lon', 'lat')) %>%
-    dplyr::mutate(type = ifelse(gageID %in% c('06268500', #see ~/docs/README_usgs_eph_gages.html for 'eph_int' vs 'eph' was determined. These are the results of that analysis, inputted here manually out of necessity
-                                              '06313700',
-                                              '06425750',
-                                              '06425780',
-                                              '08331660',
-                                              '08477600',
-                                              '08480595',
-                                              '09216527',
-                                              '09216545',
-                                              '09216562',
-                                              '09216565',
-                                              '09216750',
-                                              '09222300',
-                                              '09222400',
-                                              '09235300',
-                                              '09306235',
-                                              '09306240',
-                                              '09508300',
-                                              '09510200',
-                                              '09512450',
-                                              '09512600',
-                                              '09512830',
-                                              '09512860',
-                                              '10250800'), 'eph_int', 'eph')) 
-  
+    dplyr::mutate(type = ifelse(gageID %in% not_eph_gauges$gageID, 'eph_int', 'eph'))
   
   return(out)
 }
@@ -87,7 +66,7 @@ wrangleUSGSephGages <- function(other_sites){
 #' @name wrangleFlowingFieldData
 #' @note data comes from the following field studies (some are hardcoded into this function, but most are saved in the data repo):
 #'    Duke Forest, NC: https://doi.org/10.1002/hyp.11301 (1 years data)
-#'    Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.58 years of data)
+#'    Robinson Forest, KY: https://doi.org/10.1002/ecs2.2654 (0.5 years of data)
 #'    Mohave and Yuma Basins, AZ: https://doi.org/10.1029/2018WR023714 (2-3 years data)
 #'    Reynold's Creek, ID: https://doi.org/10.1029/2001WR000413 (29 years of data) Ephemeral site identification within catchment uses https://doi.org/10.1029/2001WR000420
 #'    Santa Rita Basin, AZ: https://doi.org/10.1029/2006WR005733 (46 years of data)
@@ -108,19 +87,23 @@ wrangleUSGSephGages <- function(other_sites){
 #' @return df of all wrangled field data in uniform form and with # flowing days for ephemeral streams calculated
 wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   #It is difficult to get flow thresholds (as well as flow rounding protocols) to be consistent across these datasets given what is availble in the literature.
-    #Here, we assume it is zero if the data requires a threshold to calculate , otherwise we use the definitions implicit in the published data.
-    #The operational runoff threshold used in our model is one way to be robust against these differences in operational definitons: by fitting a global-scope threshold, we somewhat remove the influence of individual study thresholds on overall results.
+    #Here, we assume it is zero if the data requires a threshold to calculate, otherwise we use the definitions implicit in the published data. See manuscript, but we confirmed to the best of our ability these defintions are similar.
+    #The operational runoff threshold used in our model is one way to be robust against differences in operational definitons: by fitting a global-scope threshold, we somewhat remove the influence of individual study thresholds on overall results, though we stress more data is needed
     #See manuscript for more on this.
   runoff_thresh <- 0
 
   #read in data--------------------------------------------------------
-  walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv'))
-  reynoldsCreek <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ReynoldsCreekData.csv'))
-  mohaveYuma <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/MohaveYumaData.csv'))
-  santaRita <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/SantaRitaData.csv'))
-  kentucky <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/Kentucky.csv'))
-  more_arizona <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/stromberg_etal_2017.csv'))
-  geulph <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ontario.csv'))
+  walnutGulch <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/WalnutGulchData.csv')) #pulled from paper
+  reynoldsCreek <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ReynoldsCreekData.csv')) #downloaded as is
+  mohaveYuma <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/MohaveYumaData.csv')) #pulled from paper
+  santaRita <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/SantaRitaData.csv')) #downloaded as is
+  kentucky <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/Kentucky.csv')) #pulled from paper
+  more_arizona <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/stromberg_etal_2017.csv')) #pulled from paper
+  geulph <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/ontario.csv')) #pulled from paper
+  montoyas <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/montoyas.csv')) #pulled from paper (10 flow events over 7 years- see csv for numbers)
+  dukeForest <- readr::read_csv(paste0(path_to_data, '/for_ephemeral_project/flowingDays_data/dukeForest.csv')) #pulled from paper (flowed 44% of the time per one water year- see csv for 365*0.44)
+
+  locations_approx <- readr::read_csv('data/locations_approx.csv') #approximate locations of field sites (for Fig 3a map).
 
 
 
@@ -128,18 +111,21 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   colnames(mohaveYuma) <- c('site', 'drainage_area_km2', 'elevation_m', 'period_of_record', 'num_flowing_events', 'ma_num_flowing_events', 'reference')
   mohaveYuma$watershed <- substr(mohaveYuma$site, 1, 1)
   mohaveYuma$watershed <- ifelse(mohaveYuma$watershed == 'M', 'mohave', 'yuma')
-  mohaveYuma$period_of_record_yrs <- c(3, 2, 4, 2, 3, 1, 3, 2, 4, 1, 4, 2, 4, 1, 2, 4, 3, 2) #(inputted here manually out of necessity)
+  mohaveYuma$period_of_record_yrs <- c(3, 2, 4, 2, 3, 1, 3, 2, 4, 1, 4, 2, 4, 1, 2, 4, 3, 2) #data (in csv) were downloaded from paper, here we manually add the period of record in yrs for completeness from Table 1 in that paper
   mohaveYuma$num_flowing_days <- ifelse(mohaveYuma$num_flowing_events < 1, 1, mohaveYuma$num_flowing_events)
   mohaveYuma$ma_num_flowing_days <- mohaveYuma$num_flowing_days/(mohaveYuma$period_of_record_yrs)
   mohaveYuma <- mohaveYuma %>%
-    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days','reference'))
 
 
 
   #wrangling walnut gulch (https://doi.org/10.1029/2006WR005733)--------------------------
+  #Note that we only use a subset of instrumented flumes to make analysis quicker. These are manually specified below and are well-distributed across the drainage network.
   walnutGulch <- tidyr::gather(walnutGulch, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 6","Flume 7","Flume 11","Flume 15","Flume 103","Flume 104", "Flume 112", "Flume 121", "Flume 125"))
   walnutGulch$date <- paste0(walnutGulch$Year, '-', walnutGulch$Month, '-', walnutGulch$Day)
   walnutGulch$date <- lubridate::as_date(walnutGulch$date)
+
+  #wrangle
   walnutGulch <- walnutGulch %>%
     dplyr::mutate(year = lubridate::year(date)) %>%
     dplyr::group_by(site) %>% #get no flow stats per sub watershed
@@ -147,17 +133,19 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
                     num_flowing_days = sum(runoff_mm > runoff_thresh),
                     watershed=first(watershed),
                     reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(36900, 9.1, 11.2, 2035, 4.6, 13.4, 14.6, 5912, 28100, 2220, 560, 23500, 3340)*0.004) %>% #see source reference for these numbers (inputted here manually out of necessity)
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='@stoneLongtermRunoffDatabase2008') %>%
-    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
+      dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days','reference'))
 
 
 
   #wrangling Santa Rita (https://doi.org/10.1029/2006WR005733)------------------------
+  #Note that we only use a subset of instrumented flumes to make analysis quicker. These are manually specified below and are well-distributed across the drainage network.
   santaRita <- tidyr::gather(santaRita, key=site, value=runoff_mm, c("Flume 1", "Flume 2", "Flume 3","Flume 4","Flume 5","Flume 6","Flume 7","Flume 8"))
   santaRita$date <- paste0(santaRita$Year, '-', santaRita$Month, '-', santaRita$Day)
   santaRita$date <- lubridate::as_date(santaRita$date)
+
+  #wrangle
   santaRita <- santaRita %>%
     dplyr::mutate(year = lubridate::year(date)) %>%
     dplyr::group_by(site) %>% #get no flow stats per sub watershed
@@ -165,71 +153,64 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
               num_flowing_days = sum(runoff_mm > runoff_thresh),
               watershed=first(watershed),
               reference=first(reference)) %>%
-    dplyr::mutate(drainage_area_km2 = c(4.04, 4.37, 6.81, 4.88, 9.93, 7.6, 2.63, 2.77)*0.004) %>% #see source reference for these numbers (inputted here manually out of necessity)
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='@stoneLongtermRunoffDatabase2008') %>%
-    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
+      dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days','reference'))
   
 
 
   #wrangling reynolds creek (https://doi.org/10.1029/2001WR000413)------------------
   reynoldsCreek$date <- paste0(reynoldsCreek$year, '-', reynoldsCreek$month, '-', reynoldsCreek$day)
   reynoldsCreek$date <- lubridate::as_date(reynoldsCreek$date)
-  reynoldsCreek$drainage_area_km2 <- ifelse(reynoldsCreek$site == 'summitWash', 83*0.01, #km2 (done manually from reference out of necessity)
-                                            ifelse(reynoldsCreek$site == 'flats', 0.9*0.01, #km2 (done manually from reference out of necessity)
-                                                   ifelse(reynoldsCreek$site == 'nancy_gulch',1.3*0.01, 13.4*0.01))) #Km2 (done manually from reference out of necessity)
 
+  #Add drainage areas to runoff data (to back out discharge)
+    #See data repo csv. Drainage areas (in ha) were obtained form Pierson, F. B., Slaughter, C. W., & Cram, Z. K. (2000). Monitoring discharge and suspended sediment, Reynolds Creek experimental watershed, Idaho, USA. Tech. Bull. NWRC‐2000, 8.
+  areaLookUp <- readr::read_csv('data/ReynoldsCreekDrainageAreas.csv')
+  reynoldsCreek <- dplyr::left_join(reynoldsCreek, areaLookUp, by='site')
+  reynoldsCreek$drainage_area_km2 <- reynoldsCreek$drainage_area_ha * 0.01 #ha to km2
+  
+  #wrangle
   reynoldsCreek <- dplyr::group_by(reynoldsCreek, site, date) %>% #hourly to mean daily flow
     dplyr::summarise(watershed=first(watershed),
               site=first(site),
-              runoff_mm = sum(((discharge*1000000000)/(drainage_area_km2*0.01*1000000000000))*60*24), #m3/s to mm/day
-              drainage_area_km2 = mean(drainage_area_km2)) %>%
+              runoff_mm = sum(((discharge*1000000000)/(drainage_area_km2*0.01*1000000000000))*60*24)) %>% #m3/s to mm/day
     dplyr::mutate(year = lubridate::year(date)) %>%
     dplyr::group_by(site) %>% #get no flow stats per sub watershed
     dplyr::summarise(period_of_record_yrs = length(unique(year)),
               num_flowing_days = sum(runoff_mm > runoff_thresh),
-              drainage_area_km2 = mean(drainage_area_km2),
               watershed=first(watershed)) %>%
     dplyr::mutate(ma_num_flowing_days = num_flowing_days / (period_of_record_yrs),
                   reference='@slaughterThirtyfiveYearsResearch2001') %>%
-    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days','reference'))
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days','reference'))
 
 
 
   #wrangling Kentucky Robinson Forest (https://doi.org/10.1002/ecs2.2654)-------------------------
-  kentucky$period_of_record_yrs <- kentucky$period_of_record_dys / 365
+  kentucky$period_of_record_yrs <- kentucky$period_of_record_dys / 365 #only half a year of data
   kentucky$num_flowing_events <- kentucky$perc_record_w_flow*365
-  kentucky$ma_num_flowing_days <- kentucky$num_flowing_events + 2 #field data in catchment only reports 1 or 2 flow events in the non-sampled months (see paper https://doi.org/10.1899/09-060.1)
+  kentucky$ma_num_flowing_days <- kentucky$num_flowing_events + 2 #other field data in catchment only reports 1 or 2 flow events in the non-sampled months (see related paper https://doi.org/10.1899/09-060.1)
 
   kentucky <- kentucky %>%
-    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'drainage_area_km2', 'ma_num_flowing_days', 'reference'))
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
 
 
 
   #add Duke Forest manually (https://doi.org/10.1002/hyp.11301)---------------------------------------
-  dukeForest <- data.frame('watershed'='dukeForest',
-                           'site'='a',
-                           'period_of_record_yrs'=1,
-                           'drainage_area_km2'=3.3*0.01,
-                           'ma_num_flowing_days'=(365*0.44), #(inputted here manually out of necessity)
-                           'reference'='@zimmerBidirectionalStreamGroundwater2017')
+  dukeForest <- dukeForest %>%
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
 
 
 
   #add Montoyas watershed, urban system near Albuquerque, New Mexico manually (https://doi.org/10.1016/j.ejrh.2022.101089)-------------------------------------
-  montoyas <- data.frame('watershed'='montoyas',
-                         'site'='a',
-                         'period_of_record_yrs'=7, #2008-2014
-                         'drainage_area_km2'=142,
-                         'ma_num_flowing_days'=mean(c(2,0,1,0,0,5,2)), #See paper Table 1 for runoff events per year (inputted here manually out of necessity)
-                         'reference'='@schoenerImpactUrbanizationStormwater2022')
+  montoyas <- montoyas %>%
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
 
 
 
   #add additional Arizona data https://doi.org/10.1016/j.jaridenv.2016.12.004-----------------------------------------------------
   more_arizona$ma_num_flowing_days <- 365*more_arizona$perc_record_flowing
   more_arizona <- more_arizona %>%
-    dplyr::select(c('watershed', 'site', 'drainage_area_km2', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
+    dplyr::select(c('watershed', 'site', 'period_of_record_yrs', 'ma_num_flowing_days', 'reference'))
 
 
 
@@ -238,8 +219,7 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   ontario <- data.frame('watershed'=geulph$watershed,
                         'site'=geulph$site,
                         'period_of_record_yrs'=rep(1,nrow(geulph)),
-                        'drainage_area_km2'=geulph$drainage_area_km2,
-                        'ma_num_flowing_days'=geulph$num_flowing_events * 3, #apply equivalent rate over the rest of the year
+                        'ma_num_flowing_days'=geulph$num_flowing_events * 3, #apply equivalent rate over the rest of the year- see manuscript for this assumption (we make a related assumption for kentucky sites above too)
                         'reference'=geulph$reference)
 
 
@@ -254,7 +234,6 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   eph_gages <- data.frame('watershed'=ephemeralQDataset$huc4,
                           'site'=ephemeralQDataset$gageID,
                           'period_of_record_yrs'=ephemeralQDataset$period_of_record_yrs,
-                          'drainage_area_km2'=ephemeralQDataset$drainageArea_km2,
                           'ma_num_flowing_days'=ephemeralQDataset$num_flowing_dys,
                           'reference'=ephemeralQDataset$reference)
 
@@ -262,43 +241,15 @@ wrangleFlowingFieldData <- function(path_to_data, ephemeralQDataset){
   #bring all these data together into single df--------------------------------------
   results_all <- rbind(walnutGulch, santaRita, reynoldsCreek, mohaveYuma, kentucky, dukeForest, more_arizona, montoyas, ontario, eph_gages)
 
-  #wrangle into uniform format
+  #wrangle into uniform format across all datasets
   output <- results_all %>%
     dplyr::group_by(watershed) %>%
     dplyr::summarise(watershed=first(watershed),
                      n_flw_d = mean(ma_num_flowing_days,na.rm=T),  #take catchment average across all flumed reaches (if necessary)
                      num_sample_yrs = round(mean(period_of_record_yrs),0), #mean across catchment reaches (mean of constants, just to propagate value)
-                     drainage_area_km2 = mean(drainage_area_km2),
                      n_sites=n(),
                      reference=first(reference)) %>%
-    #Here we assign approximate lat/lons for the basins (so these can be mapped in the paper figures)
-    #Unfortunately, most of these need to be hardcoded because I had to find them manually
-  dplyr::mutate(lat=c(43.436667,35.8933527,32.31537144,32.5886111,39.783585,36.64778269,36.1027488,35.24500556,33.69421054,33.72920456,36.00475278,36.021599, 43.54667, 32.711123, 31.540278, 33.3333333, 35.228431, 43.187, 37.47305556, 31.83341800, 31.66666667, 33.166667), #pulled from associated papers (general coords- Geulph long is moved ~15km east so it fits in model basin 0427)
-                long=c(-106.419722,-107.4167143,-106.7505587,-104.4213889,-108.189805,-108.1256268,-115.2077774,-115.2989889,-111.541802,-112.1198755,-115.6437917,-78.985034,-80.059, -112.831066, -110.334113, -114.50000000, -106.840627, -116.774, -83.14333333, -110.85286400 , -110.00000000, -114.50000000))
-            #alphabetical list for data the lat/longs that are manually added
-            #1009 USGS
-            #1302 USGS
-            #1303 USGS
-            #1305 USGS
-            #1306 USGS
-            #1405 USGS
-            #1408 USGS
-            #1501 USGS
-            #1503 USGS
-            #1506 USGS
-            #1507 USGS
-            #1606 USGS
-            #Duke Forest
-            #Geulph
-            #Goldwater
-            #Huachuca
-            #Mohave
-            #Montoyas
-            #Reynolds creek
-            #Robinson Forest
-            #Santa Rita
-            #Walnut Gulch
-            #Yuma
+    dplyr::left_join(locations_approx, by='watershed')
   
   return(output)
 }
@@ -366,8 +317,9 @@ flowingValidate <- function(validationData, path_to_data, codes_huc02, combined_
 #'
 #' @return df of all model results (and performance metrics) for the set of tested runoff thresholds
 flowingValidateSensitivityWrapper <- function(flowingFieldData, runoffEffScalar_real, runoffMemory_real, runoff_threshs, path_to_data, combined_runoffEff) {
-    #basins with field data (must be hardcoded)
-    huc4s = c('1009', '1302', '1303', '1306', '1405', '1408', '1501', '1503', '1506', '1507', '1606','0302', '0427', '1507', '1505', '1503', '1302', '1705', '0510', '1505', '1505', '1503')
+    #read in lookup table for basin IDs for this field data
+    not_eph_gauges <- readr::read_csv('data/locations_approx.csv') #lookup for gauges that have been manually identified as not 'strictly' ephemeral (and their associated huc4 basins). See ~/docs/README_usgs_eph_gauges.Rmd for this process and notes.
+    huc4s <- not_eph_gauges$basin
 
     #loop through global-scope operational flow thresholds and validate
     out <- data.frame()

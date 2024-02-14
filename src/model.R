@@ -165,7 +165,7 @@ getPercEph <- function(fromNode, toNode_vec, curr_perr, curr_dQ, curr_dArea, cur
   lateralProperty <- ifelse(property == 'discharge', curr_dQ, curr_dArea)
 
   #Set ephhemeral flag
-  Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1)
+  Ephflag <- ifelse(curr_perr != 'ephemeral', 0, 1) #implicitly removes any influence from foreign streams, canals, ditches, etc. Anything not classed strictly as 'ephemeral'
   
   #if net losing stream (i.e. dQ < 0), set the weight to zero as it's not contributing anything to the stream channel
   lateralProperty <- ifelse(lateralProperty < 0, 0, lateralProperty)

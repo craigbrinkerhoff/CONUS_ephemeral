@@ -470,14 +470,13 @@ calcFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, runof
 
     orig <- df
 
-    # add watershed memory
-     if(memory == 0){
+    # add watershed memory (if desired)
+     if(memory == 0){ #if no memory, skip this process
        next
      }
-     else{
-       #propagate memory for days following runoff events (see manuscript)
+     else{ #if memory, propagate memory for days following runoff events (see manuscript)
        for(m in 1:length(orig)){
-          if(df[m] == 1 & orig[m] == 1){
+          if(df[m] == 1 & orig[m] == 1){ #only add memory days following actual flow days and NOT memory days that have already been added (i.e. orig[i]==1)
             for(j in seq(1+m,memory+m,1)){
               df[j] <- 1
             }
@@ -557,14 +556,13 @@ calcDatesFlowingDays <- function(path_to_data, huc4, runoff_eff, runoff_thresh, 
 
     orig <- df
 
-    # add watershed memory
-     if(memory == 0){
+    # add watershed memory (if desired)
+     if(memory == 0){ #if no memory, skip this process
       next
      }
-     else{
-       #propagate memory for days following runoff events (see manuscript)
+     else{ #if memory, propagate memory for days following runoff events (see manuscript)
        for(m in 1:length(orig)){
-          if(df[m] == 1 & orig[m] == 1){
+          if(df[m] == 1 & orig[m] == 1){ #only add memory days following actual flow days and NOT memory days that have already been added (i.e. orig[i]==1)
             for(j in seq(1+m,memory+m,1)){
               df[j] <- 1
             }

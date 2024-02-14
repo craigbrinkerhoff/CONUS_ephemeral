@@ -9,4 +9,6 @@ render('docs/manuscript/CONUS_ephemeral.Rmd')
 
 This knits a single document containing both the manuscript and its supporting information.
 
-Note that Fig. 1 needs to be manually assembled in Adobe Illustrator to include the insets conceptually describing the model.
+## Notes
+- Fig. 1 needs to be manually assembled in Adobe Illustrator to include the insets conceptually describing the model.
+- Some manual re-formatting was done prior to journal submission, so (for example) line numbers, reference numbers, and data availability statements may change (for example).

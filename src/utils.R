@@ -155,6 +155,9 @@ exportResults <- function(rivNetFin, huc4){
 
   rivNetFin <- dplyr::select(rivNetFin, c('NHDPlusID', 'perenniality', 'percQEph_reach'))
 
+  #recast foreign streams as non-ephemeral for clarity's sake (b/c they aren't factored into the percent ephemeral discharge calcualtions- see eq S1, manuscript, and ~/src/model/getPercEph() function)
+  rivNetFin$perenniality <- ifelse(rivNetFin$perenniality == 'foreign', 'non_ephemeral', rivNetFin$perenniality)
+
   readr::write_csv(rivNetFin, paste0('cache/results_written/results_', huc4, '.csv'))
 
   return('written to file at ~/cache/results_written')
