@@ -84,8 +84,7 @@ mapped_lvl0 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -114,8 +113,7 @@ mapped_lvl1 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 2 downstream basins
@@ -143,8 +141,7 @@ mapped_lvl2 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 3 downstream basins
@@ -172,8 +169,7 @@ mapped_lvl3 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 4 downstream basins
@@ -201,8 +197,7 @@ mapped_lvl4 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 5 downstream basins
@@ -230,8 +225,7 @@ mapped_lvl5 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 6 downstream basins
@@ -259,8 +253,7 @@ mapped_lvl6 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 7 downstream basins
@@ -288,8 +281,7 @@ mapped_lvl7 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 #level 8 downstream basins
@@ -317,8 +309,7 @@ mapped_lvl8 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -347,8 +338,7 @@ mapped_lvl9 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -377,8 +367,7 @@ mapped_lvl10 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -407,8 +396,7 @@ mapped_lvl11 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -437,8 +425,7 @@ mapped_lvl12 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -467,8 +454,7 @@ mapped_lvl13 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -497,8 +483,7 @@ mapped_lvl14 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -527,8 +512,7 @@ mapped_lvl15 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -557,8 +541,7 @@ mapped_lvl16 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -587,8 +570,7 @@ mapped_lvl17 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
@@ -617,8 +599,7 @@ mapped_lvl18 <- tar_map(
       tar_target(numFlowingDays_med_low, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_low, runoffMemory_real)), #calculate number of flowing days under med-low runoff scenario
       tar_target(numFlowingDays_med_high, calcFlowingDays(path_to_data, huc4, runoffEff, flowingDaysCalibrate$thresh, runoffEffScalar_med_high, runoffMemory_real)), #calculate number of flowing days under med-high runoff scenario
   tar_target(meanLengthKM, getMeanReachLen(rivNetFin, huc4)), #calculate mean reach length [km] by basin
-  tar_target(written, exportResults(rivNetFin, huc4)), #write model results to file
-  tar_target(mediaMaps, mediaHydrographyFigure(path_to_data, shapefile_fin, rivNetFin, huc4)) #write media maps to file
+  tar_target(written, exportResults(rivNetFin, huc4)) #write model results to file
 )
 
 
