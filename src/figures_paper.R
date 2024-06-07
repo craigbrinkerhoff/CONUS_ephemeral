@@ -55,7 +55,7 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
   #INSET MAP-----------------------------------------------
   cdf_inset <- ggplot(results, aes(percQ_eph))+
     stat_ecdf(size=2, color='black') +
-    xlab('% ephemeral discharge')+
+    xlab('% Discharge ephemeral')+
     ylab('Probability')+
     theme(axis.title = element_text(size=20),
           axis.text = element_text(family="Futura-Medium", size=18))+
@@ -140,7 +140,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
+    ggtitle(bquote(atop(italic(.(name)~'River:'),italic(.(as.character(round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1)))~km^3*yr^-1~'('*.(as.character(round(results[results$huc4 == huc4,]$percQ_eph,0)))*'%)'))))
+    #ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 1406-------------------------------------------------------------------------------------------
   huc4 <- '1406'
@@ -169,7 +170,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
+    ggtitle(bquote(atop(italic(.(name)~'River:'),italic(.(as.character(round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1)))~km^3*yr^-1~'('*.(as.character(round(results[results$huc4 == huc4,]$percQ_eph,0)))*'%)'))))
+    #ggtitle(paste0(name, ' River:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
 
   ##RIVER NETWORK MAP 0701---------------------------------------------------------------------------
   huc4 <- '0701'
@@ -198,7 +200,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                face='bold'))+
     xlab('')+
     ylab('') +
-    ggtitle(paste0(name, ':\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
+    ggtitle(bquote(atop(italic(.(name)*':'),italic(.(as.character(round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1)))~km^3*yr^-1~'('*.(as.character(round(results[results$huc4 == huc4,]$percQ_eph,0)))*'%)'))))
+    #ggtitle(paste0(name, ':\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
   
 ##RIVER NETWORK MAP 1305-----------------------------------------------------------
   huc4 <- '1305'
@@ -227,7 +230,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
                                 text_cex = 1)+
     xlab('')+
     ylab('') +
-    ggtitle(paste0(name, ' Endorheic:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
+    ggtitle(bquote(atop(italic(.(name)~'Endorheic:'),italic(.(as.character(round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1)))~km^3*yr^-1~'('*.(as.character(round(results[results$huc4 == huc4,]$percQ_eph,0)))*'%)'))))
+    #ggtitle(paste0(name, ' Endorheic:\n', round(results[results$huc4 == huc4,]$QEph_exported_cms*86400*365*1e-9,1), ' km3/yr (', round(results[results$huc4 == huc4,]$percQ_eph,0), '%)'))
   
     ##EXTRACT SHARED LEGEND-----------------
     hydrography_legend <- cowplot::get_legend(hydrography_0107 +
@@ -255,8 +259,8 @@ mainFigureFunction <- function(path_to_data, shapefile_fin, net_0107_results, ne
     "
     comboPlot <- patchwork::wrap_plots(A=results_map, B=hydrography_1305, C=hydrography_1406, D=hydrography_0107+theme(legend.position='none'), E=hydrography_0701, F=hydrography_legend, design=design)
 
-   ggsave('cache/paper_figures/fig1.tiff', comboPlot, width=20, height=20, compression = "lzw", dpi=300)
-   return('see cache/paper_figures/fig1.tiff')
+   ggsave('cache/paper_figures/fig1_proofed.tiff', comboPlot, width=20, height=20, compression = "lzw", dpi=300)
+   return('see cache/paper_figures/fig1_proofed.tiff')
 }
 
 
