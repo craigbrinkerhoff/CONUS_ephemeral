@@ -1,0 +1,67 @@
+---
+title: "Data Guide"
+output: html_document
+date: "`r Sys.Date()`"
+author: 'Craig Brinkerhoff'
+---
+## Guide to all datasets and models used in this analysis
+Everything is in the `CONUS_ephemeral_data` directory.
+
+- Global Monthly Water Table Depth Model
+  - **Filename:** `~/for_ephemeral_project/NAMERICA_WTD_monthlymeans.nc`
+  - **Data:** http://thredds-gfnl.usc.es/thredds/catalog/GLOBALWTDFTP/catalog.html
+  - **Paper:** https://doi.org/10.1073/pnas.1712381114 (detailed in that paper, as well as an eLetter on this paper (older version of the model): https://doi.org/doi:10.1126/science.1229881)
+  - **Resolution/Scale:** 1km
+  - **Years:** 2004-2014
+
+- CONUS Long-Term Gauge-Based Daily Precip Model
+  - **Filenames:** `~/for_ephemeral_project/dailyPrecip_1980_1989.gri`
+    - `~/for_ephemeral_project/dailyPrecip_1990_1999.gri`,
+    - `~/for_ephemeral_project/dailyPrecip_2000_2006.gri`
+  - **Data:** https://psl.noaa.gov/data/gridded/data.unified.daily.conus.html#source
+  - **Paper (validation)**: https://doi.org/10.1029/2007JD009132
+  - **Paper (algorithm):** https://doi.org/10.1175/JHM583.1
+  - **Resolution/Scale:** 28km
+  - 1980-2006
+
+- CONUS hydrography and mean annual discharge model
+  - **Filename:** see README.md
+  - **Link:** https://www.usgs.gov/national-hydrography/nhdplus-high-resolution
+  - **Resolution/Scale:** 1:24,000
+  - **Years:** 1970-2000 (discharge validated against 1970-2018)
+
+- USGS Streamgauge data to validate NHD discharge model and $N_{flw}$ model
+  - **Filename:** `~/cache/training` directory
+  - **Data:** Accessed via `dataRetrieval` R package
+  - **Resolution/Scale:** NA
+
+- USGS HUC4 Runoff Data (weighted average per basin)
+  - **Filename:** `~/for_ephemeral_project/HUC4_runoff_mm.txt`
+  - **Data (indirect):** https://waterwatch.usgs.gov/index.php?id=romap3&sid=w__download
+  - **Paper (concept):** https://doi.org/10.1111/1752-1688.12431
+  - **Resolution/Scale:** HUC4 basins
+  - **Years:** varies, years are from 1904-2021
+
+- EPA/Corps of Engineers Voluntary WOTUS Jurisdictional Determinations Database (downloaded 06/20/2022)
+  - **Filename**: `~/for_ephemeral_project/jds202206201319.csv`
+  - **Data:** https://watersgeo.epa.gov/cwa/CWA-JDs/
+  - **Paper:** NA
+  - **Resolution/Scale:** NA
+
+- In situ data on ephemeral flow frequency
+  - **Filename**: `~/for_ephemeral_project/flowingDays_data/` all field data in here
+  - **Data:** See Table S2
+  - **Paper:** See Table S2
+  - **Resolution/Scale:** NA
+
+- Field-estimated stream type (ephemeral/intermittent/perennial) for select New England streams
+  - **Filename**: `~/for_ephemeral_project/new_england_fieldSites.csv`
+  - **Data:** Summer 2022
+  - **Method followed:** https://files.nc.gov/ncdeq/Water%20Quality/Surface%20Water%20Protection/401/Policies_Guides_Manuals/StreamID_v_4point11_Final_sept_01_2010.pdf
+  - **Resolution/Scale:** NA
+
+- Walnut Gulch Experimental Watershed
+  - **Filename**: `~/exp_catchments/walnut_gulch/` for flume data and basin shapefile
+  - **Data:** https://www.tucson.ars.ag.gov/dap/
+  - **Paper:** NA
+  - **Resolution/Scale:** NA
